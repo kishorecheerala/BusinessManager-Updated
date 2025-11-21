@@ -1,0 +1,19 @@
+
+{
+  "short_name": "Business Manager",
+  "name": "Business Manager",
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#0d9488",
+  "background_color": "#f8fafc",
+  "description": "A comprehensive sales, purchase, and customer management application for a small business."
+}

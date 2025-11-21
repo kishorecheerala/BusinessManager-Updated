@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <script>
+      // IMMEDIATE THEME SETUP - MUST BE FIRST
+      (function() {
+        try {
+          var localTheme = localStorage.getItem('theme');
+          var supportDarkMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          var isDark = localTheme === 'dark' || (!localTheme && supportDarkMode);
+          
+          if (isDark) {
+            document.documentElement.classList.add('dark');
+            // Force background color immediately to prevent white flash
+            document.documentElement.style.backgroundColor = '#0f172a'; // slate-900
+            document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0f172a');
+          } else {
+            document.documentElement.classList.remove('dark');
+            document.documentElement.style.backgroundColor = '#f8fafc'; // slate-50
+            document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#0d9488');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Business Manager</title>
+    <meta name="application-name" content="Business Manager">
+    <meta name="apple-mobile-web-app-title" content="Business Manager">
+    
+    <!-- PWA additions -->
+    <link rel="manifest" href="/pages/manifest.json" />
+    <meta name="theme-color" content="#0d9488">
+    <link rel="apple-touch-icon" href="/vite.svg">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+
+    <style>
+      :root {
+        --primary-color: #0d9488;
+        
+        /* Light Mode Defaults */
+        --sk-bg: #f8fafc;       /* slate-50 */
+        --sk-card-bg: #ffffff;  /* white */
+        --sk-text: #334155;     /* slate-700 */
+        --sk-bone-start: #f1f5f9; /* slate-100 */
+        --sk-bone-end: #e2e8f0;   /* slate-200 */
+      }
+
+      html.dark {
+        /* Dark Mode Overrides */
+        --sk-bg: #0f172a;       /* slate-900 */
+        --sk-card-bg: #1e293b;  /* slate-800 */
+        --sk-text: #cbd5e1;     /* slate-300 */
+        --sk-bone-start: #334155; /* slate-700 */
+        --sk-bone-end: #475569;   /* slate-600 */
+        
+        /* Native Dark Mode Support */
+        color-scheme: dark;
+      }
+
+      /* Critical styles for immediate theme application to prevent flicker */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      }
+
+      body {
+        background-color: var(--sk-bg);
+        color: var(--sk-text);
+        -webkit-font-smoothing: antialiased;
+      }
+
+      /* Robust Skeleton Loader Classes */
+      .sk-app {
+        background-color: var(--sk-bg);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .sk-header {
+        background-color: var(--primary-color); /* Always primary color */
+        padding: 1rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      }
+
+      .sk-nav {
+        background-color: var(--primary-color);
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.1);
+        z-index: 50;
+      }
+
+      .sk-card {
+        background-color: var(--sk-card-bg);
+        border-radius: 0.5rem; /* rounded-lg */
+        padding: 1.5rem; /* p-6 */
+        border-top: 4px solid transparent; /* Keep space but hide color to prevent flicker */
+        box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+      }
+      
+      /* Dark mode specific border for card to match app behavior */
+      html.dark .sk-card {
+        border-color: transparent; 
+      }
+
+      .sk-bone {
+        background-color: var(--sk-bone-start);
+        border-radius: 0.5rem;
+        animation: sk-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+
+      /* Keyframes using variables to adapt automatically */
+      @keyframes sk-pulse {
+        0%, 100% {
+          background-color: var(--sk-bone-start);
+        }
+        50% {
+          background-color: var(--sk-bone-end);
+        }
+      }
+
+      /* Custom Select styles */
+      .custom-select {
+        -webkit-appearance: none;
+        -moz-appearance: none;
+        appearance: none;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+        background-position: right 0.5rem center;
+        background-repeat: no-repeat;
+        background-size: 1.5em 1.5em;
+        padding-right: 2.5rem;
+      }
+      
+      .dark .custom-select {
+         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%2394a3b8' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e");
+      }
+
+      /* Pre-React loader styles */
+      .pre-loader-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        background-color: var(--sk-bg); /* Match theme */
+      }
+      .pre-loader-om {
+        font-size: 8rem; /* 128px */
+        font-family: serif;
+        color: var(--primary-color);
+        animation: pulse-om 2s infinite ease-in-out;
+        will-change: transform, opacity;
+      }
+      @keyframes pulse-om {
+        0%, 100% {
+          transform: scale(1);
+          opacity: 0.7;
+        }
+        50% {
+          transform: scale(1.1);
+          opacity: 1;
+        }
+      }
+    </style>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: '#0d9488', // teal-600
+              secondary: '#2dd4bf', // teal-400
+              accent: '#f59e0b', // amber-500
+              background: '#f8fafc', // slate-50
+              text: '#334155', // slate-700
+              divine_gold: '#f59e0b', // updated to match accent
+            },
+            keyframes: {
+              'fade-in-out': {
+                '0%, 100%': { opacity: 0, transform: 'translateY(-20px)' },
+                '10%, 90%': { opacity: 1, transform: 'translateY(0)' },
+              },
+              'fade-in-fast': {
+                '0%': { opacity: 0 },
+                '100%': { opacity: 1 },
+              },
+              'scale-in': {
+                '0%': { opacity: 0, transform: 'scale(0.95)' },
+                '100%': { opacity: 1, transform: 'scale(1)' },
+              },
+              'slide-up-fade': {
+                '0%': { opacity: 0, transform: 'translateY(10px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
+              'slide-down-fade': {
+                '0%': { opacity: 0, transform: 'translateY(-10px)' },
+                '100%': { opacity: 1, transform: 'translateY(0)' },
+              },
+              'slide-in-right': {
+                '0%': { opacity: 0, transform: 'translateX(20px)' },
+                '100%': { opacity: 1, transform: 'translateX(0)' },
+              },
+              'pop': {
+                '0%': { opacity: 0, transform: 'scale(0.95)' },
+                '100%': { opacity: 1, transform: 'scale(1)' },
+              },
+              'wiggle': {
+                '0%, 100%': { transform: 'rotate(-3deg)' },
+                '50%': { transform: 'rotate(3deg)' },
+              },
+              'pulse-bg': {
+                '0%, 100%': { backgroundColor: '#f1f5f9' }, // slate-100
+                '50%': { backgroundColor: '#e2e8f0' }, // slate-200
+              },
+            },
+            animation: {
+              'fade-in-out': 'fade-in-out 3s ease-in-out forwards',
+              'fade-in-fast': 'fade-in-fast 0.3s ease-out forwards',
+              'scale-in': 'scale-in 0.2s ease-out forwards',
+              'slide-up-fade': 'slide-up-fade 0.4s ease-out forwards',
+              'slide-down-fade': 'slide-down-fade 0.4s ease-out forwards',
+              'slide-in-right': 'slide-in-right 0.3s ease-out forwards',
+              'pop': 'pop 0.3s ease-out forwards',
+              'wiggle': 'wiggle 0.2s ease-in-out 2',
+              'pulse-bg': 'pulse-bg 2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            },
+          },
+        },
+      }
+    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.553.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "jspdf": "https://aistudiocdn.com/jspdf@^2.5.1",
+    "jspdf-autotable": "https://aistudiocdn.com/jspdf-autotable@^3.8.2",
+    "html5-qrcode": "https://aistudiocdn.com/html5-qrcode@^2.3.8",
+    "idb": "https://aistudiocdn.com/idb@^8.0.0",
+    "jsbarcode": "https://aistudiocdn.com/jsbarcode@^3.12.1",
+    "react-dom": "https://aistudiocdn.com/react-dom@^19.2.0"
+  }
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+</head>
+  <body class="bg-background dark:bg-slate-900 text-text dark:text-slate-300">
+    <div id="root">
+      <div class="pre-loader-container">
+        <div class="pre-loader-om">ॐ</div>
+      </div>
+    </div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
