@@ -18,8 +18,6 @@ import AppSkeletonLoader from './components/AppSkeletonLoader';
 import NotificationsPanel from './components/NotificationsPanel';
 import MenuPanel from './components/MenuPanel';
 import ProfileModal from './components/ProfileModal';
-// AskAIModal removed
-// FIX: Import AppMetadataBackup to use for type assertion.
 import { BeforeInstallPromptEvent, Notification, Page, AppMetadataBackup, Theme, SyncStatus } from './types';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useSwipe } from './hooks/useSwipe';
@@ -191,9 +189,45 @@ const MainApp: React.FC = () => {
     isDirtyRef.current = dirty;
   };
   
-  // ... (Backup notification logic omitted for brevity but preserved)
+  // Check for backup reminder on load
+  useEffect(() => {
+      if (isDbLoaded && state.profile) {
+          const lastBackup = state.app_metadata.find(m => m.id === 'lastBackup') as AppMetadataBackup | undefined;
+          const now = new Date();
+          const sevenDays = 7 * 24 * 60 * 60 * 1000;
+          
+          if (!lastBackup || (now.getTime() - new Date(lastBackup.date).getTime() > sevenDays)) {
+               const id = `backup-reminder-${now.toDateString()}`;
+               // Check if we already notified today to avoid spam
+               if (!state.notifications.some(n => n.id === id)) {
+                   dispatch({
+                       type: 'ADD_NOTIFICATION',
+                       payload: {
+                           id,
+                           title: 'Backup Reminder',
+                           message: lastBackup ? 'It has been over a week since your last backup. Please backup your data.' : 'Welcome! Please create your first backup to keep your data safe.',
+                           read: false,
+                           createdAt: now.toISOString(),
+                           type: 'backup',
+                           actionLink: 'DASHBOARD'
+                       }
+                   });
+               }
+          }
+      }
+  }, [isDbLoaded, state.app_metadata, dispatch, state.profile]);
 
-  // ... (Popstate handler omitted for brevity)
+  // Handle Browser Back Button and Search Modal
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      if (isSearchOpen) {
+        setIsSearchOpen(false);
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [isSearchOpen]);
 
   const openSearch = () => {
     window.history.pushState({ modal: 'search' }, '');
@@ -201,7 +235,13 @@ const MainApp: React.FC = () => {
   };
 
   const closeSearch = () => {
-    window.history.back();
+    // Robust Close: If history state is correct, go back (popping the state)
+    // Otherwise force state update. This fixes "Cancel not working" issues.
+    if (window.history.state?.modal === 'search') {
+        window.history.back();
+    } else {
+        setIsSearchOpen(false);
+    }
   };
 
   const setCurrentPage = (page: Page) => {
@@ -234,7 +274,17 @@ const MainApp: React.FC = () => {
     _setCurrentPage(page);
   };
 
-  // ... (beforeunload omitted)
+  // Protect against accidental tab close with unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (isDirtyRef.current) {
+            e.preventDefault();
+            e.returnValue = '';
+        }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
 
 
   const renderPage = () => {

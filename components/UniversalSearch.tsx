@@ -179,7 +179,7 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
                  <button onClick={() => setIsScanning(true)} className="p-3 rounded-full text-primary hover:bg-teal-50 dark:hover:bg-slate-800" aria-label="Scan QR Code">
                     <QrCode size={20} />
                 </button>
-                <button onClick={onClose} className="text-lg font-semibold text-primary">Cancel</button>
+                <button onClick={onClose} className="text-lg font-semibold text-primary dark:text-teal-400">Cancel</button>
             </div>
 
             <div className="flex-grow overflow-y-auto pr-2">
