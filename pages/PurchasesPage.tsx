@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, IndianRupee, Edit, Save, X, Search, Package, Download, ChevronDown, Printer } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, ChevronDown, Printer } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page } from '../types';
 import Card from '../components/Card';
@@ -9,12 +9,10 @@ import ConfirmationModal from '../components/ConfirmationModal';
 import DeleteButton from '../components/DeleteButton';
 import { PurchaseForm } from '../components/AddPurchaseView';
 import AddSupplierModal from '../components/AddSupplierModal';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
-import { logoBase64 } from '../utils/logo';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
+import { generateDebitNotePDF } from '../utils/pdfGenerator';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -22,7 +20,6 @@ const getLocalDateString = (date = new Date()) => {
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
-
 
 interface PurchasesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -37,10 +34,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
     const [purchaseToEdit, setPurchaseToEdit] = useState<Purchase | null>(null);
     const [activePurchaseId, setActivePurchaseId] = useState<string | null>(null);
 
-    // State for adding supplier via modal
     const [isAddSupplierModalOpen, setIsAddSupplierModalOpen] = useState(false);
     
-    // State for supplier detail view
     const [isEditing, setIsEditing] = useState(false);
     const [editedSupplier, setEditedSupplier] = useState<Supplier | null>(null);
     const [paymentModalState, setPaymentModalState] = useState<{ isOpen: boolean, purchaseId: string | null }>({ isOpen: false, purchaseId: null });
@@ -63,7 +58,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                 const supplierToSelect = state.suppliers.find(s => s.id === state.selection.id);
                 if (supplierToSelect) {
                     setSelectedSupplier(supplierToSelect);
-                    setView('list'); // Ensure we are in list/detail view
+                    setView('list');
                 }
             }
             dispatch({ type: 'CLEAR_SELECTION' });
@@ -79,32 +74,27 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         }
     }, [view, selectedSupplier, isEditing, editingScheduleId, setIsDirty]);
 
-    // On unmount, we must always clean up.
     useEffect(() => {
         return () => {
             setIsDirty(false);
         };
     }, [setIsDirty]);
     
-    // Effect to keep selectedSupplier data in sync with global state.
-    // This runs if the global supplier data changes while viewing a supplier.
     useEffect(() => {
         if (selectedSupplier) {
             const currentSupplierData = state.suppliers.find(s => s.id === selectedSupplier.id);
-            // Deep comparison to avoid re-render loops if data hasn't changed
             if (JSON.stringify(currentSupplierData) !== JSON.stringify(selectedSupplier)) {
                 setSelectedSupplier(currentSupplierData || null);
             }
         }
     }, [selectedSupplier?.id, state.suppliers]);
 
-    // Effect to reset the editing form for the supplier's details when the selected supplier changes.
     useEffect(() => {
         if (selectedSupplier) {
             setEditedSupplier(selectedSupplier);
             setActivePurchaseId(null);
         }
-        setIsEditing(false); // Always reset edit mode when supplier changes
+        setIsEditing(false);
     }, [selectedSupplier]);
     
     const handleAddSupplier = (newSupplier: Supplier) => {
@@ -196,112 +186,26 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         dispatch({ type: 'UPDATE_PURCHASE', payload: { oldPurchase: purchaseToEdit, updatedPurchase } });
         showToast("Purchase updated successfully!");
         
-        // Return to the supplier detail view by setting the view to 'list'.
-        // The component will re-render, and since 'selectedSupplier' is still set,
-        // it will correctly display the detail view with the updated data.
         setView('list');
-        setPurchaseToEdit(null); // Clean up the state
+        setPurchaseToEdit(null); 
     };
     
-    const generateDebitNotePDF = async (newReturn: Return) => {
-        const profile = state.profile;
+    const handleDownloadDebitNote = async (newReturn: Return) => {
         const supplier = state.suppliers.find(s => s.id === newReturn.partyId);
-
-        if (!profile || !supplier) {
-            alert("Could not generate PDF. Missing profile or supplier information.");
+        if (!supplier) {
+            alert("Supplier not found.");
             return;
         }
-
-        const doc = new jsPDF();
-        
-        // FIX: Removed logo from non-customer-facing document.
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(20);
-        doc.text('DEBIT NOTE', 105, 20, { align: 'center' });
-        
-        let currentY = 35;
-        
-        doc.setFontSize(18);
-        doc.text(profile.name, 14, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        const addressLines = doc.splitTextToSize(profile.address, 80);
-        doc.text(addressLines, 14, currentY + 5);
-        let leftY = currentY + 5 + (addressLines.length * 5);
-        if (profile.phone) { doc.text(`Phone: ${profile.phone}`, 14, leftY); leftY += 5; }
-        if (profile.gstNumber) { doc.text(`GSTIN: ${profile.gstNumber}`, 14, leftY); }
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('To:', 120, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(supplier.name, 120, currentY + 5);
-        const supplierAddressLines = doc.splitTextToSize(supplier.location, 80);
-        doc.text(supplierAddressLines, 120, currentY + 10);
-        let rightY = currentY + 10 + (supplierAddressLines.length * 5);
-
-        currentY = Math.max(leftY, rightY) + 15;
-        
-        doc.setDrawColor(100);
-        doc.line(14, currentY, 196, currentY);
-        currentY += 8;
-
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Debit Note No:`, 14, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(newReturn.id, 55, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Date:`, 120, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(new Date(newReturn.returnDate).toLocaleDateString(), 135, currentY);
-        currentY += 6;
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Original Inv. No:`, 14, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(newReturn.referenceId, 55, currentY);
-        currentY += 10;
-        
-        autoTable(doc, {
-            startY: currentY,
-            head: [['#', 'Description', 'Qty', 'Rate', 'Amount']],
-            body: newReturn.items.map((item, index) => [
-                index + 1,
-                item.productName,
-                item.quantity,
-                `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
-                `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [13, 148, 136] },
-            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
-        });
-
-        currentY = (doc as any).lastAutoTable.finalY + 10;
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Total Return Value:', 140, currentY, { align: 'right' });
-        doc.text(`Rs. ${Number(newReturn.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, currentY, { align: 'right' });
-        
-        if (newReturn.notes) {
-            currentY += 15;
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Notes:', 14, currentY);
-            doc.setFont('helvetica', 'normal');
-            currentY += 5;
-            const notesLines = doc.splitTextToSize(newReturn.notes, 182);
-            doc.text(notesLines, 14, currentY);
+        try {
+            const doc = await generateDebitNotePDF(newReturn, supplier, state.profile);
+            doc.save(`DebitNote-${newReturn.id}.pdf`);
+        } catch (e) {
+            console.error("PDF Error", e);
+            showToast("Failed to generate PDF", 'info');
         }
-        
-        currentY = doc.internal.pageSize.height - 30;
-        doc.line(130, currentY, 196, currentY);
-        currentY += 5;
-        doc.text('Authorised Signatory', 163, currentY, { align: 'center' });
-
-        doc.save(`DebitNote-${newReturn.id}.pdf`);
     };
 
     const renderContent = () => {
-        // Highest priority views: forms for adding/editing purchases
         if (view === 'add_purchase' || view === 'edit_purchase') {
         return (
                 <PurchaseForm
@@ -318,7 +222,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             );
         }
         
-        // View for a selected supplier's details
         if (selectedSupplier) {
             const supplierPurchases = state.purchases.filter(p => p.supplierId === selectedSupplier.id);
             const supplierReturns = state.returns.filter(r => r.type === 'SUPPLIER' && r.partyId === selectedSupplier.id);
@@ -594,7 +497,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                     <Edit size={16} />
                                                 </button>
                                                 <button 
-                                                    onClick={() => generateDebitNotePDF(ret)} 
+                                                    onClick={() => handleDownloadDebitNote(ret)} 
                                                     className="p-2 text-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/30 rounded-full" 
                                                     aria-label="Download Debit Note"
                                                 >
@@ -620,7 +523,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             );
         }
         
-        // Default 'list' view: Show supplier list
         const filteredSuppliers = state.suppliers.filter(supplier =>
             supplier.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             supplier.phone.includes(searchTerm) ||
@@ -642,8 +544,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                         isOpen={isBatchBarcodeModalOpen}
                         onClose={() => setIsBatchBarcodeModalOpen(false)}
                         purchaseItems={lastPurchase.items}
-                        businessName={state.profile?.name || 'Your Business'}
-                        title="Print Barcode Labels (New Purchase)"
+                        businessName={state.profile?.name || 'Business Manager'}
+                        title="Batch Barcode Print"
                     />
                 )}
                 
