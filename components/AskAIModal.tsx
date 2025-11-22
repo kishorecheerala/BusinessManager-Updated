@@ -37,14 +37,18 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Safe access to process.env.API_KEY
+  // Safe access to API Key
   const getApiKey = () => {
     try {
-        // This is often replaced by the bundler at build time
-        return process.env.API_KEY;
+        // Guideline: The API key must be obtained exclusively from process.env.API_KEY
+        // Check process.env (if replaced by bundler)
+        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            return process.env.API_KEY;
+        }
     } catch (e) {
         return undefined;
     }
+    return undefined;
   };
 
   // Check for API key availability on open
@@ -70,12 +74,14 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                     return [...prev, { 
                         id: 'sys-error-init', 
                         role: 'model', 
-                        text: "⚠️ Missing API Key. To use AI features, please set the API_KEY environment variable in your deployment settings.",
+                        text: "⚠️ Missing API Key. Please configure 'API_KEY' in your environment variables.",
                         isError: true 
                     }];
                 });
             } else {
                 setIsEnvConfigured(true);
+                // If key exists, remove any previous error messages about missing key
+                setMessages(prev => prev.filter(m => !m.text.includes("Missing API Key")));
             }
         };
         checkConfig();
@@ -185,16 +191,16 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
              errorText = "Please configure your API Key to use the assistant.";
              setShowKeyButton(true);
           } else {
-             errorText = "Invalid or Missing API Key. Please check your Vercel environment variables and redeploy.";
+             errorText = "Invalid or Missing API Key. Please check your environment variables and redeploy.";
              setShowKeyButton(false);
              setIsEnvConfigured(false);
           }
       } else if (error.message === "API_KEY_MISSING_PERMANENT") {
-             errorText = "Missing API Key. To use AI features, please set the API_KEY environment variable in your deployment settings.";
+             errorText = "Missing API Key. Please set 'API_KEY' in your environment variables.";
              setShowKeyButton(false);
              setIsEnvConfigured(false);
       } else if (error.message?.includes("API key")) {
-             errorText = "The configured API Key seems invalid. Please check your Vercel settings.";
+             errorText = "The configured API Key seems invalid. Please check your settings.";
              setIsEnvConfigured(false);
       } else if (error.message?.includes("Requested entity was not found")) {
           // Specific handling for race condition mentioned in guidelines
@@ -288,7 +294,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyPress}
-                    placeholder={isEnvConfigured || showKeyButton ? "Ask about sales, stock, or profit..." : "Setup Required: Set API_KEY env var"}
+                    placeholder={isEnvConfigured || showKeyButton ? "Ask about sales, stock, or profit..." : "Setup Required: API_KEY Missing"}
                     className="flex-grow bg-transparent border-none focus:ring-0 resize-none text-sm max-h-24 py-2 px-2 dark:text-white disabled:cursor-not-allowed"
                     rows={1}
                     disabled={(!isEnvConfigured && !showKeyButton) || isLoading}
