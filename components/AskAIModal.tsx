@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Sparkles, Bot, User, Loader2, Key } from 'lucide-react';
+import { X, Send, Sparkles, Bot, User, Loader2, Key, AlertTriangle } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { useAppContext } from '../context/AppContext';
 import Card from './Card';
@@ -36,13 +36,22 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
     scrollToBottom();
   }, [messages, isOpen]);
 
-  // Check for API key availability on open, but don't error out yet
+  // Check for API key availability on open
   useEffect(() => {
     const aistudio = (window as any).aistudio;
     if (isOpen && aistudio) {
-        aistudio.hasSelectedApiKey().then((hasKey: boolean) => {
-            if (!hasKey) setShowKeyButton(true);
-        });
+        // Use a timeout to avoid blocking initial render if this promise hangs
+        const checkKey = async () => {
+            try {
+                const hasKey = await aistudio.hasSelectedApiKey();
+                if (!hasKey) {
+                    setShowKeyButton(true);
+                }
+            } catch (e) {
+                console.warn("Failed to check API key status", e);
+            }
+        };
+        checkKey();
     }
   }, [isOpen]);
 
@@ -63,17 +72,27 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
       - Total Products: ${state.products.length}
       - Low Stock Items: ${lowStockItems || 'None'}
       
-      Answer questions based on this data. Be concise and helpful.
+      Answer questions based on this data. Be concise and helpful. Do not use markdown formatting like bold or italics, just plain text.
     `;
   };
 
   const handleSelectKey = async () => {
       const aistudio = (window as any).aistudio;
       if (aistudio) {
-          await aistudio.openSelectKey();
-          setShowKeyButton(false);
-          // Optional: Retry the last action or just let the user type again
-          setMessages(prev => [...prev, { id: Date.now().toString(), role: 'model', text: "API Key updated. You can ask me a question now." }]);
+          try {
+            await aistudio.openSelectKey();
+            setShowKeyButton(false);
+            // Reset error message if the last message was an error asking for key
+            setMessages(prev => {
+                const last = prev[prev.length - 1];
+                if (last.isError && last.text.includes("Configure")) {
+                    return prev.slice(0, -1);
+                }
+                return prev;
+            });
+          } catch (e) {
+              console.error("Failed to open key selector", e);
+          }
       }
   };
 
@@ -87,16 +106,23 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
     setShowKeyButton(false);
 
     try {
-      // Check if we need to prompt for key first
+      // Check environment specific API key handler
       const aistudio = (window as any).aistudio;
       if (aistudio) {
           const hasKey = await aistudio.hasSelectedApiKey();
           if (!hasKey) {
-              throw new Error("API Key not selected");
+              throw new Error("API_KEY_MISSING");
           }
       }
 
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      // Initialize client just in time
+      // process.env.API_KEY is expected to be injected by the environment
+      const apiKey = process.env.API_KEY;
+      if (!apiKey && aistudio) {
+           throw new Error("API_KEY_MISSING");
+      }
+
+      const ai = new GoogleGenAI({ apiKey: apiKey || '' }); // Pass empty string if missing to let it fail with a clear error from SDK or catch block
       const systemInstruction = generateSystemContext();
       
       const chat = ai.chats.create({
@@ -118,8 +144,13 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
       console.error("AI Error:", error);
       let errorText = "Sorry, I encountered an error connecting to the AI service.";
       
-      if (error.message === "API Key not selected" || ((window as any).aistudio && !process.env.API_KEY)) {
+      // Handle specific error cases
+      if (error.message === "API_KEY_MISSING" || error.message?.includes("API key") || error.toString().includes("API key")) {
           errorText = "Please configure your API Key to use the assistant.";
+          setShowKeyButton(true);
+      } else if (error.message?.includes("Requested entity was not found")) {
+          // Specific handling for race condition mentioned in guidelines
+          errorText = "API Key configuration seems invalid. Please try selecting it again.";
           setShowKeyButton(true);
       }
 
@@ -166,10 +197,17 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                             : 'bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
                     }`}>
                         <div className="flex items-center gap-2 mb-1 opacity-70 text-[10px] font-bold uppercase tracking-wider">
-                            {msg.role === 'user' ? <User size={10} /> : <Bot size={10} />}
+                            {msg.role === 'user' ? <User size={10} /> : msg.isError ? <AlertTriangle size={10} /> : <Bot size={10} />}
                             {msg.role === 'user' ? 'You' : 'Assistant'}
                         </div>
                         <div className="text-sm leading-relaxed whitespace-pre-wrap">{msg.text}</div>
+                        {msg.isError && showKeyButton && (
+                             <div className="mt-2">
+                                <Button onClick={handleSelectKey} variant="secondary" className="bg-white border border-red-200 text-red-700 hover:bg-red-50 text-xs py-1 px-2 h-auto">
+                                    <Key size={12} className="mr-1" /> Configure Key
+                                </Button>
+                             </div>
+                        )}
                     </div>
                 </div>
             ))}
@@ -182,20 +220,19 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                 </div>
             )}
             
-            {showKeyButton && (
-                <div className="flex justify-center mt-4">
-                    <Button onClick={handleSelectKey} variant="secondary" className="bg-yellow-100 text-yellow-800 hover:bg-yellow-200 border border-yellow-300">
-                        <Key size={16} className="mr-2" />
-                        Configure API Key
-                    </Button>
-                </div>
-            )}
-            
             <div ref={messagesEndRef} />
         </div>
 
         {/* Input Area */}
         <div className="p-3 bg-white dark:bg-slate-800 border-t dark:border-slate-700 shrink-0">
+            {showKeyButton && messages.length === 1 && (
+                 <div className="mb-2 flex justify-center">
+                    <Button onClick={handleSelectKey} className="w-full bg-yellow-500 hover:bg-yellow-600 text-white">
+                        <Key size={16} className="mr-2" />
+                        Connect Google Account (API Key)
+                    </Button>
+                 </div>
+            )}
             <div className="flex gap-2 items-end bg-gray-100 dark:bg-slate-900 p-2 rounded-xl border border-gray-200 dark:border-slate-700 focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all">
                 <textarea 
                     value={input}
