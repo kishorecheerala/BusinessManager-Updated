@@ -5,7 +5,9 @@
 // Add your Vercel URL (https://kishore-business-manager.vercel.app) to "Authorized JavaScript origins"
 // ENSURE NO TRAILING SLASH at the end of the URL in Google Console (e.g., use .app NOT .app/).
 const CLIENT_ID = '732045270886-84cr2t9q71lgttqgdn1jqu9f7ub5qfo3.apps.googleusercontent.com'.trim(); 
-const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+
+// Updated Scopes: Includes Drive File access AND User Profile/Email access
+const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 
 // Folder name in Google Drive
 const APP_FOLDER_NAME = 'BusinessManager_AppData';
@@ -59,11 +61,11 @@ export const initGoogleAuth = (callback: (response: any) => void) => {
              msg += "4. OR click 'Publish App' to allow anyone.";
         } else {
              msg += "CONFIGURATION ERROR\n\n";
-             msg += "If you see 'Error 400: invalid_request', you must allow this specific URL in Google Cloud Console.\n\n";
-             msg += "1. Copy this URL:\n";
+             msg += "If you see 'Error 400: invalid_request':\n";
+             msg += "1. Ensure the URL below is in Google Cloud Console > Authorized JavaScript origins:\n";
              msg += `${currentOrigin}\n\n`;
-             msg += "2. Paste it into 'Authorized JavaScript origins' in Google Cloud Console.\n";
-             msg += "3. Ensure there is NO trailing slash (/) at the end.\n";
+             msg += "2. Ensure there is NO trailing slash (/) at the end of the URL in the console.\n";
+             msg += "3. Wait 10 minutes if you recently changed settings.";
         }
 
         alert(msg);
@@ -146,8 +148,17 @@ export const downloadFile = async (accessToken: string, fileId: string) => {
 };
 
 export const getUserInfo = async (accessToken: string) => {
-  const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-    headers: { 'Authorization': `Bearer ${accessToken}` },
-  });
-  return await response.json();
+  try {
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { 'Authorization': `Bearer ${accessToken}` },
+    });
+    if (!response.ok) {
+        throw new Error(`Failed to fetch user info: ${response.status}`);
+    }
+    return await response.json();
+  } catch (e) {
+    console.error("Error fetching user info:", e);
+    // Return a fallback object to prevent app crashes
+    return { name: 'Google User', email: 'User', picture: '' }; 
+  }
 };
