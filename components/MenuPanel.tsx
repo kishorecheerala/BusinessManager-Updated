@@ -77,10 +77,13 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                     </button>
                     <button
                         onClick={() => { googleSignOut(); onClose(); }}
-                        className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600"
+                        className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600 group"
                     >
                         <LogOut className="w-5 h-5" />
-                        <span className="font-semibold text-sm">Sign Out</span>
+                        <div>
+                            <span className="font-semibold text-sm block">Sign Out & Switch</span>
+                            <span className="text-[10px] opacity-70 group-hover:opacity-100">Clears local data</span>
+                        </div>
                     </button>
                     </>
                 ) : (

@@ -68,7 +68,8 @@ type Action =
   | { type: 'REPLACE_COLLECTION'; payload: { storeName: StoreName, data: any[] } }
   | { type: 'SET_GOOGLE_USER'; payload: GoogleUser | null }
   | { type: 'SET_SYNC_STATUS'; payload: SyncStatus }
-  | { type: 'ADD_AUDIT_LOG'; payload: AuditLogEntry };
+  | { type: 'ADD_AUDIT_LOG'; payload: AuditLogEntry }
+  | { type: 'RESET_APP' };
 
 
 const getInitialTheme = (): Theme => {
@@ -108,6 +109,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return { ...state, ...action.payload };
     case 'SET_THEME':
         return { ...state, theme: action.payload };
+    case 'RESET_APP':
+        return { ...initialState, theme: state.theme, installPromptEvent: state.installPromptEvent };
     case 'REPLACE_COLLECTION':
         return { ...state, [action.payload.storeName]: action.payload.data };
     case 'SET_NOTIFICATIONS':
@@ -464,10 +467,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }
   };
 
-  const googleSignOut = () => {
+  const googleSignOut = async () => {
+    // 1. Clear Local Database to implement Clean Slate protocol
+    await db.clearDatabase();
+
+    // 2. Reset App State (this clears data in memory)
+    dispatch({ type: 'RESET_APP' });
+
+    // 3. Clear User Session
     dispatch({ type: 'SET_GOOGLE_USER', payload: null });
     dispatch({ type: 'SET_SYNC_STATUS', payload: 'idle' });
-    showToast("Signed out");
+    
+    showToast("Signed out. Local data cleared.");
   };
 
   // Debounced Auto-Sync on Data Change

@@ -102,3 +102,10 @@ export async function importData(data: any): Promise<void> {
     
     await tx.done;
 }
+
+export async function clearDatabase(): Promise<void> {
+  const db = await getDb();
+  const tx = db.transaction(STORE_NAMES, 'readwrite');
+  await Promise.all(STORE_NAMES.map(storeName => tx.objectStore(storeName).clear()));
+  await tx.done;
+}
