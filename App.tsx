@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Home, Users, ShoppingCart, Package, FileText, Undo2, Boxes, Search, HelpCircle, Bell, Menu, Plus, UserPlus, PackagePlus, Download, X, Sun, Moon, Cloud, CloudOff, RefreshCw } from 'lucide-react';
+import { Home, Users, ShoppingCart, Package, FileText, Undo2, Boxes, Search, HelpCircle, Bell, Menu, Plus, UserPlus, PackagePlus, Download, X, Sun, Moon, Cloud, CloudOff, RefreshCw, Sparkles } from 'lucide-react';
 
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -18,6 +18,7 @@ import AppSkeletonLoader from './components/AppSkeletonLoader';
 import NotificationsPanel from './components/NotificationsPanel';
 import MenuPanel from './components/MenuPanel';
 import ProfileModal from './components/ProfileModal';
+// AskAIModal removed
 // FIX: Import AppMetadataBackup to use for type assertion.
 import { BeforeInstallPromptEvent, Notification, Page, AppMetadataBackup, Theme, SyncStatus } from './types';
 import { useOnClickOutside } from './hooks/useOnClickOutside';

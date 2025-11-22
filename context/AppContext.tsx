@@ -83,6 +83,18 @@ const getInitialTheme = (): Theme => {
   return 'light';
 };
 
+const getInitialGoogleUser = (): GoogleUser | null => {
+  try {
+    const stored = localStorage.getItem('googleUser');
+    if (stored) {
+        return JSON.parse(stored);
+    }
+  } catch (e) {
+    console.error("Failed to parse stored google user", e);
+  }
+  return null;
+};
+
 const initialState: AppState = {
   customers: [],
   suppliers: [],
@@ -99,7 +111,7 @@ const initialState: AppState = {
   installPromptEvent: null,
   pin: null,
   theme: getInitialTheme(),
-  googleUser: null,
+  googleUser: getInitialGoogleUser(),
   syncStatus: 'idle',
 };
 
@@ -396,6 +408,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         accessToken: accessToken
       };
       
+      localStorage.setItem('googleUser', JSON.stringify(user)); // Persist user
       dispatch({ type: 'SET_GOOGLE_USER', payload: user });
       await performSync(accessToken);
       dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
@@ -474,7 +487,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // 2. Reset App State (this clears data in memory)
     dispatch({ type: 'RESET_APP' });
 
-    // 3. Clear User Session
+    // 3. Clear Persistence
+    localStorage.removeItem('googleUser');
+
+    // 4. Clear User Session
     dispatch({ type: 'SET_GOOGLE_USER', payload: null });
     dispatch({ type: 'SET_SYNC_STATUS', payload: 'idle' });
     
@@ -576,3 +592,4 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 };
 
 export const useAppContext = () => useContext(AppContext);
+    
