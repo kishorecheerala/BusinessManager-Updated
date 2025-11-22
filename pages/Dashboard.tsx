@@ -46,25 +46,6 @@ const MetricCard: React.FC<{
     </div>
 );
 
-const FinancialColumn = ({ title, sales, purchases, highlight = false, delay = 0 }: any) => (
-    <div 
-        className={`p-5 flex flex-col justify-center gap-3 h-full animate-pop ${highlight ? 'bg-teal-50/50 dark:bg-teal-900/10' : ''}`}
-        style={{ animationDelay: `${delay}ms` }}
-    >
-        <h3 className={`text-sm font-extrabold uppercase tracking-wider border-b pb-2 mb-1 ${highlight ? 'text-teal-800 border-teal-200 dark:text-teal-300 dark:border-teal-800' : 'text-gray-500 border-gray-200 dark:text-gray-400 dark:border-slate-700'}`}>{title}</h3>
-        <div className="space-y-4">
-            <div>
-                <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Sales</p>
-                <p className={`text-2xl sm:text-3xl font-bold ${highlight ? 'text-teal-700 dark:text-teal-300' : 'text-gray-800 dark:text-white'}`}>₹{sales.toLocaleString('en-IN')}</p>
-            </div>
-            <div>
-                 <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-1">Purchases</p>
-                 <p className={`text-lg sm:text-xl font-semibold ${highlight ? 'text-teal-600/90 dark:text-teal-400/90' : 'text-gray-600 dark:text-gray-300'}`}>₹{purchases.toLocaleString('en-IN')}</p>
-            </div>
-        </div>
-    </div>
-);
-
 const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers: Customer[], purchases: Purchase[], returns: Return[] }> = ({ sales, products, customers, purchases, returns }) => {
     const insights = useMemo(() => {
         const list: { icon: React.ElementType, text: string, color: string, type: string }[] = [];
@@ -789,10 +770,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         e.target.value = ''; // Reset input to allow re-selection
     };
 
-    const currentPeriodLabel = selectedMonth === 'all' 
-        ? `Full Year ${selectedYear}` 
-        : `${monthOptions.find(m => m.value === selectedMonth)?.label.substring(0, 3)} ${selectedYear}`;
-
     return (
         <div className="space-y-6 animate-fade-in-fast">
             <DataImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
@@ -843,57 +820,26 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             {/* New Smart Analyst AI Card (Moved Top) */}
             <SmartAnalystCard sales={sales} products={products} customers={customers} purchases={purchases} returns={returns} />
             
-            {/* Combined Financial Performance Matrix */}
-            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-100 dark:border-slate-700 overflow-hidden">
-                {/* Header of Combined Card */}
-                <div className="bg-gray-50 dark:bg-slate-800/50 p-4 border-b border-gray-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-center gap-3">
-                    <h2 className="text-lg font-bold text-gray-700 dark:text-gray-200 flex items-center gap-2">
-                        <TrendingUp className="w-5 h-5 text-teal-600" />
-                        Financial Overview
-                    </h2>
-                    {/* Selectors moved inside card header */}
-                    <div className="flex items-center gap-2 bg-white dark:bg-slate-700/50 p-1 rounded-lg shadow-sm border border-gray-200 dark:border-slate-600">
-                         <select 
-                            value={selectedMonth} 
-                            onChange={(e) => setSelectedMonth(e.target.value)} 
-                            className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
-                            aria-label="Select Month for Stats"
-                        >
-                            {monthOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                        </select>
-                        <div className="h-4 w-px bg-gray-300 dark:bg-slate-500"></div>
-                        <select 
-                            value={selectedYear} 
-                            onChange={(e) => setSelectedYear(e.target.value)} 
-                            className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
-                            aria-label="Select Year for Stats"
-                        >
-                            {getYears.map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
-                    </div>
-                </div>
-
-                {/* Unified Grid of Financial Columns */}
-                <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x dark:divide-slate-700">
-                    <FinancialColumn 
-                        title="All Time" 
-                        sales={stats.allTimeSales} 
-                        purchases={stats.allTimePurchases}
-                        delay={0} 
-                    />
-                    <FinancialColumn 
-                        title={`Year (${selectedYear})`} 
-                        sales={stats.yearSalesTotal} 
-                        purchases={stats.yearPurchasesTotal}
-                        delay={100} 
-                    />
-                    <FinancialColumn 
-                        title={currentPeriodLabel} 
-                        sales={stats.monthSalesTotal} 
-                        purchases={stats.monthPurchasesTotal}
-                        highlight={true}
-                        delay={200}
-                    />
+            {/* Toolbar for Period Selectors */}
+            <div className="flex justify-end items-center mb-1">
+                 <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                     <select 
+                        value={selectedMonth} 
+                        onChange={(e) => setSelectedMonth(e.target.value)} 
+                        className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
+                        aria-label="Select Month for Stats"
+                    >
+                        {monthOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
+                    </select>
+                    <div className="h-4 w-px bg-gray-300 dark:bg-slate-600"></div>
+                    <select 
+                        value={selectedYear} 
+                        onChange={(e) => setSelectedYear(e.target.value)} 
+                        className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
+                        aria-label="Select Year for Stats"
+                    >
+                        {getYears.map(y => <option key={y} value={y}>{y}</option>)}
+                    </select>
                 </div>
             </div>
 
