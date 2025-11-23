@@ -1,14 +1,17 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
-import { generateThermalInvoicePDF } from '../utils/pdfGenerator';
+import { logoBase64 } from '../utils/logo';
+import DateInput from '../components/DateInput';
 
 
 const getLocalDateString = (date = new Date()) => {
@@ -17,6 +20,16 @@ const getLocalDateString = (date = new Date()) => {
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const fetchImageAsBase64 = (url: string): Promise<string> =>
+  fetch(url)
+    .then(response => response.blob())
+    .then(blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    }));
 
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -30,7 +43,7 @@ const AddCustomerModal: React.FC<{
     onSave: () => void;
     onCancel: () => void;
 }> = React.memo(({ newCustomer, onInputChange, onSave, onCancel }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
+    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast">
         <Card title="Add New Customer" className="w-full max-w-md animate-scale-in">
             <div className="space-y-4">
                 <div>
@@ -86,7 +99,7 @@ const ProductSearchModal: React.FC<{
     const [productSearchTerm, setProductSearchTerm] = useState('');
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast">
           <Card className="w-full max-w-lg animate-scale-in">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold">Select Product</h2>
@@ -132,55 +145,45 @@ const QRScannerModal: React.FC<{
 }> = ({ onClose, onScanned }) => {
     const [scanStatus, setScanStatus] = useState<string>("Initializing camera...");
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
-    const scannerId = "qr-reader-sales";
 
     useEffect(() => {
-        // Cleanup existing instance if any (fixes overlap issues on re-render)
-        const container = document.getElementById(scannerId);
-        if (container) container.innerHTML = "";
-
-        html5QrCodeRef.current = new Html5Qrcode(scannerId);
+        html5QrCodeRef.current = new Html5Qrcode("qr-reader-sales");
         setScanStatus("Requesting camera permissions...");
 
+        const qrCodeSuccessCallback = (decodedText: string) => {
+            if (html5QrCodeRef.current?.isScanning) {
+                html5QrCodeRef.current.stop().then(() => {
+                    onScanned(decodedText);
+                }).catch(err => {
+                    console.error("Error stopping scanner", err);
+                    // Still call onScanned even if stopping fails, to proceed with logic
+                    onScanned(decodedText);
+                });
+            }
+        };
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-        html5QrCodeRef.current.start(
-            { facingMode: "environment" }, 
-            config, 
-            (decodedText) => {
-                // Success callback
-                onScanned(decodedText);
-                // Stop scanning immediately on success
-                if (html5QrCodeRef.current?.isScanning) {
-                    html5QrCodeRef.current.stop().catch(console.error);
-                }
-            }, 
-            (errorMessage) => {
-                // Ignore parse errors, they spam the console
-            }
-        ).then(() => {
-            setScanStatus("Scanning for QR Code...");
-        }).catch(err => {
-            setScanStatus(`Camera Error: ${err}. Please check permissions.`);
-            console.error("Camera start failed.", err);
-        });
+        html5QrCodeRef.current.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, undefined)
+            .then(() => setScanStatus("Scanning for QR Code..."))
+            .catch(err => {
+                setScanStatus(`Camera Permission Error. Please allow camera access for this site in your browser's settings.`);
+                console.error("Camera start failed.", err);
+            });
             
         return () => {
             if (html5QrCodeRef.current?.isScanning) {
-                html5QrCodeRef.current.stop().then(() => {
-                    html5QrCodeRef.current?.clear();
-                }).catch(console.error);
+                html5QrCodeRef.current.stop().catch(err => console.error("Cleanup stop scan failed.", err));
             }
         };
     }, [onScanned]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex flex-col items-center justify-center z-[110] p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4 animate-fade-in-fast">
             <Card title="Scan Product QR Code" className="w-full max-w-md relative animate-scale-in">
-                 <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors z-10">
+                 <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
                     <X size={20}/>
                  </button>
-                <div id={scannerId} className="w-full mt-4 rounded-lg overflow-hidden border bg-black min-h-[250px]"></div>
+                <div id="qr-reader-sales" className="w-full mt-4 rounded-lg overflow-hidden border"></div>
                 <p className="text-center text-sm my-2 text-gray-600 dark:text-gray-400">{scanStatus}</p>
             </Card>
         </div>
@@ -428,16 +431,116 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const generateAndSharePDF = async (sale: Sale, customer: Customer, paidAmountOnSale: number) => {
       try {
-        // Use thermal invoice layout for sharing
-        const doc = await generateThermalInvoicePDF(sale, customer, state.profile);
+        const doc = new jsPDF();
+        const profile = state.profile;
+        let currentY = 15;
+
+        // FIX: Change image format to PNG
+        doc.addImage(logoBase64, 'PNG', 14, 10, 25, 25);
+
+        if (profile) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(24);
+            doc.setTextColor('#0d9488');
+            doc.text(profile.name, 105, currentY, { align: 'center' });
+            currentY += 8;
+            doc.setFontSize(10);
+            doc.setTextColor('#333333');
+            const addressLines = doc.splitTextToSize(profile.address, 180);
+            doc.text(addressLines, 105, currentY, { align: 'center' });
+            currentY += (addressLines.length * 5);
+            doc.text(`Phone: ${profile.phone} | GSTIN: ${profile.gstNumber}`, 105, currentY, { align: 'center' });
+        }
+        
+        currentY = Math.max(currentY, 10 + 25) + 5;
+
+        doc.setDrawColor('#cccccc');
+        doc.line(14, currentY, 196, currentY);
+        currentY += 10;
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('TAX INVOICE', 105, currentY, { align: 'center' });
+        currentY += 10;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Billed To:', 14, currentY);
+        doc.text('Invoice Details:', 120, currentY);
+        currentY += 5;
+
+        doc.setFont('helvetica', 'normal');
+        doc.text(customer.name, 14, currentY);
+        doc.text(`Invoice ID: ${sale.id}`, 120, currentY);
+        currentY += 5;
+        
+        const customerAddressLines = doc.splitTextToSize(customer.address, 80);
+        doc.text(customerAddressLines, 14, currentY);
+        doc.text(`Date: ${new Date(sale.date).toLocaleString()}`, 120, currentY);
+        currentY += (customerAddressLines.length * 5) + 5;
+        
+        autoTable(doc, {
+            startY: currentY,
+            head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
+            body: sale.items.map((item, index) => [
+                index + 1,
+                item.productName,
+                item.quantity,
+                `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
+                `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
+            ]),
+            theme: 'grid',
+            headStyles: { fillColor: [13, 148, 136] },
+            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+        });
+        
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+        
+        // FIX: Calculate values from the `sale` object, not stale component state. This also fixes the scope issue.
+        const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+        const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
+        
+        const totalsX = 196;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Subtotal:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+
+        doc.text('Discount:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`- Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+
+        doc.text('GST Included:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text('Grand Total:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+
+        doc.setFont('helvetica', 'normal');
+        doc.text('Paid:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${paidAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(dueAmountOnSale > 0.01 ? '#dc2626' : '#16a34a');
+        doc.text('Amount Due:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        
+        currentY = doc.internal.pageSize.height - 20;
+        doc.setFontSize(10);
+        doc.setTextColor('#888888');
+        doc.text('Thank you for your business!', 105, currentY, { align: 'center' });
         
         const pdfBlob = doc.output('blob');
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
-        const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
-
+        // FIX: Use locally scoped variables for whatsAppText instead of calculations from component state to ensure data consistency.
         const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmountOnSale.toLocaleString('en-IN')}\nDue: Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
         
         if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
@@ -676,16 +779,12 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                     </div>
                     
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Sale Date</label>
-                        <input 
-                            type="date" 
-                            value={saleDate} 
-                            onChange={e => setSaleDate(e.target.value)} 
-                            className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
-                            disabled={mode === 'edit'}
-                        />
-                    </div>
+                    <DateInput
+                        label="Sale Date" 
+                        value={saleDate} 
+                        onChange={e => setSaleDate(e.target.value)} 
+                        disabled={mode === 'edit'}
+                    />
 
                     {customerId && customerTotalDue !== null && mode === 'add' && (
                         <div className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg text-center border dark:border-slate-700">
@@ -702,21 +801,22 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
 
             <Card title="Sale Items">
-                <div className="grid grid-cols-1 gap-3 mb-4">
-                    <button
-                        onClick={() => setIsSelectingProduct(true)}
+                <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                    <Button 
+                        onClick={() => setIsSelectingProduct(true)} 
                         disabled={!customerId}
-                        className="w-full py-4 bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-xl shadow-md flex items-center justify-center gap-3 text-lg font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                        className="w-full py-3 text-base flex-grow justify-center shadow-md"
                     >
-                        <Search className="w-6 h-6" /> Select Product
-                    </button>
-                    <button
-                        onClick={() => setIsScanning(true)}
+                        <Search size={20} className="mr-2"/> Select Product
+                    </Button>
+                    <Button 
+                        onClick={() => setIsScanning(true)} 
                         disabled={!customerId}
-                        className="w-full py-4 bg-rose-700/90 hover:bg-rose-700 text-white rounded-xl shadow-md flex items-center justify-center gap-3 text-lg font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                        variant="secondary"
+                        className="w-full py-3 text-base flex-grow justify-center shadow-md"
                     >
-                        <QrCode className="w-6 h-6" /> Scan Product
-                    </button>
+                        <QrCode size={20} className="mr-2"/> Scan Product
+                    </Button>
                 </div>
                 <div className="mt-4 space-y-2">
                     {items.map(item => (

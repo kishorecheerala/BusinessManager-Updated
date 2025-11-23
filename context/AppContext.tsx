@@ -79,7 +79,11 @@ const getInitialTheme = (): Theme => {
   try {
     const savedTheme = localStorage.getItem('theme') as Theme | null;
     if (savedTheme) return savedTheme;
-    if (window.matchMedia('(prefers-color-scheme: dark)').matches) return 'dark';
+    
+    // Fallback to system preference
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        return 'dark';
+    }
   } catch (e) {
     // ignore
   }
