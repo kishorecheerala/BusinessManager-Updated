@@ -9,11 +9,13 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
 
-    // Try adding logo, fallback gracefully if it fails
+    // Robust image handling
     try {
-        doc.addImage(logoBase64, 'PNG', 14, 10, 25, 25);
+        if (logoBase64 && logoBase64.startsWith('data:image')) {
+             doc.addImage(logoBase64, 'PNG', 14, 10, 25, 25);
+        }
     } catch (err) {
-        console.warn("Logo add failed", err);
+        console.warn("Logo add failed, skipping logo.", err);
     }
 
     if (profile) {
@@ -26,12 +28,19 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
         doc.setFontSize(10);
         doc.setTextColor('#333333');
         doc.setFont('helvetica', 'normal');
-        const addressLines = doc.splitTextToSize(profile.address, 120);
+        
+        // Safe address split
+        const address = profile.address || '';
+        const addressLines = doc.splitTextToSize(address, 120);
         doc.text(addressLines, centerX, currentY, { align: 'center' });
         currentY += (addressLines.length * 5);
         
-        if (profile.phone) {
-            doc.text(`Phone: ${profile.phone} | GSTIN: ${profile.gstNumber || 'N/A'}`, centerX, currentY, { align: 'center' });
+        const details = [];
+        if (profile.phone) details.push(`Phone: ${profile.phone}`);
+        if (profile.gstNumber) details.push(`GSTIN: ${profile.gstNumber}`);
+        
+        if (details.length > 0) {
+            doc.text(details.join(' | '), centerX, currentY, { align: 'center' });
         }
     } else {
         doc.setFontSize(22);

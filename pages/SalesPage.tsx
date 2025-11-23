@@ -8,10 +8,9 @@ import Button from '../components/Button';
 import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
+import { generateInvoicePDF } from '../utils/pdfGenerator';
 import AddCustomerModal from '../components/AddCustomerModal';
 import Dropdown from '../components/Dropdown';
-import { useDialog } from '../context/DialogContext';
-import { generateInvoicePDF } from '../utils/pdfGenerator';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -98,7 +97,7 @@ const QRScannerModal: React.FC<{
         html5QrCodeRef.current.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, undefined)
             .then(() => setScanStatus("Scanning for QR Code..."))
             .catch(err => {
-                setScanStatus(`Camera Permission Error.`);
+                setScanStatus(`Camera Permission Error. Please allow camera access for this site in your browser's settings.`);
                 console.error("Camera start failed.", err);
             });
             
@@ -124,7 +123,6 @@ const QRScannerModal: React.FC<{
 
 const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const { state, dispatch, showToast } = useAppContext();
-    const { showAlert } = useDialog();
     
     const [mode, setMode] = useState<'add' | 'edit'>('add');
     const [saleToEdit, setSaleToEdit] = useState<Sale | null>(null);
@@ -164,7 +162,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 setSaleToEdit(sale);
                 setMode('edit');
                 setCustomerId(sale.customerId);
-                setItems(sale.items.map(item => ({...item}))); 
+                setItems(sale.items.map(item => ({...item}))); // Deep copy
                 setDiscount(sale.discount.toString());
                 setSaleDate(getLocalDateString(new Date(sale.date)));
                 setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
@@ -215,17 +213,18 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
         if (existingItem) {
             if (existingItem.quantity + 1 > availableStock) {
-                 showAlert(`Not enough stock for ${product.name}. Only ${availableStock} available.`);
+                 alert(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`);
                  return;
             }
             setItems(items.map(i => i.productId === newItem.productId ? { ...i, quantity: i.quantity + 1 } : i));
         } else {
              if (1 > availableStock) {
-                 showAlert(`Not enough stock for ${product.name}. Only ${availableStock} available.`);
+                 alert(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`);
                  return;
             }
             setItems([...items, newItem]);
         }
+        
         setIsSelectingProduct(false);
     };
     
@@ -235,7 +234,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         if (product) {
             handleSelectProduct(product);
         } else {
-            showAlert("Product not found in inventory.");
+            alert("Product not found in inventory.");
         }
     };
 
@@ -250,7 +249,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     const originalQtyInSale = mode === 'edit' ? saleToEdit?.items.find(i => i.productId === productId)?.quantity || 0 : 0;
                     const availableStock = (Number(product?.quantity) || 0) + originalQtyInSale;
                     if (numValue > availableStock) {
-                        showAlert(`Not enough stock. Only ${availableStock} available.`);
+                        alert(`Not enough stock for ${item.productName}. Only ${availableStock} available for this sale.`);
                         return { ...item, quantity: availableStock };
                     }
                 }
@@ -306,15 +305,32 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         showToast("Customer added successfully!");
     }, [dispatch, showToast]);
 
+    // Use Centralized PDF Generator
     const processAndSharePDF = async (sale: Sale, customer: Customer) => {
         try {
             const doc = await generateInvoicePDF(sale, customer, state.profile);
             const pdfBlob = doc.output('blob');
             const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
+            const businessName = state.profile?.name || 'Invoice';
             
+            // Generate WhatsApp text for sharing
+            const subTotal = Number(sale.totalAmount) + Number(sale.discount);
+            const paidAmount = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const dueAmount = Number(sale.totalAmount) - paidAmount;
+            const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmount.toLocaleString('en-IN')}\nDue: Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
+
             if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
+                // Try to copy text to clipboard as a fallback for apps that don't support text+file share well
+                try {
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        await navigator.clipboard.writeText(whatsAppText);
+                        showToast('Invoice text copied to clipboard!');
+                    }
+                } catch (e) {}
+
                 await navigator.share({
-                    title: `Invoice ${sale.id}`,
+                    title: `${businessName} Invoice ${sale.id}`,
+                    text: whatsAppText,
                     files: [pdfFile],
                 });
             } else {
@@ -328,12 +344,12 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const handleSubmitSale = async () => {
         if (!customerId || items.length === 0) {
-            showAlert("Please select a customer and add items.");
+            alert("Please select a customer and add at least one item.");
             return;
         }
         const customer = state.customers.find(c => c.id === customerId);
         if(!customer) {
-            showAlert("Customer not found.");
+            alert("Customer not found.");
             return;
         }
         
@@ -342,7 +358,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         if (mode === 'add') {
             const paidAmount = parseFloat(paymentDetails.amount) || 0;
             if (paidAmount > totalAmount + 0.01) {
-                showAlert(`Paid amount cannot exceed total amount.`);
+                alert(`Paid amount (₹${paidAmount.toLocaleString('en-IN')}) cannot exceed total amount.`);
                 return;
             }
             const payments: Payment[] = [];
@@ -364,25 +380,25 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             items.forEach(item => {
                 dispatch({ type: 'UPDATE_PRODUCT_STOCK', payload: { productId: item.productId, change: -Number(item.quantity) } });
             });
-            showToast('Sale created!');
+            showToast('Sale created successfully!');
             await processAndSharePDF(newSale, customer);
 
         } else if (mode === 'edit' && saleToEdit) {
             const updatedSale: Sale = { ...saleToEdit, items, discount: discountAmount, gstAmount, totalAmount };
             dispatch({ type: 'UPDATE_SALE', payload: { oldSale: saleToEdit, updatedSale } });
-            showToast('Sale updated!');
+            showToast('Sale updated successfully!');
         }
         resetForm();
     };
 
      const handleRecordStandalonePayment = () => {
         if (!customerId) {
-            showAlert('Select a customer first.');
+            alert('Select a customer first.');
             return;
         }
         const paidAmount = parseFloat(paymentDetails.amount || '0');
         if (paidAmount <= 0) {
-            showAlert('Enter a valid amount.');
+            alert('Enter a valid amount.');
             return;
         }
 
@@ -394,7 +410,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         if (outstandingSales.length === 0) {
-            showAlert('No outstanding dues.');
+            alert('No outstanding dues.');
             return;
         }
         
@@ -415,13 +431,14 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             dispatch({ type: 'ADD_PAYMENT_TO_SALE', payload: { saleId: sale.id, payment: newPayment } });
             remainingPayment -= amountToApply;
         }
-        showToast(`Payment recorded.`);
+        showToast(`Payment of ₹${paidAmount.toLocaleString('en-IN')} recorded.`);
         resetForm();
     };
 
     const canCreateSale = customerId && items.length > 0 && mode === 'add';
     const canUpdateSale = customerId && items.length > 0 && mode === 'edit';
     const canRecordPayment = customerId && items.length === 0 && parseFloat(paymentDetails.amount || '0') > 0 && customerTotalDue != null && customerTotalDue > 0.01 && mode === 'add';
+    const pageTitle = mode === 'edit' ? `Edit Sale: ${saleToEdit?.id}` : 'New Sale / Payment';
     const paymentMethodOptions = [{ value: 'CASH', label: 'Cash' }, { value: 'UPI', label: 'UPI' }, { value: 'CHEQUE', label: 'Cheque' }];
 
     return (
@@ -430,14 +447,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             {isSelectingProduct && <ProductSearchModal products={state.products} onClose={() => setIsSelectingProduct(false)} onSelect={handleSelectProduct} />}
             {isScanning && <QRScannerModal onClose={() => setIsScanning(false)} onScanned={handleProductScanned} />}
             
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-primary">{mode === 'edit' ? `Edit Sale: ${saleToEdit?.id}` : 'New Sale / Payment'}</h1>
-                    <span className="text-xs sm:text-sm font-bold bg-gradient-to-r from-teal-600 to-emerald-600 text-white px-3 py-1 rounded-full shadow-md border border-teal-500/30">
-                        {new Date().toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-                    </span>
-                </div>
-            </div>
+            <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
             
             <Card>
                 <div className="space-y-4">
@@ -491,7 +501,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 </div>
                 <div className="mt-4 space-y-2">
                     {items.map(item => (
-                        <div key={item.productId} className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded animate-slide-in-right border dark:border-slate-700">
+                        <div key={item.productId} className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded animate-fade-in-fast border dark:border-slate-700">
                             <div className="flex justify-between items-start">
                                 <p className="font-semibold flex-grow">{item.productName}</p>
                                 <DeleteButton variant="remove" onClick={() => handleRemoveItem(item.productId)} />

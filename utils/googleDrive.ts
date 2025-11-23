@@ -82,9 +82,9 @@ const getHeaders = (accessToken: string) => ({
 
 // Helper for safe JSON parsing to avoid "Unexpected end of input"
 const safeJsonParse = async (response: Response) => {
-    const text = await response.text();
-    if (!text || text.trim() === '') return null;
     try {
+        const text = await response.text();
+        if (!text || text.trim() === '') return null;
         return JSON.parse(text);
     } catch (e) {
         console.warn("JSON Parse Error:", e);
@@ -167,6 +167,8 @@ export const downloadFile = async (accessToken: string, fileId: string) => {
   });
   
   if (!response.ok) {
+      // 404 implies file gone/deleted remotely
+      if (response.status === 404) return null;
       throw new Error(`Download Failed: ${response.status}`);
   }
   
