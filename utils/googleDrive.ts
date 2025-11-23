@@ -89,6 +89,8 @@ const safeJsonParse = async (response: Response) => {
     }
 };
 
+// --- Low Level Operations ---
+
 export const searchFolder = async (accessToken: string) => {
   const q = `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`;
   const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}`, {
@@ -166,7 +168,9 @@ export const downloadFile = async (accessToken: string, fileId: string) => {
   
   if (!response.ok) {
       // 404 implies file gone/deleted remotely
-      if (response.status === 404) return null;
+      if (response.status === 404) {
+          throw new Error(`Download Failed: 404 Not Found`);
+      }
       throw new Error(`Download Failed: ${response.status}`);
   }
   
@@ -188,4 +192,113 @@ export const getUserInfo = async (accessToken: string) => {
     // Return a fallback object to prevent app crashes
     return { name: 'Google User', email: 'User', picture: '' }; 
   }
+};
+
+// --- High Level Drive Service ---
+
+export const DriveService = {
+    /**
+     * Ensures the App Data folder exists. Checks cache first, then Drive. Creates if missing.
+     */
+    async ensureFolder(accessToken: string): Promise<string> {
+        let folderId = localStorage.getItem('gdrive_folder_id');
+        
+        // Verify or Find
+        if (!folderId) {
+            folderId = await searchFolder(accessToken);
+            if (!folderId) {
+                folderId = await createFolder(accessToken);
+            }
+            if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
+        }
+        
+        if (!folderId) throw new Error("Failed to initialize Google Drive folder.");
+        return folderId;
+    },
+
+    /**
+     * Reads the backup file.
+     * - Handles ID caching.
+     * - Handles 404 (stale cache) by searching again.
+     * - Returns null ONLY if no file exists.
+     * - THROWS error if file exists but download fails (prevents empty overwrite).
+     */
+    async read(accessToken: string): Promise<any | null> {
+        const folderId = await this.ensureFolder(accessToken);
+        
+        // 1. Get File ID (Cache or Search)
+        let fileId = localStorage.getItem('gdrive_file_id');
+        if (!fileId) {
+            const remoteFile = await searchFile(accessToken, folderId);
+            fileId = remoteFile ? remoteFile.id : null;
+            if (fileId) localStorage.setItem('gdrive_file_id', fileId);
+        }
+
+        // 2. If no file found after search, return null (New Setup)
+        if (!fileId) return null;
+
+        // 3. Download
+        try {
+            const data = await downloadFile(accessToken, fileId);
+            if (!data) {
+                throw new Error("Backup file found but content is empty or invalid.");
+            }
+            return data;
+        } catch (e: any) {
+            // Handle Stale ID (404)
+            if (e.message && e.message.includes('404')) {
+                console.warn("Cached File ID stale, searching again...");
+                localStorage.removeItem('gdrive_file_id');
+                
+                // Retry search once
+                const remoteFile = await searchFile(accessToken, folderId);
+                if (remoteFile) {
+                    localStorage.setItem('gdrive_file_id', remoteFile.id);
+                    const retryData = await downloadFile(accessToken, remoteFile.id);
+                    if (!retryData) throw new Error("Backup file found on retry but content is empty.");
+                    return retryData;
+                } else {
+                    return null; // File truly deleted
+                }
+            }
+            // Rethrow other errors (Network, Auth, Corrupt Data) to abort sync
+            throw e;
+        }
+    },
+
+    /**
+     * Writes data to the backup file.
+     * - Creates new file if none exists.
+     * - Updates existing file if ID is known.
+     * - Handles 404 by creating a new file.
+     */
+    async write(accessToken: string, data: any): Promise<void> {
+        const folderId = await this.ensureFolder(accessToken);
+        
+        // Check for file existence if we don't have a cached ID
+        let fileId = localStorage.getItem('gdrive_file_id');
+        if (!fileId) {
+             const remoteFile = await searchFile(accessToken, folderId);
+             fileId = remoteFile ? remoteFile.id : null;
+        }
+
+        try {
+            const result = await uploadFile(accessToken, folderId, data, fileId || undefined);
+            if (result && result.id) {
+                localStorage.setItem('gdrive_file_id', result.id);
+            }
+        } catch (e: any) {
+            // Handle Stale ID during upload (404)
+            if (e.message && e.message.includes('404')) {
+                console.warn("Upload target not found, creating new file...");
+                localStorage.removeItem('gdrive_file_id');
+                const result = await uploadFile(accessToken, folderId, data);
+                if (result && result.id) {
+                    localStorage.setItem('gdrive_file_id', result.id);
+                }
+            } else {
+                throw e;
+            }
+        }
+    }
 };

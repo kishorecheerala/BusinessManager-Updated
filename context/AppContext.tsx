@@ -3,7 +3,7 @@ import React, { createContext, useReducer, useContext, useEffect, ReactNode, use
 import { Customer, Supplier, Product, Sale, Purchase, Return, Payment, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, AppMetadataPin, Theme, GoogleUser, AuditLogEntry, SyncStatus } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
-import { searchFolder, createFolder, searchFile, uploadFile, downloadFile, initGoogleAuth, getUserInfo, loadGoogleScript } from '../utils/googleDrive';
+import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript } from '../utils/googleDrive';
 
 interface ToastState {
   message: string;
@@ -427,44 +427,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     isSyncingRef.current = true;
 
     try {
-        let folderId = localStorage.getItem('gdrive_folder_id');
-        let fileId = localStorage.getItem('gdrive_file_id');
-
-        // 1. Ensure Folder Exists
-        if (!folderId) {
-            folderId = await searchFolder(accessToken);
-            if (!folderId) {
-                folderId = await createFolder(accessToken);
-            }
-            if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
-        }
-
-        // 2. Look for backup file
-        let remoteFileId = fileId;
-        if (!remoteFileId && folderId) {
-             const remoteFile = await searchFile(accessToken, folderId);
-             remoteFileId = remoteFile ? remoteFile.id : null;
-             if (remoteFileId) localStorage.setItem('gdrive_file_id', remoteFileId);
-        }
-
-        // 3. Pull (Download & Merge)
+        // 1. Pull (Download) using DriveService
         let remoteData = null;
-        if (remoteFileId) {
-            try {
-                showToast("Found backup, restoring...", 'info');
-                remoteData = await downloadFile(accessToken, remoteFileId);
-                if (!remoteData) {
-                    throw new Error("Backup file found but returned empty content.");
-                }
-            } catch (e) {
-                // CRITICAL FIX: If we found an ID but failed to download, DO NOT continue.
-                // Continuing would cause the 'else if' block to run, potentially uploading empty local state
-                // and destroying the cloud backup on the next sync.
-                console.error("Failed to download remote file:", e);
-                showToast("Restore Failed: Found backup but could not download. Check connection.", 'info');
-                // Rethrow so we exit the sync process entirely
-                throw e; 
-            }
+        try {
+            showToast("Checking cloud backup...", 'info');
+            remoteData = await DriveService.read(accessToken);
+        } catch (e) {
+            console.error("Failed to download remote file:", e);
+            showToast("Sync Failed: Could not download backup. Check connection.", 'info');
+            // Rethrow so we exit the sync process entirely
+            throw e; 
         }
 
         if (remoteData) {
@@ -493,29 +465,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'SET_STATE', payload: finalState });
 
             // 4. Push (Upload combined)
-            // Only push if we have a valid folderId
-            if (folderId) {
-                try {
-                    await uploadFile(accessToken, folderId, finalState, remoteFileId || undefined);
-                } catch(e: any) {
-                    if (e.message && e.message.includes('404')) {
-                        const result = await uploadFile(accessToken, folderId, finalState);
-                        if (result && result.id) localStorage.setItem('gdrive_file_id', result.id);
-                    } else {
-                        throw e;
-                    }
-                }
+            try {
+                await DriveService.write(accessToken, finalState);
+            } catch(e: any) {
+                console.error("Upload failed during sync", e);
+                throw e;
             }
-        } else if (folderId) {
-            // No remote file found -> Upload Local (Only if it's truly a new setup)
+        } else {
+            // No remote file found -> Upload Local (Only if it's truly a new setup with data)
             const currentData = await db.exportData();
             const hasLocalData = (currentData.customers && currentData.customers.length > 0) || 
                                  (currentData.sales && currentData.sales.length > 0) ||
                                  (currentData.products && currentData.products.length > 0);
 
             if (hasLocalData) {
-                const result = await uploadFile(accessToken, folderId, currentData);
-                if (result && result.id) localStorage.setItem('gdrive_file_id', result.id);
+                await DriveService.write(accessToken, currentData);
             }
         }
     } catch (e: any) {
