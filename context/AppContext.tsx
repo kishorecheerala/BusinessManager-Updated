@@ -451,18 +451,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         let remoteData = null;
         if (remoteFileId) {
             try {
+                showToast("Found backup, restoring...", 'info');
                 remoteData = await downloadFile(accessToken, remoteFileId);
                 if (!remoteData) {
-                    // File returned 404 or null, cleanup ID to force upload
-                    console.warn("Remote file not found, resetting ID.");
-                    localStorage.removeItem('gdrive_file_id');
-                    remoteFileId = null;
+                    throw new Error("Backup file found but returned empty content.");
                 }
             } catch (e) {
-                console.warn("Failed to download with cached ID, retrying discovery", e);
-                // We proceed to upload fallback if download fails
-                localStorage.removeItem('gdrive_file_id');
-                remoteFileId = null;
+                // CRITICAL FIX: If we found an ID but failed to download, DO NOT continue.
+                // Continuing would cause the 'else if' block to run, potentially uploading empty local state
+                // and destroying the cloud backup on the next sync.
+                console.error("Failed to download remote file:", e);
+                showToast("Restore Failed: Found backup but could not download. Check connection.", 'info');
+                // Rethrow so we exit the sync process entirely
+                throw e; 
             }
         }
 
@@ -492,12 +493,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'SET_STATE', payload: finalState });
 
             // 4. Push (Upload combined)
+            // Only push if we have a valid folderId
             if (folderId) {
                 try {
-                    // Try update first if we had an ID (even if download failed, we might try reusing ID, but we nulled it above if download failed)
                     await uploadFile(accessToken, folderId, finalState, remoteFileId || undefined);
                 } catch(e: any) {
-                    // If update fails with 404, try creating new
                     if (e.message && e.message.includes('404')) {
                         const result = await uploadFile(accessToken, folderId, finalState);
                         if (result && result.id) localStorage.setItem('gdrive_file_id', result.id);
@@ -507,7 +507,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
             }
         } else if (folderId) {
-            // No remote file found -> Upload Local
+            // No remote file found -> Upload Local (Only if it's truly a new setup)
             const currentData = await db.exportData();
             const hasLocalData = (currentData.customers && currentData.customers.length > 0) || 
                                  (currentData.sales && currentData.sales.length > 0) ||
@@ -524,9 +524,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
         if (e.message && (e.message.includes('401') || e.message.includes('403'))) {
              showToast("Sync Error: Authentication failed. Please sign in again.", 'info');
-             // Optional: auto-logout if token is definitely bad
-             // localStorage.removeItem('googleUser');
-             // dispatch({ type: 'SET_GOOGLE_USER', payload: null });
         }
     } finally {
         isSyncingRef.current = false;
