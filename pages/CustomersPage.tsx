@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, User, Phone, MapPin, Search, Edit, Save, X, Trash2, IndianRupee, ShoppingCart, Download, Share2, ChevronDown } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Search, Edit, Save, X, Trash2, IndianRupee, ShoppingCart, Download, Share2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Payment, Sale, Page } from '../types';
 import Card from '../components/Card';
@@ -18,6 +18,16 @@ const getLocalDateString = (date = new Date()) => {
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+const fetchImageAsBase64 = (url: string): Promise<string> =>
+  fetch(url)
+    .then(response => response.blob())
+    .then(blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    }));
 
 // Standalone PaymentModal component to prevent re-renders on parent state change
 const PaymentModal: React.FC<{
@@ -92,7 +102,6 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     const [isAdding, setIsAdding] = useState(false);
     const [newCustomer, setNewCustomer] = useState({ id: '', name: '', phone: '', address: '', area: '', reference: '' });
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-    const [activeSaleId, setActiveSaleId] = useState<string | null>(null);
     const [actionMenuSaleId, setActionMenuSaleId] = useState<string | null>(null);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -157,7 +166,6 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     useEffect(() => {
         if (selectedCustomer) {
             setEditedCustomer(selectedCustomer);
-            setActiveSaleId(null); // Close any open accordion when customer changes
         }
         setIsEditing(false);
     }, [selectedCustomer]);
@@ -469,20 +477,16 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                 </Card>
                 <Card title="Sales History">
                     {customerSales.length > 0 ? (
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                             {customerSales.slice().reverse().map(sale => {
                                 const amountPaid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
                                 const dueAmount = Number(sale.totalAmount) - amountPaid;
                                 const isPaid = dueAmount <= 0.01;
                                 const subTotal = Number(sale.totalAmount) + Number(sale.discount);
-                                const isExpanded = activeSaleId === sale.id;
 
                                 return (
-                                <div key={sale.id} className="bg-gray-50 rounded-lg border overflow-hidden transition-all duration-300">
-                                    <button 
-                                        onClick={() => setActiveSaleId(isExpanded ? null : sale.id)}
-                                        className="w-full text-left p-3 flex justify-between items-center hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition-colors"
-                                    >
+                                <div key={sale.id} className="bg-white rounded-lg border overflow-hidden mb-4 shadow-sm">
+                                    <div className="w-full text-left p-3 flex justify-between items-center bg-gray-50 border-b">
                                         <div className="flex-1">
                                             <p className="font-semibold text-gray-800">{sale.id}</p>
                                             <p className="text-xs text-gray-600">{new Date(sale.date).toLocaleString()}</p>
@@ -493,75 +497,72 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                                 {isPaid ? 'Paid' : `Due: ₹${dueAmount.toLocaleString('en-IN')}`}
                                             </p>
                                         </div>
-                                        <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                                    </button>
+                                    </div>
                                     
-                                    {isExpanded && (
-                                        <div className="p-3 border-t bg-white animate-slide-down-fade">
-                                            <div className="flex justify-end items-start mb-2">
-                                                <div className="flex items-center gap-1">
-                                                    <button onClick={() => handleEditSale(sale.id)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full" aria-label="Edit Sale"><Edit size={16} /></button>
-                                                     <div className="relative" ref={actionMenuSaleId === sale.id ? actionMenuRef : undefined}>
-                                                        <button onClick={() => setActionMenuSaleId(sale.id)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full" aria-label="Share or Download Invoice">
-                                                            <Share2 size={16} />
-                                                        </button>
-                                                        {actionMenuSaleId === sale.id && (
-                                                            <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border text-text z-10 animate-scale-in origin-top-right">
-                                                                <button onClick={() => { handlePrintA4Invoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Print (A4)</button>
-                                                                <button onClick={() => { handleDownloadThermalReceipt(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Download Receipt</button>
-                                                                <button onClick={() => { handleShareInvoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Share Invoice</button>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <DeleteButton 
-                                                        variant="delete" 
-                                                        onClick={(e) => { e.stopPropagation(); handleDeleteSale(sale.id); }} 
-                                                    />
+                                    <div className="p-3">
+                                        <div className="flex justify-end items-start mb-2">
+                                            <div className="flex items-center gap-1">
+                                                <button onClick={() => handleEditSale(sale.id)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full" aria-label="Edit Sale"><Edit size={16} /></button>
+                                                    <div className="relative" ref={actionMenuSaleId === sale.id ? actionMenuRef : undefined}>
+                                                    <button onClick={() => setActionMenuSaleId(actionMenuSaleId === sale.id ? null : sale.id)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full" aria-label="Share or Download Invoice">
+                                                        <Share2 size={16} />
+                                                    </button>
+                                                    {actionMenuSaleId === sale.id && (
+                                                        <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border text-text z-10 animate-scale-in origin-top-right">
+                                                            <button onClick={() => { handlePrintA4Invoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Print (A4)</button>
+                                                            <button onClick={() => { handleDownloadThermalReceipt(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Download Receipt</button>
+                                                            <button onClick={() => { handleShareInvoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Share Invoice</button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <DeleteButton 
+                                                    variant="delete" 
+                                                    onClick={(e) => { e.stopPropagation(); handleDeleteSale(sale.id); }} 
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <h4 className="font-semibold text-sm text-gray-700 mb-1">Items Purchased:</h4>
+                                                <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                                                    {sale.items.map((item, index) => (
+                                                        <li key={index}>
+                                                            {item.productName} (x{item.quantity}) @ ₹{Number(item.price).toLocaleString('en-IN')} each
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                            <div className="p-2 bg-gray-50 rounded-md text-sm border">
+                                                <h4 className="font-semibold text-gray-700 mb-2">Transaction Details:</h4>
+                                                <div className="space-y-1">
+                                                    <div className="flex justify-between"><span>Subtotal:</span> <span>₹{subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                    <div className="flex justify-between"><span>Discount:</span> <span>- ₹{Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                    <div className="flex justify-between"><span>GST Included:</span> <span>₹{Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                    <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Grand Total:</span> <span>₹{Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
                                                 </div>
                                             </div>
-                                            <div className="space-y-3">
-                                                <div>
-                                                    <h4 className="font-semibold text-sm text-gray-700 mb-1">Items Purchased:</h4>
+                                            <div>
+                                                <h4 className="font-semibold text-sm text-gray-700 mb-1">Payments Made:</h4>
+                                                {sale.payments.length > 0 ? (
                                                     <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                                                        {sale.items.map((item, index) => (
-                                                            <li key={index}>
-                                                                {item.productName} (x{item.quantity}) @ ₹{Number(item.price).toLocaleString('en-IN')} each
+                                                        {sale.payments.map(payment => (
+                                                            <li key={payment.id}>
+                                                                ₹{Number(payment.amount).toLocaleString('en-IN')} {payment.method === 'RETURN_CREDIT' ? <span className="text-blue-600 font-semibold">(Return Credit)</span> : `via ${payment.method}`} on {new Date(payment.date).toLocaleDateString()}
+                                                                {payment.reference && <span className="text-xs text-gray-500 block">Ref: {payment.reference}</span>}
                                                             </li>
                                                         ))}
                                                     </ul>
-                                                </div>
-                                                <div className="p-2 bg-white rounded-md text-sm border">
-                                                    <h4 className="font-semibold text-gray-700 mb-2">Transaction Details:</h4>
-                                                    <div className="space-y-1">
-                                                        <div className="flex justify-between"><span>Subtotal:</span> <span>₹{subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-                                                        <div className="flex justify-between"><span>Discount:</span> <span>- ₹{Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-                                                        <div className="flex justify-between"><span>GST Included:</span> <span>₹{Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-                                                        <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Grand Total:</span> <span>₹{Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-semibold text-sm text-gray-700 mb-1">Payments Made:</h4>
-                                                    {sale.payments.length > 0 ? (
-                                                        <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
-                                                            {sale.payments.map(payment => (
-                                                                <li key={payment.id}>
-                                                                    ₹{Number(payment.amount).toLocaleString('en-IN')} {payment.method === 'RETURN_CREDIT' ? <span className="text-blue-600 font-semibold">(Return Credit)</span> : `via ${payment.method}`} on {new Date(payment.date).toLocaleDateString()}
-                                                                    {payment.reference && <span className="text-xs text-gray-500 block">Ref: {payment.reference}</span>}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    ) : <p className="text-sm text-gray-500">No payments made yet.</p>}
-                                                </div>
-                                                {!isPaid && (
-                                                    <div className="pt-2">
-                                                        <Button onClick={() => setPaymentModalState({ isOpen: true, saleId: sale.id })} className="w-full">
-                                                            <Plus size={16} className="mr-2"/> Add Payment
-                                                        </Button>
-                                                    </div>
-                                                )}
+                                                ) : <p className="text-sm text-gray-500">No payments made yet.</p>}
                                             </div>
+                                            {!isPaid && (
+                                                <div className="pt-2">
+                                                    <Button onClick={() => setPaymentModalState({ isOpen: true, saleId: sale.id })} className="w-full">
+                                                        <Plus size={16} className="mr-2"/> Add Payment
+                                                    </Button>
+                                                </div>
+                                            )}
                                         </div>
-                                    )}
+                                    </div>
                                 </div>
                             )})}
                         </div>
@@ -603,6 +604,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
             </div>
         );
     }
+
 
     return (
         <div className="space-y-4">
