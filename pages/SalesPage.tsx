@@ -8,9 +8,8 @@ import Button from '../components/Button';
 import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
-import { generateThermalInvoicePDF } from '../utils/pdfGenerator';
 import DateInput from '../components/DateInput';
-import Dropdown from '../components/Dropdown';
+import { generateThermalInvoicePDF } from '../utils/pdfGenerator';
 
 
 const getLocalDateString = (date = new Date()) => {
@@ -420,14 +419,13 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const generateAndSharePDF = async (sale: Sale, customer: Customer, paidAmountOnSale: number) => {
       try {
-        // Use the shared thermal generator
+        // Use the shared thermal generator for consistent receipts
         const doc = await generateThermalInvoicePDF(sale, customer, state.profile);
         
         const pdfBlob = doc.output('blob');
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        // Calculate values for text message
         const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
         const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
 
@@ -671,8 +669,8 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     
                     <DateInput 
                         label="Sale Date"
-                        value={saleDate}
-                        onChange={e => setSaleDate(e.target.value)}
+                        value={saleDate} 
+                        onChange={e => setSaleDate(e.target.value)} 
                         disabled={mode === 'edit'}
                     />
 
@@ -752,15 +750,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                 <Dropdown
-                                    options={[
-                                        { value: 'CASH', label: 'Cash' },
-                                        { value: 'UPI', label: 'UPI' },
-                                        { value: 'CHEQUE', label: 'Cheque' }
-                                    ]}
-                                    value={paymentDetails.method}
-                                    onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
-                                />
+                                <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600">
+                                    <option value="CASH">Cash</option>
+                                    <option value="UPI">UPI</option>
+                                    <option value="CHEQUE">Cheque</option>
+                                </select>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
@@ -784,15 +778,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                            <Dropdown
-                                options={[
-                                    { value: 'CASH', label: 'Cash' },
-                                    { value: 'UPI', label: 'UPI' },
-                                    { value: 'CHEQUE', label: 'Cheque' }
-                                ]}
-                                value={paymentDetails.method}
-                                onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
-                            />
+                            <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600">
+                                <option value="CASH">Cash</option>
+                                <option value="UPI">UPI</option>
+                                <option value="CHEQUE">Cheque</option>
+                            </select>
                         </div>
                     </div>
                 </Card>
