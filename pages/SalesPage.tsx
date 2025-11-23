@@ -8,7 +8,7 @@ import Button from '../components/Button';
 import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
-import { generateThermalInvoicePDF } from '../utils/pdfGenerator';
+import { generateThermalInvoicePDF, generateA4InvoicePdf } from '../utils/pdfGenerator';
 
 
 const getLocalDateString = (date = new Date()) => {
@@ -212,6 +212,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         }
     });
 
+    // Effect to handle switching to edit mode from another page
     useEffect(() => {
         if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
             const sale = state.sales.find(s => s.id === state.selection.id);
@@ -240,6 +241,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     }, [customerId, items, discount, paymentDetails.amount, isAddingCustomer, newCustomer, setIsDirty, saleDate, mode]);
 
 
+    // On unmount, we must always clean up.
     useEffect(() => {
         return () => {
             setIsDirty(false);
@@ -416,7 +418,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const generateAndSharePDF = async (sale: Sale, customer: Customer, paidAmountOnSale: number) => {
       try {
-        // Use the THERMAL invoice generator for sharing on mobile
+        // Use thermal invoice layout for sharing as requested
         const doc = await generateThermalInvoicePDF(sale, customer, state.profile);
         
         const pdfBlob = doc.output('blob');
