@@ -91,14 +91,22 @@ const safeJsonParse = async (response: Response) => {
 
 // --- Low Level Operations ---
 
-export const searchFolder = async (accessToken: string) => {
+// Helper to get ALL candidate folders
+export const getCandidateFolders = async (accessToken: string) => {
   const q = `mimeType='application/vnd.google-apps.folder' and name='${APP_FOLDER_NAME}' and trashed=false`;
-  const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}`, {
+  // Order by createdTime descending to check newest folders first
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=createdTime desc`, {
     headers: getHeaders(accessToken),
   });
-  if (!response.ok) throw new Error(`Search Folder Failed: ${response.status}`);
+  if (!response.ok) throw new Error(`Search Folders Failed: ${response.status}`);
   const data = await safeJsonParse(response);
-  return data && data.files && data.files.length > 0 ? data.files[0].id : null;
+  return data && data.files ? data.files : [];
+};
+
+// Original searchFolder kept for backward compatibility/single folder find
+export const searchFolder = async (accessToken: string) => {
+  const folders = await getCandidateFolders(accessToken);
+  return folders.length > 0 ? folders[0].id : null;
 };
 
 export const createFolder = async (accessToken: string) => {
@@ -218,58 +226,54 @@ export const DriveService = {
 
     /**
      * Reads the backup file.
-     * - Handles ID caching.
-     * - Handles 404 (stale cache) by searching again.
-     * - Returns null ONLY if no file exists.
-     * - THROWS error if file exists but download fails (prevents empty overwrite).
+     * - Robustly finds the file by checking cached IDs and searching through folder candidates.
      */
     async read(accessToken: string): Promise<any | null> {
-        // Recursively try to read, allowing one retry with cache cleared
-        const attemptRead = async (retry: boolean): Promise<any | null> => {
-            try {
-                const folderId = await this.ensureFolder(accessToken);
-                
-                // 1. Get File ID (Cache or Search)
-                let fileId = localStorage.getItem('gdrive_file_id');
-                if (!fileId) {
-                    const remoteFile = await searchFile(accessToken, folderId);
-                    fileId = remoteFile ? remoteFile.id : null;
-                    if (fileId) localStorage.setItem('gdrive_file_id', fileId);
-                }
-
-                if (!fileId) {
-                    // Critical: If no file found, it might be because the Cached Folder ID is dead/trashed.
-                    // If this is the first attempt, verify by clearing folder cache and retrying.
-                    if (retry) {
-                        console.warn("No file found in cached folder. Clearing folder cache and retrying...");
-                        localStorage.removeItem('gdrive_folder_id');
-                        localStorage.removeItem('gdrive_file_id');
-                        return await attemptRead(false); // Retry once
-                    }
-                    return null;
-                }
-
-                // 3. Download
-                const data = await downloadFile(accessToken, fileId);
-                if (!data) {
-                    throw new Error("Backup file found but content is empty or invalid.");
-                }
-                return data;
-
-            } catch (e: any) {
-                // Handle Stale ID (404) for File or Folder (network/api errors)
-                if (retry && (e.message?.includes('404') || e.message?.includes('Stale'))) {
-                    console.warn("Drive read error (404/Stale). Clearing cache and retrying...", e);
-                    localStorage.removeItem('gdrive_folder_id');
+        try {
+            // 1. Attempt Fast Read using Cached File ID
+            const cachedFileId = localStorage.getItem('gdrive_file_id');
+            if (cachedFileId) {
+                try {
+                    const data = await downloadFile(accessToken, cachedFileId);
+                    if (data) return data;
+                } catch (e) {
+                    console.warn("Cached file download failed, clearing cache and falling back to search.", e);
                     localStorage.removeItem('gdrive_file_id');
-                    return await attemptRead(false);
                 }
-                // Rethrow other errors (Auth, Corrupt Data)
-                throw e;
             }
-        };
 
-        return attemptRead(true);
+            // 2. Search Logic
+            // If no cache or cache failed, search for ALL candidate folders.
+            // This handles cases where duplicate folders might exist (e.g. one empty, one full).
+            const folders = await getCandidateFolders(accessToken);
+            
+            if (folders.length === 0) return null;
+
+            // Iterate through folders to find one that contains the backup file
+            for (const folder of folders) {
+                const remoteFile = await searchFile(accessToken, folder.id);
+                if (remoteFile) {
+                    // Found valid file!
+                    console.log("Found backup in folder:", folder.id);
+                    
+                    // Update Cache to this working pair
+                    localStorage.setItem('gdrive_folder_id', folder.id);
+                    localStorage.setItem('gdrive_file_id', remoteFile.id);
+                    
+                    // Download
+                    const data = await downloadFile(accessToken, remoteFile.id);
+                    return data;
+                }
+            }
+            
+            // No file found in any candidate folder
+            return null;
+
+        } catch (e: any) {
+            console.error("DriveService.read failed", e);
+            // Rethrow so the UI knows sync failed
+            throw e;
+        }
     },
 
     /**
