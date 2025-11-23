@@ -541,7 +541,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
       supplierId,
       items,
       totalAmount: total,
-      date: new Date(purchaseDate).toISOString(),
+      date: new Date(`${purchaseDate}T${new Date().toTimeString().split(' ')[0]}`).toISOString(),
       supplierInvoiceId: supplierInvoiceId || undefined,
       payments,
       paymentDueDates: paymentDueDates.filter(d => d).length > 0 ? paymentDueDates.filter(d => d).sort() : undefined,

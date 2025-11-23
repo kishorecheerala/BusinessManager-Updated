@@ -266,7 +266,7 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
 
         const returnData: Return = {
             id: returnId, type: returnType, referenceId, partyId, items: itemsToReturn,
-            returnDate: new Date(returnDate).toISOString(), amount, reason, notes,
+            returnDate: new Date(`${returnDate}T${new Date().toTimeString().split(' ')[0]}`).toISOString(), amount, reason, notes,
         };
 
         if (mode === 'add') {

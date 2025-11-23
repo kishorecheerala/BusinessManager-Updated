@@ -116,7 +116,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             id: `PAY-P-${Date.now()}`,
             amount: newPaymentAmount,
             method: paymentDetails.method,
-            date: new Date(paymentDetails.date).toISOString(),
+            date: new Date(`${paymentDetails.date}T${new Date().toTimeString().split(' ')[0]}`).toISOString(),
             reference: paymentDetails.reference.trim() || undefined,
         };
 

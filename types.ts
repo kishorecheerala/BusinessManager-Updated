@@ -161,4 +161,9 @@ export interface AppMetadataRevenueGoal {
   amount: number;
 }
 
-export type AppMetadata = AppMetadataPin | AppMetadataBackup | AppMetadataRevenueGoal;
+export interface AppMetadataLastModified {
+  id: 'lastModified';
+  timestamp: number;
+}
+
+export type AppMetadata = AppMetadataPin | AppMetadataBackup | AppMetadataRevenueGoal | AppMetadataLastModified;

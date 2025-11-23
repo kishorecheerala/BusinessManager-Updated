@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Download, Folder, FileText, RefreshCw, Terminal, AlertTriangle, LogIn } from 'lucide-react';
+import { X, Download, Folder, FileText, RefreshCw, Terminal, AlertTriangle, LogIn, Settings, Save } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
-import { debugDriveState } from '../utils/googleDrive';
+import { debugDriveState, getClientId } from '../utils/googleDrive';
 
 interface CloudDebugModalProps {
   isOpen: boolean;
@@ -17,6 +17,12 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
   const [details, setDetails] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  
+  const [customClientId, setCustomClientId] = useState('');
+
+  useEffect(() => {
+      setCustomClientId(getClientId());
+  }, [isOpen]);
 
   const runDiagnostics = async () => {
     if (!state.googleUser?.accessToken) {
@@ -39,7 +45,7 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
   };
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && state.googleUser) {
       runDiagnostics();
     }
   }, [isOpen]);
@@ -67,6 +73,21 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
   const handleForceAuth = () => {
       googleSignIn({ forceConsent: true });
       onClose();
+  };
+  
+  const handleSaveClientId = () => {
+      if (!customClientId.trim()) return;
+      if (window.confirm("Changing Client ID requires a page reload. Continue?")) {
+          localStorage.setItem('google_client_id', customClientId.trim());
+          window.location.reload();
+      }
+  };
+  
+  const handleResetClientId = () => {
+      if (window.confirm("Reset to default Client ID?")) {
+          localStorage.removeItem('google_client_id');
+          window.location.reload();
+      }
   };
 
   if (!isOpen) return null;
@@ -113,7 +134,7 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
                             or a different version of this app.
                         </p>
                         <p className="text-xs text-red-600 dark:text-red-400 mt-2 font-bold">
-                            If Debug Log shows "403": Click "Force Re-Auth" and allow all permissions.
+                            If Debug Log shows "403": Check Configuration below.
                         </p>
                     </div>
                 )}
@@ -158,6 +179,38 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
                             </div>
                         </div>
                     ))}
+                </div>
+            </div>
+
+            {/* Custom Configuration Section */}
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-lg border border-gray-200 dark:border-slate-700">
+                <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
+                    <Settings size={16} /> Custom Configuration
+                </h3>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                    If you are getting a <b>403 error</b>, it means the default Client ID is blocked or mismatches your project. 
+                    Create your own OAuth Client ID in Google Cloud Console, enable Drive API, and paste the ID below.
+                </p>
+                <div className="space-y-2">
+                    <label className="block text-xs font-bold text-gray-600 dark:text-gray-300">Client ID</label>
+                    <div className="flex gap-2">
+                        <input 
+                            type="text" 
+                            value={customClientId}
+                            onChange={(e) => setCustomClientId(e.target.value)}
+                            className="flex-grow p-2 text-xs border rounded dark:bg-slate-900 dark:border-slate-600 dark:text-white"
+                            placeholder="7320...apps.googleusercontent.com"
+                        />
+                        <Button onClick={handleSaveClientId} className="h-8 text-xs">
+                            <Save size={14} className="mr-1" /> Save & Reload
+                        </Button>
+                    </div>
+                    <div className="flex justify-between items-center mt-2">
+                        <p className="text-[10px] text-gray-400">
+                            Authorized Origin: <span className="font-mono text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-slate-700 px-1 rounded">{window.location.origin}</span>
+                        </p>
+                        <button onClick={handleResetClientId} className="text-[10px] text-red-500 hover:underline">Reset to Default</button>
+                    </div>
                 </div>
             </div>
 

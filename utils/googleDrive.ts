@@ -4,7 +4,11 @@
 // Create an OAuth 2.0 Client ID -> Web Application
 // Add your Vercel URL (https://kishore-business-manager.vercel.app) to "Authorized JavaScript origins"
 // ENSURE NO TRAILING SLASH at the end of the URL in Google Console (e.g., use .app NOT .app/).
-const CLIENT_ID = '732045270886-84cr2t9q71lgttqgdn1jqu9f7ub5qfo3.apps.googleusercontent.com'.trim(); 
+const DEFAULT_CLIENT_ID = '732045270886-84cr2t9q71lgttqgdn1jqu9f7ub5qfo3.apps.googleusercontent.com'.trim(); 
+
+export const getClientId = () => {
+    return localStorage.getItem('google_client_id') || DEFAULT_CLIENT_ID;
+};
 
 // Updated Scopes: Includes Drive File access AND User Profile/Email access
 // Note: drive.file only allows access to files created by THIS app.
@@ -32,7 +36,7 @@ export const loadGoogleScript = (): Promise<void> => {
 
 export const initGoogleAuth = (callback: (response: any) => void) => {
   return (window as any).google.accounts.oauth2.initTokenClient({
-    client_id: CLIENT_ID,
+    client_id: getClientId(),
     scope: SCOPES,
     ux_mode: 'popup',
     callback: callback,

@@ -41,6 +41,7 @@ type Action =
   | { type: 'SET_PIN'; payload: string }
   | { type: 'REMOVE_PIN' }
   | { type: 'SET_REVENUE_GOAL'; payload: number }
+  | { type: 'UPDATE_METADATA_TIMESTAMP'; payload: number }
   | { type: 'ADD_CUSTOMER'; payload: Customer }
   | { type: 'UPDATE_CUSTOMER'; payload: Customer }
   | { type: 'ADD_SUPPLIER'; payload: Supplier }
@@ -148,6 +149,12 @@ const appReducer = (state: AppState, action: Action): AppState => {
             app_metadata: [...metaWithoutGoal, { id: 'revenueGoal', amount: action.payload }],
             ...touch
         };
+    }
+    case 'UPDATE_METADATA_TIMESTAMP': {
+        const timestamp = action.payload;
+        const meta = state.app_metadata.filter(m => m.id !== 'lastModified');
+        // Note: We DO NOT update lastLocalUpdate here to avoid loops with the useEffect that triggers this
+        return { ...state, app_metadata: [...meta, { id: 'lastModified', timestamp }] };
     }
     case 'ADD_CUSTOMER':
       return { ...state, customers: [...state.customers, action.payload], ...touch };
@@ -416,7 +423,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       localStorage.setItem('googleUser', JSON.stringify(user));
       dispatch({ type: 'SET_GOOGLE_USER', payload: user });
       await performSync(accessToken);
-      dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
+      // syncStatus is set inside performSync
       showToast(`Signed in as ${user.name}`);
     } catch (error) {
       console.error("Login failed", error);
@@ -428,31 +435,37 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   const performRestore = async (data: any, accessToken: string) => {
       await db.importData(data, true); // Merge
             
-      // Reload state
+      // Reload state from DB to ensure we have the full picture (Arrays)
       const mergedData = await db.exportData() as any;
       
-      // Normalize
-      const normalize = (d: any) => {
-          if (d.profile && Array.isArray(d.profile)) {
-              d.profile = d.profile.length > 0 ? d.profile[0] : null;
+      // Normalize for App State (React)
+      // Profile must be an object in state, but is an array in DB/JSON
+      const normalizeForState = (d: any) => {
+          const stateData = { ...d };
+          if (stateData.profile && Array.isArray(stateData.profile)) {
+              stateData.profile = stateData.profile.length > 0 ? stateData.profile[0] : null;
           }
-          if (d.sales) {
-              d.sales = d.sales.map((s: any) => ({ ...s, payments: s.payments || [] }));
+          if (stateData.sales) {
+              stateData.sales = stateData.sales.map((s: any) => ({ ...s, payments: s.payments || [] }));
           }
-          if (d.purchases) {
-              d.purchases = d.purchases.map((p: any) => ({ ...p, payments: p.payments || [] }));
+          if (stateData.purchases) {
+              stateData.purchases = stateData.purchases.map((p: any) => ({ ...p, payments: p.payments || [] }));
           }
-          return d;
+          return stateData;
       };
       
-      const finalState = normalize(mergedData);
-      // Update state without triggering lastLocalUpdate (to avoid infinite loop)
+      // We create a separate object for state to not mutate mergedData which is used for upload
+      const finalState = normalizeForState(mergedData);
+      
+      // Update React State
       dispatch({ type: 'SET_STATE', payload: finalState });
       showToast("Data restored from cloud.", 'success');
 
       // Push back to update timestamp on current active file
+      // CRITICAL FIX: Upload `mergedData` (where profile is Array) NOT `finalState` (where profile is Object).
+      // IndexedDB/Import expects arrays for collections to work correctly on other devices.
       try {
-          await DriveService.write(accessToken, finalState);
+          await DriveService.write(accessToken, mergedData);
       } catch(e: any) {
           console.error("Upload failed during sync", e);
       }
@@ -466,36 +479,49 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // 1. Pull (Download) using DriveService
         let remoteData = null;
         try {
-            showToast("Checking cloud backup...", 'info');
+            showToast("Checking cloud...", 'info');
             remoteData = await DriveService.read(accessToken);
-            console.log("Remote Data received keys:", remoteData ? Object.keys(remoteData) : "null");
         } catch (e) {
             console.error("Failed to download remote file:", e);
-            showToast("Sync Failed: Could not download backup. Check connection.", 'info');
-            // Rethrow so we exit the sync process entirely
+            // If download fails completely (network/auth), abort sync
             throw e; 
         }
 
-        if (remoteData && Object.keys(remoteData).length > 0) {
-            await performRestore(remoteData, accessToken);
-        } else {
-            // No remote file found or empty -> Check local
-            const currentData = await db.exportData();
-            const hasLocalData = (currentData.customers && currentData.customers.length > 0) || 
-                                 (currentData.sales && currentData.sales.length > 0) ||
-                                 (currentData.products && currentData.products.length > 0);
+        // 2. Timestamp Check
+        const currentLocalData = await db.exportData();
+        const localMeta = (currentLocalData.app_metadata || []) as AppMetadata[];
+        // @ts-ignore
+        const localTs = localMeta.find(m => m.id === 'lastModified')?.timestamp || 0;
+        
+        const remoteMeta = (remoteData?.app_metadata || []) as AppMetadata[];
+        // @ts-ignore
+        const remoteTs = remoteMeta.find(m => m.id === 'lastModified')?.timestamp || 0;
 
-            if (hasLocalData) {
-                await DriveService.write(accessToken, currentData);
-            } else {
-                // Both local and remote are empty or remote is null
-                if (remoteData === null) {
-                    showToast("No cloud backup found. Creating new one...", 'info');
-                    // Attempt to initialize empty cloud file to establish link
-                    await DriveService.write(accessToken, currentData);
-                }
-            }
+        console.log(`Sync Check: LocalTS=${localTs}, RemoteTS=${remoteTs}`);
+
+        if (remoteData && remoteTs > localTs) {
+            console.log("Remote is newer. Restoring...");
+            await performRestore(remoteData, accessToken);
+        } else if (localTs > remoteTs || !remoteData) {
+             console.log("Local is newer (or remote empty). Uploading...");
+             // Upload local data to cloud (currentLocalData has arrays, so it's safe)
+             await DriveService.write(accessToken, currentLocalData);
+        } else {
+             // Timestamps equal.
+             // Legacy Case Check: If both 0, and local is empty but remote has data, restore.
+             const localHasData = (currentLocalData.customers || []).length > 0;
+             const remoteHasData = (remoteData?.customers || []).length > 0;
+             
+             if (localTs === 0 && remoteTs === 0 && !localHasData && remoteHasData) {
+                 console.log("Legacy Sync: Local empty, remote has data. Restoring...");
+                 await performRestore(remoteData, accessToken);
+             } else {
+                 console.log("Data is up to date.");
+             }
         }
+        
+        dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
+
     } catch (e: any) {
         console.error("Sync failed", e);
         dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
@@ -538,7 +564,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       try {
           const accessToken = state.googleUser.accessToken;
           await performSync(accessToken);
-          dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
           showToast("Cloud Sync Complete");
       } catch (e) {
           dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
@@ -568,6 +593,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch({ type: 'SET_SYNC_STATUS', payload: 'idle' });
     showToast("Signed out. Local data cleared.");
   };
+
+  // Update Metadata Timestamp when local data changes
+  // This is crucial for the sync logic to work
+  useEffect(() => {
+      if (isDbLoaded && state.lastLocalUpdate > 0) {
+          dispatch({ type: 'UPDATE_METADATA_TIMESTAMP', payload: state.lastLocalUpdate });
+      }
+  }, [state.lastLocalUpdate, isDbLoaded]);
 
   // Auto-Sync Effect
   useEffect(() => {
