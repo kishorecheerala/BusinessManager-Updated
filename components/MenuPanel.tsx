@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
-import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning } from 'lucide-react';
+import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit } from 'lucide-react';
 import { Page } from '../types';
 import { useAppContext } from '../context/AppContext';
 import AuditLogPanel from './AuditLogPanel';
 import CloudDebugModal from './CloudDebugModal';
+import ColorPickerModal from './ColorPickerModal';
 
 interface MenuPanelProps {
   isOpen: boolean;
@@ -13,98 +14,263 @@ interface MenuPanelProps {
   onNavigate: (page: Page) => void;
 }
 
+const THEME_GROUPS = [
+    {
+        name: 'Business',
+        colors: [
+            { hex: '#0d9488', name: 'Teal (Default)' },
+            { hex: '#2563eb', name: 'Blue' },
+            { hex: '#4f46e5', name: 'Indigo' },
+            { hex: '#334155', name: 'Slate' },
+        ]
+    },
+    {
+        name: 'Vibrant',
+        colors: [
+            { hex: '#7c3aed', name: 'Violet' },
+            { hex: '#db2777', name: 'Pink' },
+            { hex: '#e11d48', name: 'Rose' },
+            { hex: '#ea580c', name: 'Orange' },
+        ]
+    },
+    {
+        name: 'Nature',
+        colors: [
+            { hex: '#059669', name: 'Emerald' },
+            { hex: '#16a34a', name: 'Green' },
+            { hex: '#65a30d', name: 'Lime' },
+            { hex: '#0891b2', name: 'Cyan' },
+        ]
+    },
+    {
+        name: 'Dark',
+        colors: [
+            { hex: '#475569', name: 'Slate' },
+            { hex: '#52525b', name: 'Zinc' },
+            { hex: '#57534e', name: 'Stone' },
+            { hex: '#000000', name: 'Black' },
+        ]
+    }
+];
+
+// Helper to determine best text color (black or white) for a given background color
+const getContrastColor = (hexColor: string) => {
+    const r = parseInt(hexColor.substr(1, 2), 16);
+    const g = parseInt(hexColor.substr(3, 2), 16);
+    const b = parseInt(hexColor.substr(5, 2), 16);
+    const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+    return (yiq >= 128) ? 'black' : 'white';
+};
+
 const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, onNavigate }) => {
-    const { state, googleSignIn, googleSignOut, syncData } = useAppContext();
+    const { state, dispatch, googleSignIn, googleSignOut, syncData } = useAppContext();
     const [isAuditOpen, setIsAuditOpen] = useState(false);
     const [isCloudDebugOpen, setIsCloudDebugOpen] = useState(false);
+    const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
 
-    if (!isOpen && !isAuditOpen && !isCloudDebugOpen) return null;
+    const setTheme = (mode: 'light' | 'dark') => {
+        dispatch({ type: 'SET_THEME', payload: mode });
+    };
+
+    const resetTheme = () => {
+        dispatch({ type: 'SET_THEME_COLOR', payload: '#0d9488' });
+        dispatch({ type: 'SET_THEME', payload: 'light' });
+    };
+
+    if (!isOpen && !isAuditOpen && !isCloudDebugOpen && !isColorPickerOpen) return null;
 
     return (
         <>
         <AuditLogPanel isOpen={isAuditOpen} onClose={() => setIsAuditOpen(false)} />
         <CloudDebugModal isOpen={isCloudDebugOpen} onClose={() => setIsCloudDebugOpen(false)} />
+        <ColorPickerModal 
+            isOpen={isColorPickerOpen} 
+            onClose={() => setIsColorPickerOpen(false)}
+            initialColor={state.themeColor}
+            onChange={(color) => dispatch({ type: 'SET_THEME_COLOR', payload: color })}
+        />
         
         {isOpen && (
         <div 
-          className="absolute top-full left-0 mt-2 w-72 bg-white dark:bg-slate-800 rounded-lg shadow-2xl border border-gray-200 dark:border-slate-700 text-text dark:text-slate-200 animate-scale-in origin-top-left z-40 flex flex-col max-h-[80vh]"
+          className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 text-text dark:text-slate-200 animate-scale-in origin-top-left z-40 flex flex-col overflow-hidden max-h-[calc(100vh-6rem)]"
           role="dialog"
           aria-label="Main Menu"
+          onTouchStart={(e) => e.stopPropagation()} 
         >
-            <div className="p-2 flex-grow overflow-y-auto">
+            {/* User Header */}
+            <div className="p-4 bg-gray-50 dark:bg-slate-900/50 border-b border-gray-100 dark:border-slate-700 shrink-0">
                 {state.googleUser ? (
-                    <div className="p-3 mb-2 bg-gray-100 dark:bg-slate-700 rounded-lg flex items-center gap-3">
-                        <img src={state.googleUser.picture} alt="User" className="w-8 h-8 rounded-full" />
+                    <div className="flex items-center gap-3">
+                        <img src={state.googleUser.picture} alt="User" className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-600 shadow-sm" />
                         <div className="overflow-hidden">
-                            <p className="text-xs font-bold truncate">{state.googleUser.name}</p>
-                            <p className="text-[10px] text-gray-500 truncate">{state.googleUser.email}</p>
+                            <p className="text-sm font-bold truncate text-gray-800 dark:text-white">{state.googleUser.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{state.googleUser.email}</p>
                         </div>
                     </div>
-                ) : null}
-
-                <button
-                    onClick={onProfileClick}
-                    className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                    <User className="w-5 h-5 text-primary" />
-                    <span className="font-semibold text-sm">My Business Profile</span>
-                </button>
-                <button
-                    onClick={() => onNavigate('INSIGHTS')}
-                    className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                    <BarChart2 className="w-5 h-5 text-primary" />
-                    <span className="font-semibold text-sm">Business Insights</span>
-                </button>
-                <button
-                    onClick={() => { onClose(); setIsAuditOpen(true); }}
-                    className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                    <Activity className="w-5 h-5 text-primary" />
-                    <span className="font-semibold text-sm">Audit Logs</span>
-                </button>
-                
-                <div className="my-1 border-t dark:border-slate-700"></div>
-
-                {state.googleUser ? (
-                    <>
-                    <button
-                        onClick={() => { syncData(); onClose(); }}
-                        className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors"
-                    >
-                        <RefreshCw className={`w-5 h-5 text-blue-600 ${state.syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                        <span className="font-semibold text-sm">Sync Now</span>
-                    </button>
-                    
-                    <button
-                        onClick={() => { onClose(); setIsCloudDebugOpen(true); }}
-                        className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-amber-50 dark:hover:bg-slate-700 transition-colors text-amber-600"
-                    >
-                        <CloudLightning className="w-5 h-5" />
-                        <span className="font-semibold text-sm">Cloud Diagnostics</span>
-                    </button>
-
-                    <button
-                        onClick={() => { googleSignOut(); onClose(); }}
-                        className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors text-red-600 group"
-                    >
-                        <LogOut className="w-5 h-5" />
-                        <div>
-                            <span className="font-semibold text-sm block">Sign Out & Switch</span>
-                            <span className="text-[10px] opacity-70 group-hover:opacity-100">Clears local data</span>
-                        </div>
-                    </button>
-                    </>
                 ) : (
                     <button
                         onClick={() => { googleSignIn(); onClose(); }}
-                        className="w-full flex items-center gap-3 text-left p-3 rounded-md hover:bg-teal-50 dark:hover:bg-slate-700 transition-colors text-primary"
+                        className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-primary text-white font-semibold text-sm shadow-md hover:bg-opacity-90 transition-all"
                     >
-                        <LogIn className="w-5 h-5" />
-                        <span className="font-semibold text-sm">Sign In with Google</span>
+                        <LogIn className="w-4 h-4" />
+                        Sign In with Google
                     </button>
                 )}
             </div>
+
+            {/* Scrollable Content - Added min-h-0 and overscroll-contain for reliable scrolling */}
+            <div className="p-2 flex-grow overflow-y-auto custom-scrollbar space-y-1 min-h-0 overscroll-contain pb-10">
+                
+                {/* Main Navigation */}
+                <button onClick={onProfileClick} className="menu-item">
+                    <User className="w-5 h-5 text-blue-500" />
+                    <span className="flex-grow text-sm font-medium">Business Profile</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+                
+                <button onClick={() => onNavigate('INSIGHTS')} className="menu-item">
+                    <BarChart2 className="w-5 h-5 text-purple-500" />
+                    <span className="flex-grow text-sm font-medium">Business Insights</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+
+                <button onClick={() => { onClose(); setIsAuditOpen(true); }} className="menu-item">
+                    <Activity className="w-5 h-5 text-amber-500" />
+                    <span className="flex-grow text-sm font-medium">Audit Logs</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+
+                <div className="my-2 border-t border-gray-100 dark:border-slate-700 mx-2"></div>
+
+                {/* Appearance Section */}
+                <div className="px-3 py-2">
+                    <div className="flex items-center gap-2 mb-3">
+                        <Palette className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Appearance</span>
+                    </div>
+
+                    {/* Mode Switcher */}
+                    <div className="bg-gray-100 dark:bg-slate-700 p-1 rounded-lg flex mb-4">
+                        <button 
+                            onClick={() => setTheme('light')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-semibold transition-all ${state.theme === 'light' ? 'bg-white dark:bg-slate-600 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                        >
+                            <Sun size={14} /> Light
+                        </button>
+                        <button 
+                            onClick={() => setTheme('dark')}
+                            className={`flex-1 flex items-center justify-center gap-2 py-1.5 rounded-md text-xs font-semibold transition-all ${state.theme === 'dark' ? 'bg-slate-600 text-white shadow-sm' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'}`}
+                        >
+                            <Moon size={14} /> Dark
+                        </button>
+                    </div>
+
+                    {/* Color Picker Grid */}
+                    <div className="space-y-3">
+                        {THEME_GROUPS.map(group => (
+                            <div key={group.name}>
+                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-1.5 pl-1">{group.name}</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {group.colors.map((t) => {
+                                        const isSelected = state.themeColor.toLowerCase() === t.hex.toLowerCase();
+                                        return (
+                                            <button
+                                                key={t.hex}
+                                                onClick={() => dispatch({ type: 'SET_THEME_COLOR', payload: t.hex })}
+                                                className={`w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-110 ${
+                                                    isSelected 
+                                                    ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-500 scale-110 shadow-sm' 
+                                                    : 'border border-gray-200 dark:border-slate-600 opacity-80 hover:opacity-100'
+                                                }`}
+                                                style={{ backgroundColor: t.hex }}
+                                                title={t.name}
+                                            >
+                                                {isSelected && (
+                                                    <Check 
+                                                        size={14} 
+                                                        color={getContrastColor(t.hex)} 
+                                                        strokeWidth={3} 
+                                                        className="drop-shadow-sm" 
+                                                    />
+                                                )}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ))}
+                        
+                        {/* Custom & Reset */}
+                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
+                             <div 
+                                className="relative group cursor-pointer flex-1"
+                                onClick={() => { onClose(); setIsColorPickerOpen(true); }}
+                             >
+                                <div className="w-full h-9 rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shadow-sm group-hover:shadow-md transition-all border border-white/20 hover:scale-[1.02]">
+                                    Custom Color
+                                </div>
+                            </div>
+                            <button 
+                                onClick={resetTheme}
+                                className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                                title="Reset to Default"
+                            >
+                                <RotateCcw size={16} />
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="my-2 border-t border-gray-100 dark:border-slate-700 mx-2"></div>
+
+                {/* System / Sync Section */}
+                {state.googleUser && (
+                    <div className="px-2 pb-2 space-y-1">
+                        <button
+                            onClick={() => { syncData(); onClose(); }}
+                            className="menu-item text-blue-600 dark:text-blue-400"
+                        >
+                            <RefreshCw className={`w-5 h-5 ${state.syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                            <span className="flex-grow text-sm font-medium">Sync Now</span>
+                        </button>
+                        
+                        <button
+                            onClick={() => { onClose(); setIsCloudDebugOpen(true); }}
+                            className="menu-item text-amber-600 dark:text-amber-400"
+                        >
+                            <CloudLightning className="w-5 h-5" />
+                            <span className="flex-grow text-sm font-medium">Diagnostics</span>
+                        </button>
+
+                        <button
+                            onClick={() => { googleSignOut(); onClose(); }}
+                            className="menu-item text-red-600 dark:text-red-400"
+                        >
+                            <LogOut className="w-5 h-5" />
+                            <span className="flex-grow text-sm font-medium">Sign Out</span>
+                        </button>
+                    </div>
+                )}
+            </div>
+            
+            <style>{`
+                .menu-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                    width: 100%;
+                    padding: 10px 12px;
+                    border-radius: 12px;
+                    transition: all 0.2s;
+                    color: inherit;
+                }
+                .menu-item:hover {
+                    background-color: rgba(0,0,0,0.04);
+                }
+                .dark .menu-item:hover {
+                    background-color: rgba(255,255,255,0.05);
+                }
+            `}</style>
         </div>
         )}
         </>

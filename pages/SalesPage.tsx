@@ -12,6 +12,7 @@ import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { logoBase64 } from '../utils/logo';
 import DateInput from '../components/DateInput';
+import DatePill from '../components/DatePill';
 
 
 const getLocalDateString = (date = new Date()) => {
@@ -706,7 +707,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
-            <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
+            
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
+                <DatePill />
+            </div>
             
             <Card>
                 <div className="space-y-4">

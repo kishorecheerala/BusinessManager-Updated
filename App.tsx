@@ -19,6 +19,7 @@ import NotificationsPanel from './components/NotificationsPanel';
 import MenuPanel from './components/MenuPanel';
 import ProfileModal from './components/ProfileModal';
 import AskAIModal from './components/AskAIModal';
+import FloatingActionButton from './components/FloatingActionButton';
 import { BeforeInstallPromptEvent, Page, SyncStatus } from './types';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useSwipe } from './hooks/useSwipe';
@@ -30,7 +31,7 @@ const Toast = () => {
     const isSuccess = state.toast.type === 'success';
     const containerClasses = "fixed top-5 inset-x-0 flex justify-center z-[200]";
     const toastClasses = isSuccess
-        ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-full shadow-xl animate-fade-in-up font-medium flex items-center gap-2"
+        ? "bg-primary text-white px-6 py-3 rounded-full shadow-xl animate-fade-in-up font-medium flex items-center gap-2"
         : "bg-slate-800 text-white px-6 py-3 rounded-full shadow-xl animate-fade-in-up font-medium flex items-center gap-2";
 
     return (
@@ -53,12 +54,12 @@ const NavItem: React.FC<{
       onClick={onClick}
       className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-1 rounded-2xl transition-all duration-300 ${
         isActive 
-          ? 'text-teal-600 dark:text-teal-400 transform -translate-y-1' 
+          ? 'text-primary transform -translate-y-1' 
           : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
       }`}
     >
-      <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-teal-50 dark:bg-teal-900/30' : ''}`}>
-        <Icon className={`w-6 h-6 ${isActive ? 'fill-teal-600/20 dark:fill-teal-400/20' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
+      <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-primary/10' : ''}`}>
+        <Icon className={`w-6 h-6 ${isActive ? 'fill-primary/20' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
       </div>
       <span className={`text-[10px] font-semibold mt-1 transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
     </button>
@@ -101,7 +102,7 @@ const QuickAddMenu: React.FC<{
 
 const SyncIndicator: React.FC<{ status: SyncStatus, user: any }> = ({ status, user }) => {
     // Keep this as a visual icon summary on the right
-    if (!user) return <CloudOff className="w-5 h-5 text-teal-200 opacity-60" />;
+    if (!user) return <CloudOff className="w-5 h-5 text-white/60" />;
     
     if (status === 'syncing') return <RefreshCw className="w-5 h-5 text-white animate-spin" />;
     if (status === 'error') return <CloudOff className="w-5 h-5 text-red-300" />;
@@ -131,7 +132,7 @@ const MainApp: React.FC = () => {
   const [navConfirm, setNavConfirm] = useState<{ show: boolean, page: Page | null }>({ show: false, page: null });
 
   const { state, dispatch, isDbLoaded } = useAppContext();
-  const { installPromptEvent, theme } = state;
+  const { installPromptEvent, theme, themeColor } = state;
   const [isInstallBannerVisible, setIsInstallBannerVisible] = useState(true);
 
   const menuRef = useRef<HTMLDivElement>(null);
@@ -155,12 +156,35 @@ const MainApp: React.FC = () => {
     
     localStorage.setItem('theme', theme);
   }, [theme]);
-  
-  const toggleTheme = () => {
-    const newTheme = theme === 'dark' ? 'light' : 'dark';
-    dispatch({ type: 'SET_THEME', payload: newTheme });
-  };
 
+  // Apply dynamic theme color with Adaptive Lightening for Dark Mode
+  useEffect(() => {
+      if (themeColor) {
+          // Convert Hex to RGB
+          const hex = themeColor.replace('#', '');
+          let r = parseInt(hex.substring(0, 2), 16);
+          let g = parseInt(hex.substring(2, 4), 16);
+          let b = parseInt(hex.substring(4, 6), 16);
+          
+          // If in dark mode, we might need to lighten the primary color if it's too dark
+          // to ensure visibility of text/icons against dark backgrounds.
+          if (theme === 'dark') {
+              // Calculate relative luminance
+              const lum = (0.299 * r + 0.587 * g + 0.114 * b);
+              // If luminance is low (dark color), lighten it
+              if (lum < 120) {
+                  const mix = 0.4; // Blend 40% with white
+                  r = Math.round(r + (255 - r) * mix);
+                  g = Math.round(g + (255 - g) * mix);
+                  b = Math.round(b + (255 - b) * mix);
+              }
+          }
+
+          document.documentElement.style.setProperty('--primary-color', `${r} ${g} ${b}`);
+          localStorage.setItem('themeColor', themeColor);
+      }
+  }, [themeColor, theme]);
+  
   const handleInstallClick = async () => {
     if (!installPromptEvent) return;
     installPromptEvent.prompt();
@@ -217,8 +241,10 @@ const MainApp: React.FC = () => {
       <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
       <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={(p, id) => { dispatch({ type: 'SET_SELECTION', payload: { page: p, id } }); _setCurrentPage(p); setIsSearchOpen(false); }} />
       <ConfirmationModal isOpen={navConfirm.show} onClose={() => setNavConfirm({ show: false, page: null })} onConfirm={() => { if (navConfirm.page) { setIsDirty(false); _setCurrentPage(navConfirm.page); } setNavConfirm({ show: false, page: null }); }} title="Unsaved Changes">You have unsaved changes. Leave anyway?</ConfirmationModal>
+      <FloatingActionButton onNavigate={(page, action) => { dispatch({ type: 'SET_SELECTION', payload: { page, id: action || 'new' } }); _setCurrentPage(page); }} />
       
-      <header className="bg-gradient-to-r from-teal-600 to-emerald-600 text-white shadow-lg p-3 px-4 flex items-center justify-between relative z-30 sticky top-0">
+      {/* Dynamic Theme Header */}
+      <header className="bg-primary text-white shadow-lg p-3 px-4 flex items-center justify-between relative z-[60] sticky top-0">
           <div className="flex items-center gap-1">
             <div className="relative" ref={menuRef}>
               <button onClick={() => setIsMenuOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95">
@@ -265,10 +291,9 @@ const MainApp: React.FC = () => {
              <div className='flex items-center justify-center w-8 h-8'>
                 <SyncIndicator status={state.syncStatus} user={state.googleUser} />
              </div>
-             <button onClick={toggleTheme} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95">
-                {theme === 'dark' ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-            </button>
-             <div className="relative" ref={quickAddRef}>
+             
+             {/* Hidden on mobile, visible on desktop */}
+             <div className="relative hidden md:block" ref={quickAddRef}>
                 <button onClick={() => setIsQuickAddOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95 bg-white/10 shadow-sm border border-white/10">
                     <Plus className="w-6 h-6" strokeWidth={3} />
                 </button>
@@ -277,7 +302,7 @@ const MainApp: React.FC = () => {
             <div className="relative" ref={notificationsRef}>
                  <button onClick={() => setIsNotificationsOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95">
                     <Bell className="w-6 h-6" />
-                    {state.notifications.some(n => !n.read) && <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-500 border-2 border-white"></span>}
+                    {state.notifications.some(n => !n.read) && <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-50 border-2 border-white"></span>}
                 </button>
                  <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={(page) => { _setCurrentPage(page); setIsNotificationsOpen(false); }} />
             </div>
@@ -285,13 +310,13 @@ const MainApp: React.FC = () => {
       </header>
 
       {installPromptEvent && isInstallBannerVisible && (
-        <div className="bg-gradient-to-r from-teal-500 to-emerald-500 text-white p-3 flex items-center justify-between gap-4 animate-fade-in-up shadow-lg mx-4 mt-4 rounded-xl">
+        <div className="bg-primary text-white p-3 flex items-center justify-between gap-4 animate-fade-in-up shadow-lg mx-4 mt-4 rounded-xl">
             <div className="flex items-center gap-3">
                 <div className="bg-white/20 p-2 rounded-lg"><Download className="w-5 h-5" /></div>
                 <p className="font-bold text-sm">Install App for Offline Access</p>
             </div>
             <div className="flex items-center gap-2">
-                <button onClick={handleInstallClick} className="bg-white text-teal-600 font-bold py-1.5 px-4 rounded-lg text-xs shadow-md hover:bg-gray-50 transition-colors">Install</button>
+                <button onClick={handleInstallClick} className="bg-white text-primary font-bold py-1.5 px-4 rounded-lg text-xs shadow-md hover:bg-gray-50 transition-colors">Install</button>
                 <button onClick={() => setIsInstallBannerVisible(false)} className="p-1 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
             </div>
         </div>
@@ -316,11 +341,11 @@ const MainApp: React.FC = () => {
                     onClick={() => setIsMoreMenuOpen(prev => !prev)}
                     className={`flex flex-col items-center justify-center w-full pt-3 pb-2 rounded-2xl transition-all duration-300 ${
                         moreNavItems.some(i => i.page === currentPage) || isMoreMenuOpen 
-                        ? 'text-teal-600 dark:text-teal-400 transform -translate-y-1' 
+                        ? 'text-primary transform -translate-y-1' 
                         : 'text-gray-400 dark:text-gray-500'
                     }`}
                     >
-                    <div className={`p-1 rounded-full ${moreNavItems.some(i => i.page === currentPage) ? 'bg-teal-50 dark:bg-teal-900/30' : ''}`}>
+                    <div className={`p-1 rounded-full ${moreNavItems.some(i => i.page === currentPage) ? 'bg-primary/10' : ''}`}>
                          <Menu className="w-6 h-6" strokeWidth={moreNavItems.some(i => i.page === currentPage) ? 2.5 : 2} />
                     </div>
                     <span className="text-[10px] font-semibold mt-1">More</span>
@@ -335,7 +360,7 @@ const MainApp: React.FC = () => {
                                     onClick={() => { setCurrentPage(item.page); setIsMoreMenuOpen(false); }} 
                                     className={`w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-colors ${
                                         currentPage === item.page 
-                                            ? 'bg-teal-50 dark:bg-teal-900/20 text-teal-600 dark:text-teal-400 font-bold' 
+                                            ? 'bg-primary/10 text-primary font-bold' 
                                             : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 text-gray-600 dark:text-gray-300'
                                     }`}
                                 >

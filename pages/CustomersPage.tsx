@@ -12,6 +12,7 @@ import autoTable from 'jspdf-autotable';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { generateThermalInvoicePDF, generateA4InvoicePdf } from '../utils/pdfGenerator';
 import DateInput from '../components/DateInput';
+import DatePill from '../components/DatePill';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -604,8 +605,11 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     return (
         <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-primary">Customers</h1>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-primary">Customers</h1>
+                    <DatePill />
+                </div>
                 <Button onClick={() => setIsAdding(!isAdding)}>
                     <Plus className="w-4 h-4 mr-2" />
                     {isAdding ? 'Cancel' : 'Add Customer'}

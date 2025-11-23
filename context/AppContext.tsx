@@ -27,9 +27,10 @@ export interface AppState {
   installPromptEvent: BeforeInstallPromptEvent | null;
   pin: string | null;
   theme: Theme;
+  themeColor: string; // Added property
   googleUser: GoogleUser | null;
   syncStatus: SyncStatus;
-  lastSyncTime: number | null; // Added property
+  lastSyncTime: number | null;
   lastLocalUpdate: number;
   restoreFromFileId?: (fileId: string) => Promise<void>;
 }
@@ -37,6 +38,7 @@ export interface AppState {
 type Action =
   | { type: 'SET_STATE'; payload: Partial<AppState> }
   | { type: 'SET_THEME'; payload: Theme }
+  | { type: 'SET_THEME_COLOR'; payload: string } // Added action
   | { type: 'SET_NOTIFICATIONS'; payload: Notification[] }
   | { type: 'SET_PROFILE'; payload: ProfileData | null }
   | { type: 'SET_PIN'; payload: string }
@@ -91,6 +93,10 @@ const getInitialTheme = (): Theme => {
   return 'light';
 };
 
+const getInitialThemeColor = (): string => {
+    return localStorage.getItem('themeColor') || '#0d9488';
+};
+
 const getInitialGoogleUser = (): GoogleUser | null => {
   try {
     const stored = localStorage.getItem('googleUser');
@@ -128,6 +134,7 @@ const initialState: AppState = {
   installPromptEvent: null,
   pin: null,
   theme: getInitialTheme(),
+  themeColor: getInitialThemeColor(),
   googleUser: getInitialGoogleUser(),
   syncStatus: 'idle',
   lastSyncTime: getInitialSyncTime(),
@@ -141,8 +148,10 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return { ...state, ...action.payload };
     case 'SET_THEME':
         return { ...state, theme: action.payload };
+    case 'SET_THEME_COLOR':
+        return { ...state, themeColor: action.payload };
     case 'RESET_APP':
-        return { ...initialState, theme: state.theme, installPromptEvent: state.installPromptEvent };
+        return { ...initialState, theme: state.theme, themeColor: state.themeColor, installPromptEvent: state.installPromptEvent };
     case 'REPLACE_COLLECTION':
         return { ...state, [action.payload.storeName]: action.payload.data, ...touch };
     case 'SET_NOTIFICATIONS':

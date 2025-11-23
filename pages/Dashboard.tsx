@@ -241,7 +241,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
                     icon: Crown,
                     type: 'Top Customer',
                     text: `${topCustomer.name} is the top spender this month (₹${customerSpend[topCustomerId].toLocaleString('en-IN')}).`,
-                    color: 'text-teal-600 dark:text-teal-400'
+                    color: 'text-primary dark:text-teal-400'
                 });
             }
         }
@@ -252,7 +252,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
                 icon: Sparkles,
                 type: 'AI Assistant',
                 text: "I'm analyzing your data. Record more sales and purchases to see advanced trends and alerts here.",
-                color: 'text-teal-600 dark:text-teal-400'
+                color: 'text-primary dark:text-teal-400'
             });
         }
 
@@ -260,20 +260,20 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
     }, [sales, products, customers, purchases, returns]);
 
     return (
-        <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-teal-100 dark:border-slate-700 transition-all hover:shadow-xl animate-slide-up-fade">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 via-emerald-500 to-cyan-500"></div>
+        <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-primary/10 dark:border-slate-700 transition-all hover:shadow-xl animate-slide-up-fade">
+            <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
             <div className="p-5">
                 <div className="flex items-center gap-2 mb-4">
-                    <div className="p-2 bg-teal-100 dark:bg-teal-900/50 rounded-full animate-pulse-bg">
-                        <BrainCircuit className="w-6 h-6 text-teal-600 dark:text-teal-400" />
+                    <div className="p-2 bg-primary/10 rounded-full animate-pulse-bg">
+                        <BrainCircuit className="w-6 h-6 text-primary" />
                     </div>
                     <h3 className="font-bold text-xl text-gray-800 dark:text-white">Smart Analyst</h3>
-                    <span className="text-[10px] font-bold bg-teal-100 text-teal-700 dark:bg-teal-900 dark:text-teal-300 px-2 py-0.5 rounded-full border border-teal-200 dark:border-teal-800">AI Powered</span>
+                    <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">AI Powered</span>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {insights.map((insight, idx) => (
-                        <div key={idx} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors border border-transparent hover:border-teal-100 dark:hover:border-teal-800 animate-slide-up-fade" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div key={idx} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade" style={{ animationDelay: `${idx * 100}ms` }}>
                             <div className="mt-1 flex-shrink-0">
                                 <insight.icon className={`w-5 h-5 ${insight.color}`} />
                             </div>
@@ -793,7 +793,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     
                     {/* Left: Welcome Message (First) */}
                     <div className="flex justify-start z-10">
-                         <span className="text-xs sm:text-sm font-medium px-2 sm:px-4 py-1 sm:py-1.5 rounded-full bg-teal-50 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 shadow-sm transition-transform hover:scale-105 cursor-default whitespace-nowrap flex items-center gap-1 max-w-full">
+                         <span className="text-xs sm:text-sm font-medium px-2 sm:px-4 py-1 sm:py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm transition-transform hover:scale-105 cursor-default whitespace-nowrap flex items-center gap-1 max-w-full">
                             <span className="hidden sm:inline">Welcome back,</span>
                             <span className="sm:hidden">Hi,</span>
                             <strong className="truncate">{profile?.ownerName || 'Owner'}</strong>
@@ -802,7 +802,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
 
                     {/* Center: Dashboard Title (Second) */}
                     <div className="flex justify-center">
-                        <h1 className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-teal-600 to-emerald-600 dark:from-teal-400 dark:to-emerald-400 tracking-tight drop-shadow-sm">
+                        <h1 className="text-xl sm:text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-emerald-600 tracking-tight drop-shadow-sm">
                             Dashboard
                         </h1>
                     </div>
@@ -846,9 +846,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     title="Sales" 
                     value={stats.monthSalesTotal} 
                     subValue={`${stats.salesCount} orders this period`}
-                    color="bg-teal-50 dark:bg-teal-900/20" 
-                    iconBgColor="bg-teal-100 dark:bg-teal-800" 
-                    textColor="text-teal-700 dark:text-teal-100" 
+                    color="bg-primary/5 dark:bg-primary/10" 
+                    iconBgColor="bg-primary/20" 
+                    textColor="text-primary" 
                     onClick={() => setCurrentPage('SALES')}
                     delay={0}
                 />
