@@ -87,23 +87,24 @@ export async function importData(data: any, merge: boolean = false): Promise<voi
     const db = await getDb();
     const tx = db.transaction(STORE_NAMES, 'readwrite');
     
-    await Promise.all(STORE_NAMES.map(async (storeName) => {
-        // Exclude notifications from the main data import
-        if (storeName === 'notifications') return;
+    // Execute sequentially to ensure transaction stability
+    for (const storeName of STORE_NAMES) {
+        if (storeName === 'notifications') continue;
         
         // If not merging, clear the existing data first (overwrite mode)
-        // If merging, we keep existing data and overwrite only collisions (same IDs)
         if (!merge) {
             await tx.objectStore(storeName).clear();
         }
         
         const items = (data as any)[storeName] || [];
-        for (const item of items) {
-            if (item && 'id' in item) {
-                await tx.objectStore(storeName).put(item);
+        if (Array.isArray(items)) {
+            for (const item of items) {
+                if (item && 'id' in item) {
+                    await tx.objectStore(storeName).put(item);
+                }
             }
         }
-    }));
+    }
     
     await tx.done;
 }

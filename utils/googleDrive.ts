@@ -224,46 +224,52 @@ export const DriveService = {
      * - THROWS error if file exists but download fails (prevents empty overwrite).
      */
     async read(accessToken: string): Promise<any | null> {
-        const folderId = await this.ensureFolder(accessToken);
-        
-        // 1. Get File ID (Cache or Search)
-        let fileId = localStorage.getItem('gdrive_file_id');
-        if (!fileId) {
-            const remoteFile = await searchFile(accessToken, folderId);
-            fileId = remoteFile ? remoteFile.id : null;
-            if (fileId) localStorage.setItem('gdrive_file_id', fileId);
-        }
-
-        // 2. If no file found after search, return null (New Setup)
-        if (!fileId) return null;
-
-        // 3. Download
-        try {
-            const data = await downloadFile(accessToken, fileId);
-            if (!data) {
-                throw new Error("Backup file found but content is empty or invalid.");
-            }
-            return data;
-        } catch (e: any) {
-            // Handle Stale ID (404)
-            if (e.message && e.message.includes('404')) {
-                console.warn("Cached File ID stale, searching again...");
-                localStorage.removeItem('gdrive_file_id');
+        // Recursively try to read, allowing one retry with cache cleared
+        const attemptRead = async (retry: boolean): Promise<any | null> => {
+            try {
+                const folderId = await this.ensureFolder(accessToken);
                 
-                // Retry search once
-                const remoteFile = await searchFile(accessToken, folderId);
-                if (remoteFile) {
-                    localStorage.setItem('gdrive_file_id', remoteFile.id);
-                    const retryData = await downloadFile(accessToken, remoteFile.id);
-                    if (!retryData) throw new Error("Backup file found on retry but content is empty.");
-                    return retryData;
-                } else {
-                    return null; // File truly deleted
+                // 1. Get File ID (Cache or Search)
+                let fileId = localStorage.getItem('gdrive_file_id');
+                if (!fileId) {
+                    const remoteFile = await searchFile(accessToken, folderId);
+                    fileId = remoteFile ? remoteFile.id : null;
+                    if (fileId) localStorage.setItem('gdrive_file_id', fileId);
                 }
+
+                if (!fileId) {
+                    // Critical: If no file found, it might be because the Cached Folder ID is dead/trashed.
+                    // If this is the first attempt, verify by clearing folder cache and retrying.
+                    if (retry) {
+                        console.warn("No file found in cached folder. Clearing folder cache and retrying...");
+                        localStorage.removeItem('gdrive_folder_id');
+                        localStorage.removeItem('gdrive_file_id');
+                        return await attemptRead(false); // Retry once
+                    }
+                    return null;
+                }
+
+                // 3. Download
+                const data = await downloadFile(accessToken, fileId);
+                if (!data) {
+                    throw new Error("Backup file found but content is empty or invalid.");
+                }
+                return data;
+
+            } catch (e: any) {
+                // Handle Stale ID (404) for File or Folder (network/api errors)
+                if (retry && (e.message?.includes('404') || e.message?.includes('Stale'))) {
+                    console.warn("Drive read error (404/Stale). Clearing cache and retrying...", e);
+                    localStorage.removeItem('gdrive_folder_id');
+                    localStorage.removeItem('gdrive_file_id');
+                    return await attemptRead(false);
+                }
+                // Rethrow other errors (Auth, Corrupt Data)
+                throw e;
             }
-            // Rethrow other errors (Network, Auth, Corrupt Data) to abort sync
-            throw e;
-        }
+        };
+
+        return attemptRead(true);
     },
 
     /**
@@ -292,6 +298,7 @@ export const DriveService = {
             if (e.message && e.message.includes('404')) {
                 console.warn("Upload target not found, creating new file...");
                 localStorage.removeItem('gdrive_file_id');
+                // Retry upload as a new file
                 const result = await uploadFile(accessToken, folderId, data);
                 if (result && result.id) {
                     localStorage.setItem('gdrive_file_id', result.id);
