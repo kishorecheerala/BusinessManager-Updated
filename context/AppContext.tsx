@@ -348,7 +348,7 @@ interface AppContextType {
     dispatch: React.Dispatch<Action>;
     showToast: (message: string, type?: 'success' | 'info') => void;
     isDbLoaded: boolean;
-    googleSignIn: () => void;
+    googleSignIn: (options?: { forceConsent?: boolean }) => void;
     googleSignOut: () => void;
     syncData: () => Promise<void>;
     restoreFromFileId: (fileId: string) => Promise<void>;
@@ -502,6 +502,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         
         if (e.message && (e.message.includes('401') || e.message.includes('403'))) {
              showToast("Sync Error: Authentication failed. Please sign in again.", 'info');
+        } else if (e.message && e.message.includes('Access Not Configured')) {
+             showToast("Sync Error: Drive API not enabled. See Diagnostics.", 'info');
         }
     } finally {
         isSyncingRef.current = false;
@@ -544,9 +546,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       }
   };
 
-  const googleSignIn = () => {
+  const googleSignIn = (options?: { forceConsent?: boolean }) => {
     if (tokenClient.current) {
-      tokenClient.current.requestAccessToken();
+      if (options?.forceConsent) {
+          tokenClient.current.requestAccessToken({ prompt: 'consent' });
+      } else {
+          tokenClient.current.requestAccessToken();
+      }
     } else {
       showToast("Google Auth not initialized", 'info');
     }

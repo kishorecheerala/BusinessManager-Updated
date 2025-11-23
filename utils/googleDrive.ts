@@ -89,6 +89,25 @@ const safeJsonParse = async (response: Response) => {
     }
 };
 
+const handleApiError = async (response: Response, context: string) => {
+    let details = response.statusText;
+    try {
+        const body = await response.json();
+        if (body.error) {
+            details = body.error.message || JSON.stringify(body.error);
+        }
+    } catch (e) {
+        // fallback to text if json fails
+        try {
+             const text = await response.text();
+             if(text) details = text;
+        } catch(e2) {}
+    }
+    const msg = `${context}: ${response.status} (${details})`;
+    console.error(msg);
+    throw new Error(msg);
+}
+
 // --- Low Level Operations ---
 
 // Helper to get ALL candidate folders
@@ -101,8 +120,7 @@ export const getCandidateFolders = async (accessToken: string) => {
     cache: 'no-store' // Force network request
   });
   if (!response.ok) {
-      console.error("Google Drive List Folders Failed", response.status, response.statusText);
-      throw new Error(`Search Folders Failed: ${response.status}`);
+      await handleApiError(response, "Search Folders Failed");
   }
   const data = await safeJsonParse(response);
   return data && data.files ? data.files : [];
@@ -120,7 +138,7 @@ export const createFolder = async (accessToken: string) => {
     body: JSON.stringify(metadata),
     cache: 'no-store'
   });
-  if (!response.ok) throw new Error(`Create Folder Failed: ${response.status}`);
+  if (!response.ok) await handleApiError(response, "Create Folder Failed");
   const file = await safeJsonParse(response);
   return file ? file.id : null;
 };
@@ -132,7 +150,7 @@ export const searchFile = async (accessToken: string, folderId: string) => {
     headers: getHeaders(accessToken),
     cache: 'no-store'
   });
-  if (!response.ok) throw new Error(`Search File Failed: ${response.status}`);
+  if (!response.ok) await handleApiError(response, "Search File Failed");
   const data = await safeJsonParse(response);
   return data && data.files && data.files.length > 0 ? data.files[0] : null;
 };
@@ -164,10 +182,7 @@ export const uploadFile = async (accessToken: string, folderId: string, content:
     cache: 'no-store'
   });
   
-  if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Upload Failed: ${response.status} - ${errText}`);
-  }
+  if (!response.ok) await handleApiError(response, "Upload Failed");
   
   return await safeJsonParse(response);
 };
@@ -180,11 +195,10 @@ export const downloadFile = async (accessToken: string, fileId: string) => {
   });
   
   if (!response.ok) {
-      // 404 implies file gone/deleted remotely
       if (response.status === 404) {
           throw new Error(`Download Failed: 404 Not Found (File ID: ${fileId})`);
       }
-      throw new Error(`Download Failed: ${response.status} ${response.statusText}`);
+      await handleApiError(response, "Download Failed");
   }
   
   const data = await safeJsonParse(response);
@@ -280,7 +294,14 @@ export const debugDriveState = async (accessToken: string) => {
             });
             
             if (!response.ok) {
-                log(`  ERROR reading folder: ${response.status}`);
+                let errMsg = `ERROR reading folder: ${response.status}`;
+                try {
+                    const errBody = await response.json();
+                    if (errBody.error && errBody.error.message) {
+                        errMsg += ` - ${errBody.error.message}`;
+                    }
+                } catch(e) {}
+                log(`  ${errMsg}`);
                 continue;
             }
 
@@ -298,6 +319,12 @@ export const debugDriveState = async (accessToken: string) => {
         return { logs, details };
     } catch (e: any) {
         log(`CRITICAL ERROR: ${e.message}`);
+        if (e.message && (e.message.includes("403") || e.message.includes("Access Not Configured"))) {
+            log("HINT: This usually means the 'Google Drive API' is not enabled in Google Cloud Console.");
+        }
+        if (e.message && e.message.includes("Insufficient Permission")) {
+            log("HINT: Try 'Force Re-Auth' to grant permissions again.");
+        }
         return { logs, details: [] };
     }
 }

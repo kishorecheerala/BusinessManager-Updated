@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { X, Download, Folder, FileText, RefreshCw, Terminal, AlertTriangle } from 'lucide-react';
+import { X, Download, Folder, FileText, RefreshCw, Terminal, AlertTriangle, LogIn } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
@@ -12,7 +12,7 @@ interface CloudDebugModalProps {
 }
 
 const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) => {
-  const { state, dispatch } = useAppContext();
+  const { state, dispatch, googleSignIn } = useAppContext();
   const [logs, setLogs] = useState<string[]>([]);
   const [details, setDetails] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -50,34 +50,23 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
 
     setRestoringId(fileId);
     try {
-        // We use the generic SYNC action but triggering a specific read logic would be ideal.
-        // Here we re-use the download logic but manually.
-        // Since we don't have a direct 'download and load' exposed in context, we import directly from utils in context.
-        // However, context exposes `performSync`. Let's use a dispatch to trigger a special restore action if possible,
-        // or since this is a debug component, using the global `window.appContext` pattern or adding a helper in context is needed.
-        // For now, we will rely on the AppContext having a method or we handle it via a custom event/callback prop if we were pure.
-        // BUT, to make it work with existing context, we will call a new exposed method in AppContext (see AppContext update).
-        // Assuming AppContext now has `restoreSpecificFile`.
-        const context: any = (window as any).__businessManagerContext; // Fallback hack or use hook
-        // Better way: Use the hook. The hook is used at top level.
+        // @ts-ignore
+        const restoreFn = state.restoreFromFileId; 
+        if (restoreFn) {
+            await restoreFn(fileId);
+        } else {
+            alert("Restore function not available in context yet. Please refresh.");
+        }
     } catch (e) {
         alert("Restore failed.");
     }
-    
-    // Actually, let's dispatch a custom action or rely on prop if AppContext was passed.
-    // Since we are inside the component, we have `dispatch` and `state`.
-    // We need `restoreFromFileId` in AppContext.
-    // Let's assume we added `restoreFromFileId` to the context value.
-    
-    // @ts-ignore
-    const restoreFn = state.restoreFromFileId; 
-    if (restoreFn) {
-        await restoreFn(fileId);
-    } else {
-        alert("Restore function not available in context yet. Please refresh.");
-    }
     setRestoringId(null);
     onClose();
+  };
+
+  const handleForceAuth = () => {
+      googleSignIn({ forceConsent: true });
+      onClose();
   };
 
   if (!isOpen) return null;
@@ -95,13 +84,18 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
 
         <div className="flex-grow overflow-y-auto p-4 space-y-6 bg-slate-50 dark:bg-slate-900">
             {/* Status Bar */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
                 <span className={`text-xs font-bold px-2 py-1 rounded ${loading ? 'bg-blue-100 text-blue-700' : 'bg-green-100 text-green-700'}`}>
                     {loading ? 'Scanning Drive...' : 'Scan Complete'}
                 </span>
-                <Button onClick={runDiagnostics} variant="secondary" className="h-8 text-xs">
-                    <RefreshCw size={14} className={`mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
-                </Button>
+                <div className="flex gap-2">
+                    <Button onClick={handleForceAuth} variant="secondary" className="h-8 text-xs bg-amber-100 hover:bg-amber-200 text-amber-800 border-amber-200">
+                        <LogIn size={14} className="mr-1" /> Force Re-Auth
+                    </Button>
+                    <Button onClick={runDiagnostics} variant="secondary" className="h-8 text-xs">
+                        <RefreshCw size={14} className={`mr-1 ${loading ? 'animate-spin' : ''}`} /> Refresh
+                    </Button>
+                </div>
             </div>
 
             {/* Found Data Section */}
@@ -116,7 +110,10 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
                         <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                             The app cannot see any folder named 'BusinessManager_AppData'. 
                             This usually means the backup was created with a different Google Account 
-                            or a different version of this app (due to permissions).
+                            or a different version of this app.
+                        </p>
+                        <p className="text-xs text-red-600 dark:text-red-400 mt-2 font-bold">
+                            If Debug Log shows "403": Click "Force Re-Auth" and allow all permissions.
                         </p>
                     </div>
                 )}
