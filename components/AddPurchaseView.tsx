@@ -103,44 +103,51 @@ const QRScannerModal: React.FC<{
 }> = ({ onClose, onScanned }) => {
     const [scanStatus, setScanStatus] = useState<string>("Initializing camera...");
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+    const scannerId = "qr-reader-purchase";
 
     useEffect(() => {
-        html5QrCodeRef.current = new Html5Qrcode("qr-reader-purchase");
+        // Cleanup element to ensure fresh start
+        const container = document.getElementById(scannerId);
+        if (container) container.innerHTML = "";
+
+        html5QrCodeRef.current = new Html5Qrcode(scannerId);
         setScanStatus("Requesting camera permissions...");
 
-        const qrCodeSuccessCallback = (decodedText: string) => {
-            if (html5QrCodeRef.current?.isScanning) {
-                html5QrCodeRef.current.stop().then(() => {
-                    onScanned(decodedText);
-                }).catch(err => {
-                    console.error("Error stopping scanner", err);
-                    onScanned(decodedText);
-                });
-            }
-        };
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-        html5QrCodeRef.current.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, undefined)
-            .then(() => setScanStatus("Scanning for QR Code..."))
-            .catch(err => {
-                setScanStatus(`Camera Permission Error. Please allow camera access.`);
-                console.error("Camera start failed.", err);
-            });
+        html5QrCodeRef.current.start(
+            { facingMode: "environment" }, 
+            config, 
+            (decodedText) => {
+                onScanned(decodedText);
+                if (html5QrCodeRef.current?.isScanning) {
+                    html5QrCodeRef.current.stop().catch(console.error);
+                }
+            }, 
+            (errorMessage) => {}
+        ).then(() => {
+            setScanStatus("Scanning for QR Code...");
+        }).catch(err => {
+            setScanStatus(`Camera Error: ${err}. Please allow camera access.`);
+            console.error("Camera start failed.", err);
+        });
             
         return () => {
             if (html5QrCodeRef.current?.isScanning) {
-                html5QrCodeRef.current.stop().catch(err => console.error("Cleanup stop scan failed.", err));
+                html5QrCodeRef.current.stop().then(() => {
+                    html5QrCodeRef.current?.clear();
+                }).catch(console.error);
             }
         };
     }, [onScanned]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex flex-col items-center justify-center z-[100] p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex flex-col items-center justify-center z-[110] p-4 animate-fade-in-fast">
             <Card title="Scan Product QR Code" className="w-full max-w-md relative animate-scale-in">
-                 <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                 <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors z-10">
                     <X size={20}/>
                  </button>
-                <div id="qr-reader-purchase" className="w-full mt-4 rounded-lg overflow-hidden border"></div>
+                <div id={scannerId} className="w-full mt-4 rounded-lg overflow-hidden border bg-black min-h-[250px]"></div>
                 <p className="text-center text-sm my-2 text-gray-600 dark:text-gray-400">{scanStatus}</p>
             </Card>
         </div>

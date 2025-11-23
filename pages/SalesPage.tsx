@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ChevronDown } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -8,7 +8,7 @@ import Button from '../components/Button';
 import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
-import { generateThermalInvoicePDF, generateA4InvoicePdf } from '../utils/pdfGenerator';
+import { generateThermalInvoicePDF } from '../utils/pdfGenerator';
 
 
 const getLocalDateString = (date = new Date()) => {
@@ -30,7 +30,7 @@ const AddCustomerModal: React.FC<{
     onSave: () => void;
     onCancel: () => void;
 }> = React.memo(({ newCustomer, onInputChange, onSave, onCancel }) => (
-    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast">
+    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
         <Card title="Add New Customer" className="w-full max-w-md animate-scale-in">
             <div className="space-y-4">
                 <div>
@@ -86,7 +86,7 @@ const ProductSearchModal: React.FC<{
     const [productSearchTerm, setProductSearchTerm] = useState('');
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
           <Card className="w-full max-w-lg animate-scale-in">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-bold">Select Product</h2>
@@ -132,45 +132,55 @@ const QRScannerModal: React.FC<{
 }> = ({ onClose, onScanned }) => {
     const [scanStatus, setScanStatus] = useState<string>("Initializing camera...");
     const html5QrCodeRef = useRef<Html5Qrcode | null>(null);
+    const scannerId = "qr-reader-sales";
 
     useEffect(() => {
-        html5QrCodeRef.current = new Html5Qrcode("qr-reader-sales");
+        // Cleanup existing instance if any (fixes overlap issues on re-render)
+        const container = document.getElementById(scannerId);
+        if (container) container.innerHTML = "";
+
+        html5QrCodeRef.current = new Html5Qrcode(scannerId);
         setScanStatus("Requesting camera permissions...");
 
-        const qrCodeSuccessCallback = (decodedText: string) => {
-            if (html5QrCodeRef.current?.isScanning) {
-                html5QrCodeRef.current.stop().then(() => {
-                    onScanned(decodedText);
-                }).catch(err => {
-                    console.error("Error stopping scanner", err);
-                    // Still call onScanned even if stopping fails, to proceed with logic
-                    onScanned(decodedText);
-                });
-            }
-        };
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-        html5QrCodeRef.current.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, undefined)
-            .then(() => setScanStatus("Scanning for QR Code..."))
-            .catch(err => {
-                setScanStatus(`Camera Permission Error. Please allow camera access for this site in your browser's settings.`);
-                console.error("Camera start failed.", err);
-            });
+        html5QrCodeRef.current.start(
+            { facingMode: "environment" }, 
+            config, 
+            (decodedText) => {
+                // Success callback
+                onScanned(decodedText);
+                // Stop scanning immediately on success
+                if (html5QrCodeRef.current?.isScanning) {
+                    html5QrCodeRef.current.stop().catch(console.error);
+                }
+            }, 
+            (errorMessage) => {
+                // Ignore parse errors, they spam the console
+            }
+        ).then(() => {
+            setScanStatus("Scanning for QR Code...");
+        }).catch(err => {
+            setScanStatus(`Camera Error: ${err}. Please check permissions.`);
+            console.error("Camera start failed.", err);
+        });
             
         return () => {
             if (html5QrCodeRef.current?.isScanning) {
-                html5QrCodeRef.current.stop().catch(err => console.error("Cleanup stop scan failed.", err));
+                html5QrCodeRef.current.stop().then(() => {
+                    html5QrCodeRef.current?.clear();
+                }).catch(console.error);
             }
         };
     }, [onScanned]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex flex-col items-center justify-center z-50 p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-80 backdrop-blur-sm flex flex-col items-center justify-center z-[110] p-4 animate-fade-in-fast">
             <Card title="Scan Product QR Code" className="w-full max-w-md relative animate-scale-in">
-                 <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                 <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors z-10">
                     <X size={20}/>
                  </button>
-                <div id="qr-reader-sales" className="w-full mt-4 rounded-lg overflow-hidden border"></div>
+                <div id={scannerId} className="w-full mt-4 rounded-lg overflow-hidden border bg-black min-h-[250px]"></div>
                 <p className="text-center text-sm my-2 text-gray-600 dark:text-gray-400">{scanStatus}</p>
             </Card>
         </div>
@@ -418,7 +428,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const generateAndSharePDF = async (sale: Sale, customer: Customer, paidAmountOnSale: number) => {
       try {
-        // Use thermal invoice layout for sharing as requested
+        // Use thermal invoice layout for sharing
         const doc = await generateThermalInvoicePDF(sale, customer, state.profile);
         
         const pdfBlob = doc.output('blob');
@@ -692,13 +702,21 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
 
             <Card title="Sale Items">
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={() => setIsSelectingProduct(true)} className="w-full sm:w-auto flex-grow" disabled={!customerId}>
-                        <Search size={16} className="mr-2"/> Select Product
-                    </Button>
-                    <Button onClick={() => setIsScanning(true)} variant="secondary" className="w-full sm:w-auto flex-grow" disabled={!customerId}>
-                        <QrCode size={16} className="mr-2"/> Scan Product
-                    </Button>
+                <div className="grid grid-cols-1 gap-3 mb-4">
+                    <button
+                        onClick={() => setIsSelectingProduct(true)}
+                        disabled={!customerId}
+                        className="w-full py-4 bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-xl shadow-md flex items-center justify-center gap-3 text-lg font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                    >
+                        <Search className="w-6 h-6" /> Select Product
+                    </button>
+                    <button
+                        onClick={() => setIsScanning(true)}
+                        disabled={!customerId}
+                        className="w-full py-4 bg-rose-700/90 hover:bg-rose-700 text-white rounded-xl shadow-md flex items-center justify-center gap-3 text-lg font-semibold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed backdrop-blur-sm"
+                    >
+                        <QrCode className="w-6 h-6" /> Scan Product
+                    </button>
                 </div>
                 <div className="mt-4 space-y-2">
                     {items.map(item => (

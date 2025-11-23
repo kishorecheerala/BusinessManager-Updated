@@ -1,4 +1,3 @@
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Sale, Customer, ProfileData, Purchase, Supplier, Return } from '../types';
@@ -35,7 +34,7 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
     if (profile) {
         doc.setFont('times', 'bold');
         doc.setFontSize(22);
-        doc.setTextColor('#009688'); // Teal Color
+        doc.setTextColor(0, 128, 128); // Teal Color #008080
         doc.text(profile.name, centerX, currentY, { align: 'center' });
         currentY += 8;
         
@@ -57,7 +56,7 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
         }
     } else {
         doc.setFontSize(22);
-        doc.setTextColor('#0d9488');
+        doc.setTextColor(0, 128, 128);
         doc.text("Business Manager", centerX, currentY, { align: 'center' });
         currentY += 8;
     }
@@ -74,7 +73,7 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
 // --- Thermal Receipt Generator (80mm) ---
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null): Promise<jsPDF> => {
     // Estimate height dynamically: Base ~150mm + items
-    const estimatedHeight = 180 + (sale.items.length * 15);
+    const estimatedHeight = 200 + (sale.items.length * 15);
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -82,23 +81,23 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     });
 
     const pageWidth = 80;
-    const margin = 4;
+    const margin = 3;
     const centerX = pageWidth / 2;
     let y = 8;
 
     // 1. Sacred Text
     doc.setFont('times', 'italic');
-    doc.setFontSize(11);
+    doc.setFontSize(10);
     doc.setTextColor('#000000');
     doc.text('Om Namo Venkatesaya', centerX, y, { align: 'center' });
     y += 6;
 
     // 2. Business Name (Teal, Times Bold)
     doc.setFont('times', 'bold');
-    doc.setFontSize(20);
-    doc.setTextColor('#009688'); // Teal
+    doc.setFontSize(18);
+    doc.setTextColor(0, 128, 128); // Teal color #008080
     doc.text(profile?.name || 'Business Name', centerX, y, { align: 'center' });
-    y += 8;
+    y += 7;
 
     doc.setTextColor('#000000');
     doc.setFont('helvetica', 'normal');
@@ -110,38 +109,40 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     const startHeaderY = y;
 
     // Left side: Invoice No & Date
+    doc.setFontSize(8);
     doc.text(`Invoice: ${sale.id}`, margin, y);
-    y += 5;
-    const dateStr = new Date(sale.date).toLocaleString('en-IN', {
-        day: '2-digit', month: '2-digit', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', hour12: false
-    });
+    y += 4;
+    
+    // Format date as DD/MM/YYYY, HH:mm:ss
+    const d = new Date(sale.date);
+    const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}, ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
     doc.text(`Date: ${dateStr}`, margin, y);
-    y += 5;
+    y += 4;
 
     // Right side: QR Code
     const qrBase64 = await getQrCodeBase64(sale.id);
     if (qrBase64) {
-        doc.addImage(qrBase64, 'PNG', qrX, startHeaderY - 2, qrSize, qrSize);
+        doc.addImage(qrBase64, 'PNG', qrX, startHeaderY, qrSize, qrSize);
     }
 
-    // Move y past QR code if needed
+    // Adjust Y to be below QR code or text, whichever is lower, but typically text is on left and QR on right
+    // We need some space before "Billed To"
     y = Math.max(y + 2, startHeaderY + qrSize + 2);
 
     // 4. Billed To
     doc.setFont('helvetica', 'bold');
     doc.text('Billed To:', margin, y);
-    y += 5;
+    y += 4;
     doc.setFont('helvetica', 'normal');
     doc.text(customer.name, margin, y);
-    y += 5;
+    y += 4;
     const addressLines = doc.splitTextToSize(customer.address, pageWidth - (margin * 2));
     doc.text(addressLines, margin, y);
-    y += (addressLines.length * 5) + 3;
+    y += (addressLines.length * 4) + 2;
 
     // 5. Purchase Details Header
     doc.setDrawColor(0);
-    doc.setLineWidth(0.3);
+    doc.setLineWidth(0.2);
     doc.line(margin, y, pageWidth - margin, y);
     y += 5;
     doc.setFont('helvetica', 'bold');
@@ -154,7 +155,6 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     doc.text('Item', margin, y);
     doc.text('Total', pageWidth - margin, y, { align: 'right' });
     y += 2;
-    doc.setDrawColor(200); // Light grey separator
     doc.line(margin, y, pageWidth - margin, y);
     y += 5;
 
@@ -166,7 +166,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         // Item Name
         doc.setTextColor('#000000');
         doc.setFontSize(9);
-        const nameLines = doc.splitTextToSize(item.productName, 50); // Leave room for total
+        const nameLines = doc.splitTextToSize(item.productName, 50); 
         doc.text(nameLines, margin, y);
         
         // Total (aligned with first line of name)
@@ -183,7 +183,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
 
     // 8. Separator
     y += 2;
-    doc.setDrawColor(200);
+    doc.setDrawColor(200); // Light grey
     doc.line(margin, y, pageWidth - margin, y);
     y += 5;
 
@@ -205,13 +205,20 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     addTotalRow('GST', `Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
     addTotalRow('Discount', `Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
     
-    y += 2;
-    addTotalRow('Total', `Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, true, 11);
+    y += 1;
+    // Grand Total in Bold
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Total', pageWidth - 35, y, { align: 'right' });
+    doc.text(`Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, pageWidth - margin, y, { align: 'right' });
+    y += 6;
     
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
     addTotalRow('Paid', `Rs. ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
     
-    y += 2;
-    addTotalRow('Due', `Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, true, 11);
+    doc.setFont('helvetica', 'bold');
+    addTotalRow('Due', `Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
 
     return doc;
 };
@@ -255,7 +262,7 @@ export const generateA4InvoicePdf = async (sale: Sale, customer: Customer, profi
             `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [13, 148, 136] }, 
+        headStyles: { fillColor: [0, 128, 128] }, // Teal
         columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
     });
 
@@ -337,7 +344,7 @@ export const generateDebitNotePDF = async (returnData: Return, supplier: Supplie
             `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
         ]),
         theme: 'grid',
-        headStyles: { fillColor: [13, 148, 136] },
+        headStyles: { fillColor: [0, 128, 128] },
         columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
     });
 

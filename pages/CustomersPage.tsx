@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, User, Phone, MapPin, Search, Edit, Save, X, Trash2, IndianRupee, ShoppingCart, Download, Share2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -290,7 +289,6 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     const handleShareInvoice = async (sale: Sale) => {
         if (!selectedCustomer) return;
         try {
-            // Use thermal invoice layout for sharing
             const doc = await generateThermalInvoicePDF(sale, selectedCustomer, state.profile);
             const pdfBlob = doc.output('blob');
             const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
