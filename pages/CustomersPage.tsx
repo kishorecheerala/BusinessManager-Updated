@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, ChevronDown } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, ChevronDown, Printer } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Payment, Sale, Page } from '../types';
 import Card from '../components/Card';
@@ -10,7 +9,7 @@ import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { useDialog } from '../context/DialogContext';
 import PaymentModal from '../components/PaymentModal';
-import { generateInvoicePDF } from '../utils/pdfGenerator';
+import { generateInvoicePDF, generateThermalInvoicePDF } from '../utils/pdfGenerator';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -78,6 +77,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     const [confirmModalState, setConfirmModalState] = useState<{ isOpen: boolean, saleIdToDelete: string | null }>({ isOpen: false, saleIdToDelete: null });
     const isDirtyRef = useRef(false);
     const actionMenuRef = useRef<HTMLDivElement>(null);
+    const printIframeRef = useRef<HTMLIFrameElement | null>(null);
 
     useOnClickOutside(actionMenuRef, () => setActionMenuSaleId(null));
 
@@ -107,6 +107,10 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     useEffect(() => {
         return () => {
             setIsDirty(false);
+            // Cleanup print iframe if exists
+            if (printIframeRef.current) {
+                document.body.removeChild(printIframeRef.current);
+            }
         };
     }, [setIsDirty]);
 
@@ -226,34 +230,62 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
     };
 
-    const handlePrintInvoice = async (sale: Sale) => {
+    const handlePrintInvoice = async (sale: Sale, type: 'a4' | 'thermal' = 'a4') => {
         if (!selectedCustomer) return;
         try {
-            const doc = await generateInvoicePDF(sale, selectedCustomer, state.profile);
-            doc.autoPrint();
-            const pdfUrl = doc.output('bloburl');
-            window.open(pdfUrl, '_blank');
+            const doc = type === 'thermal' 
+                ? await generateThermalInvoicePDF(sale, selectedCustomer, state.profile)
+                : await generateInvoicePDF(sale, selectedCustomer, state.profile);
+            
+            // Create Blob URL
+            const blob = doc.output('blob');
+            const blobUrl = URL.createObjectURL(blob);
+
+            // Clean up old iframe
+            if (printIframeRef.current) {
+                document.body.removeChild(printIframeRef.current);
+            }
+
+            // Create hidden iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'absolute';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.src = blobUrl;
+            printIframeRef.current = iframe;
+            document.body.appendChild(iframe);
+
+            iframe.onload = () => {
+                if (iframe.contentWindow) {
+                    iframe.contentWindow.print();
+                }
+            };
         } catch (e) {
             console.error("Print error", e);
             showToast("Failed to generate invoice for printing.", 'info');
         }
     };
 
-    const handleShareInvoice = async (sale: Sale) => {
+    const handleShareInvoice = async (sale: Sale, type: 'a4' | 'thermal' = 'a4') => {
         if (!selectedCustomer) return;
         try {
-            const doc = await generateInvoicePDF(sale, selectedCustomer, state.profile);
+            const doc = type === 'thermal'
+                ? await generateThermalInvoicePDF(sale, selectedCustomer, state.profile)
+                : await generateInvoicePDF(sale, selectedCustomer, state.profile);
+                
             const pdfBlob = doc.output('blob');
-            const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
+            const fileName = type === 'thermal' ? `Receipt-${sale.id}.pdf` : `Invoice-${sale.id}.pdf`;
+            const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
             const businessName = state.profile?.name || 'Invoice';
 
             if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
                 await navigator.share({
-                    title: `${businessName} - Invoice ${sale.id}`,
+                    title: `${businessName} ${type === 'thermal' ? 'Receipt' : 'Invoice'} ${sale.id}`,
                     files: [pdfFile],
                 });
             } else {
-                doc.save(`Invoice-${sale.id}.pdf`);
+                doc.save(fileName);
             }
         } catch (e) {
             console.error("Share error", e);
@@ -275,6 +307,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         }
         // ... (rest of summary logic handled by manual jspdf calls is fine, or could be moved too)
         // For brevity, keeping existing Dues Summary logic but could be refactored later
+        showAlert("Feature coming soon!");
     };
 
     const filteredCustomers = state.customers.filter(c =>
@@ -395,9 +428,12 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                                             <Share2 size={16} />
                                                         </button>
                                                         {actionMenuSaleId === sale.id && (
-                                                            <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 text-text dark:text-slate-200 z-10 animate-scale-in origin-top-right">
-                                                                <button onClick={() => { handlePrintInvoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700">Print Invoice</button>
-                                                                <button onClick={() => { handleShareInvoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700">Share Invoice</button>
+                                                            <div className="absolute top-full right-0 mt-1 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 text-text dark:text-slate-200 z-10 animate-scale-in origin-top-right">
+                                                                <button onClick={() => { handlePrintInvoice(sale, 'a4'); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"><Printer size={14}/> Print A4 Invoice</button>
+                                                                <button onClick={() => { handlePrintInvoice(sale, 'thermal'); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"><Printer size={14}/> Print Thermal Receipt</button>
+                                                                <div className="border-t dark:border-slate-700 my-1"></div>
+                                                                <button onClick={() => { handleShareInvoice(sale, 'a4'); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"><Share2 size={14}/> Share A4 PDF</button>
+                                                                <button onClick={() => { handleShareInvoice(sale, 'thermal'); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700 flex items-center gap-2"><Share2 size={14}/> Share Receipt PDF</button>
                                                             </div>
                                                         )}
                                                     </div>
