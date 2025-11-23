@@ -5,13 +5,12 @@ import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
-import { logoBase64 } from '../utils/logo';
+import { generateThermalInvoicePDF } from '../utils/pdfGenerator';
 import DateInput from '../components/DateInput';
+import Dropdown from '../components/Dropdown';
 
 
 const getLocalDateString = (date = new Date()) => {
@@ -20,16 +19,6 @@ const getLocalDateString = (date = new Date()) => {
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
-
-const fetchImageAsBase64 = (url: string): Promise<string> =>
-  fetch(url)
-    .then(response => response.blob())
-    .then(blob => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    }));
 
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -431,116 +420,17 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const generateAndSharePDF = async (sale: Sale, customer: Customer, paidAmountOnSale: number) => {
       try {
-        const doc = new jsPDF();
-        const profile = state.profile;
-        let currentY = 15;
-
-        // FIX: Change image format to PNG
-        doc.addImage(logoBase64, 'PNG', 14, 10, 25, 25);
-
-        if (profile) {
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(24);
-            doc.setTextColor('#0d9488');
-            doc.text(profile.name, 105, currentY, { align: 'center' });
-            currentY += 8;
-            doc.setFontSize(10);
-            doc.setTextColor('#333333');
-            const addressLines = doc.splitTextToSize(profile.address, 180);
-            doc.text(addressLines, 105, currentY, { align: 'center' });
-            currentY += (addressLines.length * 5);
-            doc.text(`Phone: ${profile.phone} | GSTIN: ${profile.gstNumber}`, 105, currentY, { align: 'center' });
-        }
-        
-        currentY = Math.max(currentY, 10 + 25) + 5;
-
-        doc.setDrawColor('#cccccc');
-        doc.line(14, currentY, 196, currentY);
-        currentY += 10;
-        
-        doc.setFontSize(16);
-        doc.setFont('helvetica', 'bold');
-        doc.text('TAX INVOICE', 105, currentY, { align: 'center' });
-        currentY += 10;
-        
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Billed To:', 14, currentY);
-        doc.text('Invoice Details:', 120, currentY);
-        currentY += 5;
-
-        doc.setFont('helvetica', 'normal');
-        doc.text(customer.name, 14, currentY);
-        doc.text(`Invoice ID: ${sale.id}`, 120, currentY);
-        currentY += 5;
-        
-        const customerAddressLines = doc.splitTextToSize(customer.address, 80);
-        doc.text(customerAddressLines, 14, currentY);
-        doc.text(`Date: ${new Date(sale.date).toLocaleString()}`, 120, currentY);
-        currentY += (customerAddressLines.length * 5) + 5;
-        
-        autoTable(doc, {
-            startY: currentY,
-            head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
-            body: sale.items.map((item, index) => [
-                index + 1,
-                item.productName,
-                item.quantity,
-                `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
-                `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [13, 148, 136] },
-            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
-        });
-        
-        currentY = (doc as any).lastAutoTable.finalY + 10;
-        
-        // FIX: Calculate values from the `sale` object, not stale component state. This also fixes the scope issue.
-        const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
-        const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
-        
-        const totalsX = 196;
-        doc.setFontSize(10);
-        doc.setFont('helvetica', 'normal');
-        doc.text('Subtotal:', totalsX - 30, currentY, { align: 'right' });
-        doc.text(`Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
-        currentY += 7;
-
-        doc.text('Discount:', totalsX - 30, currentY, { align: 'right' });
-        doc.text(`- Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
-        currentY += 7;
-
-        doc.text('GST Included:', totalsX - 30, currentY, { align: 'right' });
-        doc.text(`Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
-        currentY += 7;
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('Grand Total:', totalsX - 30, currentY, { align: 'right' });
-        doc.text(`Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
-        currentY += 7;
-
-        doc.setFont('helvetica', 'normal');
-        doc.text('Paid:', totalsX - 30, currentY, { align: 'right' });
-        doc.text(`Rs. ${paidAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
-        currentY += 7;
-
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(dueAmountOnSale > 0.01 ? '#dc2626' : '#16a34a');
-        doc.text('Amount Due:', totalsX - 30, currentY, { align: 'right' });
-        doc.text(`Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
-        
-        currentY = doc.internal.pageSize.height - 20;
-        doc.setFontSize(10);
-        doc.setTextColor('#888888');
-        doc.text('Thank you for your business!', 105, currentY, { align: 'center' });
+        // Use the shared thermal generator
+        const doc = await generateThermalInvoicePDF(sale, customer, state.profile);
         
         const pdfBlob = doc.output('blob');
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        // FIX: Use locally scoped variables for whatsAppText instead of calculations from component state to ensure data consistency.
+        // Calculate values for text message
+        const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+        const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
+
         const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmountOnSale.toLocaleString('en-IN')}\nDue: Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
         
         if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
@@ -862,11 +752,15 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600">
-                                    <option value="CASH">Cash</option>
-                                    <option value="UPI">UPI</option>
-                                    <option value="CHEQUE">Cheque</option>
-                                </select>
+                                 <Dropdown
+                                    options={[
+                                        { value: 'CASH', label: 'Cash' },
+                                        { value: 'UPI', label: 'UPI' },
+                                        { value: 'CHEQUE', label: 'Cheque' }
+                                    ]}
+                                    value={paymentDetails.method}
+                                    onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
@@ -890,11 +784,15 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                            <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600">
-                                <option value="CASH">Cash</option>
-                                <option value="UPI">UPI</option>
-                                <option value="CHEQUE">Cheque</option>
-                            </select>
+                            <Dropdown
+                                options={[
+                                    { value: 'CASH', label: 'Cash' },
+                                    { value: 'UPI', label: 'UPI' },
+                                    { value: 'CHEQUE', label: 'Cheque' }
+                                ]}
+                                value={paymentDetails.method}
+                                onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
+                            />
                         </div>
                     </div>
                 </Card>
