@@ -45,7 +45,7 @@ const PaymentModal: React.FC<{
     const dueAmount = Number(sale.totalAmount) - amountPaid;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
             <Card title="Add Payment" className="w-full max-w-sm animate-scale-in">
                 <div className="space-y-4">
                     <p>Invoice Total: <span className="font-bold">₹{Number(sale.totalAmount).toLocaleString('en-IN')}</span></p>
@@ -841,11 +841,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-primary">Customers</h1>
-                    <DatePill />
-                </div>
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-primary">Customers</h1>
                 <Button onClick={() => setIsAdding(!isAdding)}>
                     <Plus className="w-4 h-4 mr-2" />
                     {isAdding ? 'Cancel' : 'Add Customer'}

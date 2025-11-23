@@ -18,7 +18,7 @@ const ConfirmationModal: React.FC<ConfirmationModalProps> = ({ isOpen, onClose, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in-fast" aria-modal="true" role="dialog">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 animate-fade-in-fast" aria-modal="true" role="dialog">
       <Card title={title} className="w-full max-w-md animate-scale-in">
         <div className="space-y-4">
           <p className="text-gray-600 dark:text-gray-300">{children}</p>

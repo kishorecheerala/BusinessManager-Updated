@@ -54,7 +54,7 @@ const QRScannerModal: React.FC<{ onClose: () => void; onScanned: (text: string) 
     }, [onScanned]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center z-60 p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex flex-col items-center justify-center z-[100] p-4 animate-fade-in-fast">
             <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-4 w-full max-w-md relative animate-scale-in">
                 <div className="flex justify-between items-center mb-2">
                      <h3 className="text-lg font-bold text-primary">Scan QR Code</h3>
@@ -162,7 +162,7 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-background dark:bg-slate-900 z-50 flex flex-col p-4 animate-fade-in-fast" role="dialog" aria-modal="true">
+        <div className="fixed inset-0 bg-background dark:bg-slate-900 z-[100] flex flex-col p-4 animate-fade-in-fast" role="dialog" aria-modal="true">
             {isScanning && <QRScannerModal onClose={() => setIsScanning(false)} onScanned={handleScan} />}
             <div className="flex items-center gap-2 mb-4">
                 <div className="relative flex-grow">

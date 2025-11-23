@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Globe } from 'lucide-react';
 import Card from './Card';
 
 interface HelpModalProps {
@@ -277,73 +277,9 @@ const helpContent = {
           </div>
         )
       },
-      {
-        title: 'వాపసులు (Returns)',
-        content: (
-          <div className="space-y-2 text-sm">
-             <p>కస్టమర్ల నుండి వాపసులను లేదా మీరు సరఫరాదారునికి చేసే వాపసులను ప్రాసెస్ చేయండి.</p>
-             <h4 className="font-semibold mt-2">కస్టమర్ వాపసు:</h4>
-            <ol className="list-decimal list-inside pl-4">
-              <li>"Customer Return" ట్యాబ్‌కు వెళ్లండి.</li>
-              <li>కస్టమర్‌ను మరియు అసలు అమ్మకాల ఇన్‌వాయిస్‌ను ఎంచుకోండి.</li>
-              <li>వాపసు చేయబడుతున్న వస్తువుల పరిమాణాన్ని నమోదు చేయండి.</li>
-              <li>తిరిగి చెల్లించే మొత్తాన్ని నమోదు చేయండి. స్టాక్ స్వయంచాలకంగా మీ ఇన్వెంటరీకి తిరిగి జోడించబడుతుంది మరియు ఆ అమ్మకం కోసం కస్టమర్ ఖాతాకు క్రెడిట్ వర్తింపజేయబడుతుంది.</li>
-            </ol>
-            <h4 className="font-semibold mt-2">సరఫరాదారునికి వాపసు:</h4>
-            <ol className="list-decimal list-inside pl-4">
-              <li>"Return to Supplier" ట్యాబ్‌కు వెళ్లండి.</li>
-              <li>సరఫరాదారుని మరియు అసలు కొనుగోలు ఇన్‌వాయిస్‌ను ఎంచుకోండి.</li>
-              <li>వాపసు చేయబడుతున్న వస్తువుల పరిమాణాన్ని నమోదు చేయండి.</li>
-              <li>క్రెడిట్ నోట్ విలువను నమోదు చేయండి. ఇది ఒక <strong>డెబిట్ నోట్ PDF</strong>ని రూపొందిస్తుంది.</li>
-              <li>స్టాక్ స్వయంచాలకంగా మీ ఇన్వెంటరీ నుండి తీసివేయబడుతుంది మరియు ఆ కొనుగోలు కోసం మీ ఖాతాకు క్రెడిట్ వర్తింపజేయబడుతుంది.</li>
-            </ol>
-          </div>
-        )
-      },
-      {
-        title: 'నివేదికలు (Reports)',
-        content: (
-          <div className="space-y-2 text-sm">
-             <p>బకాయిలు ఉన్న కస్టమర్లందరి నివేదికను రూపొందించండి.</p>
-            <ol className="list-decimal list-inside pl-4">
-              <li>నిర్దిష్ట ప్రాంతాన్ని లేదా అమ్మకాల కోసం తేదీ పరిధిని ఎంచుకోవడానికి ఫిల్టర్‌లను ఉపయోగించండి.</li>
-              <li>పట్టిక మీ ఫిల్టర్‌ల ఆధారంగా బకాయిలు ఉన్న కస్టమర్లందరినీ చూపుతుంది.</li>
-              <li>మీరు ఈ జాబితాను ప్రింటింగ్ లేదా షేరింగ్ కోసం <strong>PDF</strong> లేదా <strong>CSV</strong> ఫైల్‌గా ఎగుమతి చేయవచ్చు.</li>
-            </ol>
-          </div>
-        )
-      },
-       {
-        title: 'యూనివర్సల్ సెర్చ్',
-        content: (
-          <div className="space-y-2 text-sm">
-             <p>ఎగువ హెడర్‌లోని సెర్చ్ బటన్ యాప్‌లో ఏదైనా త్వరగా కనుగొనడానికి మిమ్మల్ని అనుమతిస్తుంది.</p>
-            <ol className="list-decimal list-inside pl-4">
-                <li><strong>సెర్చ్</strong> ఐకాన్‌పై నొక్కండి.</li>
-                <li>కస్టమర్ పేరు, ఉత్పత్తి పేరు, ఇన్‌వాయిస్ ID మొదలైనవి టైప్ చేయండి.</li>
-                <li>ఆ పేజీకి నేరుగా నావిగేట్ చేయడానికి ఫలితంపై నొక్కండి.</li>
-            </ol>
-          </div>
-        )
-      },
-      {
-        title: 'నా వ్యాపార ప్రొఫైల్',
-        content: (
-          <div className="space-y-2 text-sm">
-            <p>అధికారిక పత్రాలలో ఉపయోగించడానికి మీ వ్యాపార వివరాలను సెటప్ చేయండి.</p>
-            <ol className="list-decimal list-inside pl-4">
-                <li>ఎగువ-ఎడమ మూలలో ఉన్న <strong>మెనూ</strong> ఐకాన్ (మూడు అడ్డ గీతలు) పై క్లిక్ చేయండి.</li>
-                <li>"My Business Profile" ఎంచుకోండి.</li>
-                <li>మీ వ్యాపారం పేరు, చిరునామా, ఫోన్ మరియు GST నంబర్‌ను పూరించండి.</li>
-                <li>ఈ సమాచారం మీరు సరఫరాదారునికి వస్తువులను వాపసు చేసేటప్పుడు రూపొందించే <strong>డెబిట్ నోట్</strong> వంటి పత్రాలపై స్వయంచాలకంగా కనిపిస్తుంది.</li>
-            </ol>
-          </div>
-        )
-      },
     ]
   }
 };
-
 
 const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   const [language, setLanguage] = useState<'en' | 'te'>('en');
@@ -353,47 +289,39 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
   const content = helpContent[language];
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in-fast" 
-      aria-modal="true" 
-      role="dialog"
-      onClick={onClose}
-    >
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
-        <Card className="w-full flex-shrink-0 animate-scale-in">
-           <div className="flex justify-between items-start mb-4">
-            <div>
-              <h2 className="text-xl font-bold text-primary">{content.title}</h2>
-              <div className="mt-2">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
+      <Card className="w-full max-w-2xl h-[80vh] flex flex-col p-0 animate-scale-in overflow-hidden relative">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex justify-between items-center text-white shrink-0">
+            <h2 className="font-bold text-lg flex items-center gap-2">
+               {content.title}
+            </h2>
+            <div className="flex items-center gap-3">
                 <button 
-                  onClick={() => setLanguage('en')}
-                  className={`px-3 py-1 text-sm rounded-l-md ${language === 'en' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-slate-700'}`}
+                    onClick={() => setLanguage(prev => prev === 'en' ? 'te' : 'en')}
+                    className="text-xs font-bold bg-white/20 hover:bg-white/30 px-2 py-1 rounded flex items-center gap-1 transition-colors"
                 >
-                  English
+                    <Globe size={14} />
+                    {language === 'en' ? 'తెలుగు' : 'English'}
                 </button>
-                <button 
-                  onClick={() => setLanguage('te')}
-                  className={`px-3 py-1 text-sm rounded-r-md ${language === 'te' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-slate-700'}`}
-                >
-                  తెలుగు
+                <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors">
+                    <X size={20} />
                 </button>
-              </div>
-            </div>
-            <button onClick={onClose} className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-              <X size={24} />
-            </button>
-          </div>
-        </Card>
-        <div className="overflow-y-auto mt-2 pr-2">
-            <div className="space-y-4">
-              {content.sections.map((section, index) => (
-                <Card key={index} title={section.title} className="animate-slide-up-fade" style={{ animationDelay: `${index * 50}ms` }}>
-                  <div className="dark:text-slate-300">{section.content}</div>
-                </Card>
-              ))}
             </div>
         </div>
-      </div>
+
+        {/* Content */}
+        <div className="flex-grow overflow-y-auto p-5 space-y-6">
+            {content.sections.map((section, index) => (
+                <div key={index} className="border-b border-gray-100 dark:border-slate-700 pb-4 last:border-0">
+                    <h3 className="text-lg font-bold text-indigo-600 dark:text-indigo-400 mb-2">{section.title}</h3>
+                    <div className="text-gray-700 dark:text-gray-300 leading-relaxed">
+                        {section.content}
+                    </div>
+                </div>
+            ))}
+        </div>
+      </Card>
     </div>
   );
 };

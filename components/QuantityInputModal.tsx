@@ -41,7 +41,7 @@ const QuantityInputModal: React.FC<QuantityInputModalProps> = ({ isOpen, onClose
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[51] p-4 animate-fade-in-fast">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
       <Card className="w-full max-w-sm animate-scale-in">
         <div className="flex justify-between items-center">
             <h2 className="text-lg font-bold text-primary">Enter Quantity</h2>

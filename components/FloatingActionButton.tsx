@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from 'react';
 import { Plus, X, UserPlus, ShoppingCart, PackagePlus, Undo2 } from 'lucide-react';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
@@ -33,7 +34,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onNavigate 
     }
 
     return (
-        <div ref={fabRef} className="fixed bottom-20 right-4 z-[60] md:hidden">
+        <div ref={fabRef} className="fixed bottom-20 right-4 z-[100] md:hidden">
             {/* Backdrop */}
             {isOpen && <div className="fixed inset-0 bg-black bg-opacity-40" />}
             

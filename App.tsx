@@ -28,7 +28,7 @@ const Toast = () => {
     const { state } = useAppContext();
     if (!state.toast.show) return null;
     const isSuccess = state.toast.type === 'success';
-    const containerClasses = "fixed top-5 inset-x-0 flex justify-center z-[70]";
+    const containerClasses = "fixed top-5 inset-x-0 flex justify-center z-[200]";
     const toastClasses = isSuccess
         ? "bg-gradient-to-r from-emerald-500 to-teal-600 text-white px-6 py-3 rounded-full shadow-xl animate-fade-in-up font-medium flex items-center gap-2"
         : "bg-slate-800 text-white px-6 py-3 rounded-full shadow-xl animate-fade-in-up font-medium flex items-center gap-2";
