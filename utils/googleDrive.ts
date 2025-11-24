@@ -16,7 +16,15 @@ const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapi
 
 // Folder name in Google Drive
 const APP_FOLDER_NAME = 'BusinessManager_AppData';
-const BACKUP_FILE_NAME = 'backup.json';
+
+// Helper to generate daily filename
+const getDailyBackupFilename = () => {
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `BusinessManager_Backup_${year}-${month}-${day}.json`;
+};
 
 export const loadGoogleScript = (): Promise<void> => {
   return new Promise((resolve, reject) => {
@@ -147,9 +155,20 @@ export const createFolder = async (accessToken: string) => {
   return file ? file.id : null;
 };
 
-export const searchFile = async (accessToken: string, folderId: string) => {
-  // We add orderBy modifiedTime desc to get the most recent backup if duplicates exist
-  const q = `name='${BACKUP_FILE_NAME}' and '${folderId}' in parents and trashed=false`;
+export const findLatestFile = async (accessToken: string, folderId: string) => {
+  const q = `'${folderId}' in parents and mimeType='application/json' and trashed=false`;
+  // Order by modifiedTime desc to get the absolute latest file regardless of name
+  const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc&pageSize=1`, {
+    headers: getHeaders(accessToken),
+    cache: 'no-store'
+  });
+  if (!response.ok) await handleApiError(response, "Search Latest File Failed");
+  const data = await safeJsonParse(response);
+  return data && data.files && data.files.length > 0 ? data.files[0] : null;
+};
+
+export const findFileByName = async (accessToken: string, folderId: string, filename: string) => {
+  const q = `name='${filename}' and '${folderId}' in parents and trashed=false`;
   const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc&pageSize=1`, {
     headers: getHeaders(accessToken),
     cache: 'no-store'
@@ -159,10 +178,10 @@ export const searchFile = async (accessToken: string, folderId: string) => {
   return data && data.files && data.files.length > 0 ? data.files[0] : null;
 };
 
-export const uploadFile = async (accessToken: string, folderId: string, content: any, existingFileId?: string) => {
+export const uploadFile = async (accessToken: string, folderId: string, content: any, filename: string, existingFileId?: string) => {
   const fileContent = JSON.stringify(content);
   const metadata = {
-    name: BACKUP_FILE_NAME,
+    name: filename,
     mimeType: 'application/json',
     parents: existingFileId ? undefined : [folderId],
   };
@@ -191,6 +210,27 @@ export const uploadFile = async (accessToken: string, folderId: string, content:
   return await safeJsonParse(response);
 };
 
+export const renameFile = async (accessToken: string, fileId: string, newName: string) => {
+    console.log(`Renaming file ${fileId} to ${newName}`);
+    const metadata = { name: newName };
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+        method: 'PATCH',
+        headers: getHeaders(accessToken),
+        body: JSON.stringify(metadata)
+    });
+    if (!response.ok) await handleApiError(response, "Rename Failed");
+    return await safeJsonParse(response);
+};
+
+export const deleteFile = async (accessToken: string, fileId: string) => {
+    console.log(`Deleting file ${fileId}`);
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${accessToken}` }
+    });
+    if (!response.ok) await handleApiError(response, "Delete Failed");
+};
+
 export const downloadFile = async (accessToken: string, fileId: string) => {
   console.log(`Downloading file content for ID: ${fileId}`);
   const response = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
@@ -208,6 +248,11 @@ export const downloadFile = async (accessToken: string, fileId: string) => {
   const data = await safeJsonParse(response);
   if (data === null) {
       console.warn("Downloaded file but parsing failed (empty or invalid).");
+      return null;
+  }
+  // Basic Validation
+  if (!data || (typeof data !== 'object')) {
+      console.warn("Downloaded data is not a valid object");
       return null;
   }
   console.log("Download successful, data keys:", Object.keys(data));
@@ -239,34 +284,18 @@ async function locateDriveConfig(accessToken: string) {
     const folders = await getCandidateFolders(accessToken);
     
     let activeFolderId = null;
-    let activeFileId = null;
 
     if (folders.length > 0) {
         console.log(`Found ${folders.length} candidate folders.`);
-        // We have candidates. Iterate to find one containing the backup file.
-        // This fixes issues where multiple folders exist (e.g. one empty, one with data).
-        for (const folder of folders) {
-            const file = await searchFile(accessToken, folder.id);
-            if (file) {
-                activeFolderId = folder.id;
-                activeFileId = file.id;
-                console.log("Found active backup in folder:", folder.id, "File ID:", file.id);
-                break; // Found the data! Stop searching.
-            }
-        }
-
-        // If we iterated all and found no file, default to the newest folder (first in list)
-        if (!activeFolderId) {
-            activeFolderId = folders[0].id;
-            console.log("No backup file found in any folder. Using newest folder:", activeFolderId);
-        }
+        // Just use the newest folder
+        activeFolderId = folders[0].id;
     } else {
         console.log("No app folder found. Creating new one.");
         // No folder exists at all. Create one.
         activeFolderId = await createFolder(accessToken);
     }
 
-    return { folderId: activeFolderId, fileId: activeFileId };
+    return { folderId: activeFolderId };
 }
 
 // New Diagnostic Function for Mobile Debugging
@@ -336,28 +365,32 @@ export const debugDriveState = async (accessToken: string) => {
 export const DriveService = {
     /**
      * Reads data from Drive.
-     * Always performs a fresh search to guarantee we find the true cloud state
+     * It finds the most recently modified JSON file in the folder.
      */
     async read(accessToken: string): Promise<any | null> {
         try {
-            // Clean state: ignore local cache to ensure we find the true cloud state
-            const { fileId, folderId } = await locateDriveConfig(accessToken);
+            const { folderId } = await locateDriveConfig(accessToken);
+            if (!folderId) return null;
             
-            // Update cache for subsequent writes during this session
             if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
-            if (fileId) localStorage.setItem('gdrive_file_id', fileId);
 
-            if (fileId) {
-                console.log("Attempting to download backup file...");
-                const data = await downloadFile(accessToken, fileId);
-                if (!data) {
-                    console.warn("File found but content was empty or null.");
+            // Find the most recent backup file regardless of name
+            const latestFile = await findLatestFile(accessToken, folderId);
+
+            if (latestFile) {
+                console.log("Attempting to read latest backup:", latestFile.name);
+                try {
+                    const data = await downloadFile(accessToken, latestFile.id);
+                    if (data) return data; // Success
+                    console.warn("Backup file was empty or invalid.");
+                } catch (e) {
+                    console.error("Error reading backup file:", e);
                 }
-                return data;
+            } else {
+                console.log("No backup files found.");
             }
-            
-            console.log("No file ID found during read operation.");
-            return null; // Folder exists but no file -> No backup data
+
+            return null; 
         } catch (e: any) {
             console.error("DriveService.read failed", e);
             throw e;
@@ -365,51 +398,46 @@ export const DriveService = {
     },
 
     /**
-     * Writes data to Drive.
-     * Tries cached config first, but falls back to full search/recovery if upload fails.
+     * Writes data to Drive using Daily File Strategy.
+     * Creates a file named 'BusinessManager_Backup_YYYY-MM-DD.json'.
+     * Updates the file if it already exists for today.
      */
     async write(accessToken: string, data: any): Promise<void> {
         let folderId = localStorage.getItem('gdrive_folder_id');
-        let fileId = localStorage.getItem('gdrive_file_id');
 
-        // If no cache, resolve config
         if (!folderId) {
              const config = await locateDriveConfig(accessToken);
              folderId = config.folderId;
-             fileId = config.fileId;
              if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
-             if (fileId) localStorage.setItem('gdrive_file_id', fileId);
         }
 
         if (!folderId) throw new Error("Could not locate or create Drive folder.");
 
         try {
-            console.log("Uploading backup to Drive...");
-            // Attempt upload
-            const result = await uploadFile(accessToken, folderId, data, fileId || undefined);
-            if (result && result.id) {
-                localStorage.setItem('gdrive_file_id', result.id);
-                console.log("Upload successful. File ID:", result.id);
+            const filename = getDailyBackupFilename();
+            console.log(`Preparing backup: ${filename}`);
+            
+            // Check if today's backup file already exists
+            const existingFile = await findFileByName(accessToken, folderId, filename);
+
+            if (existingFile) {
+                console.log("Updating today's existing backup file...");
+                await uploadFile(accessToken, folderId, data, filename, existingFile.id);
+            } else {
+                console.log("Creating new daily backup file...");
+                await uploadFile(accessToken, folderId, data, filename);
             }
+            
+            console.log("Backup successful.");
         } catch (e: any) {
-            // If upload fails (likely 404 on stale fileId), perform full resolution and retry
-            console.warn("Upload failed, retrying with full discovery...", e);
-            
-            const config = await locateDriveConfig(accessToken);
-            folderId = config.folderId;
-            fileId = config.fileId;
-            
-            if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
-            if (fileId) localStorage.setItem('gdrive_file_id', fileId);
-            else localStorage.removeItem('gdrive_file_id'); // clear stale file id if new folder is empty
-
-            if (!folderId) throw new Error("Recovery failed: Could not locate Drive folder.");
-
-            // Retry upload
-            const retryResult = await uploadFile(accessToken, folderId, data, fileId || undefined);
-            if (retryResult && retryResult.id) {
-                localStorage.setItem('gdrive_file_id', retryResult.id);
+            // If folder ID is stale (404), recover
+            if (e.message && e.message.includes('404')) {
+                 console.warn("Folder 404, retrying with discovery...", e);
+                 localStorage.removeItem('gdrive_folder_id');
+                 // Recursive retry once
+                 return this.write(accessToken, data);
             }
+            throw e;
         }
     }
 };
