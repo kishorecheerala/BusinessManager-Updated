@@ -11,8 +11,8 @@ import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { logoBase64 } from '../utils/logo';
-import DateInput from '../components/DateInput';
 import Dropdown from '../components/Dropdown';
+import DateInput from '../components/DateInput';
 import DatePill from '../components/DatePill';
 
 
@@ -217,6 +217,8 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [newCustomer, setNewCustomer] = useState(newCustomerInitialState);
     const isDirtyRef = useRef(false);
 
+    const [customerSearchTerm, setCustomerSearchTerm] = useState('');
+    
     // Effect to handle switching to edit mode from another page
     useEffect(() => {
         if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
@@ -355,10 +357,17 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const selectedCustomer = useMemo(() => customerId ? state.customers.find(c => c.id === customerId) : null, [customerId, state.customers]);
 
+    const filteredCustomers = useMemo(() => 
+        state.customers.filter(c => 
+            c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || 
+            c.area.toLowerCase().includes(customerSearchTerm.toLowerCase())
+        ).sort((a,b) => a.name.localeCompare(b.name)),
+    [state.customers, customerSearchTerm]);
+
     const customerOptions = useMemo(() => state.customers.map(c => ({
         value: c.id,
         label: `${c.name} - ${c.area}`,
-        searchText: `${c.name} ${c.area} ${c.phone}`
+        searchText: `${c.name} ${c.area}`
     })), [state.customers]);
 
     const customerTotalDue = useMemo(() => {
@@ -697,10 +706,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
-            
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
-                <DatePill />
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
+                    <DatePill />
+                </div>
             </div>
             
             <Card>
@@ -708,31 +718,34 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
                         <div className="flex gap-2 items-center">
-                            <Dropdown 
+                            <Dropdown
                                 options={customerOptions}
                                 value={customerId}
                                 onChange={(val) => setCustomerId(val)}
-                                placeholder="Select a Customer"
+                                placeholder="Search or Select Customer"
                                 searchable={true}
-                                searchPlaceholder="Search by name or area..."
+                                searchPlaceholder="Search customers..."
                                 disabled={mode === 'edit' || (mode === 'add' && items.length > 0)}
+                                icon="search"
                             />
                             {mode === 'add' && (
                                 <Button 
                                     onClick={() => setIsAddingCustomer(true)} 
-                                    variant="secondary"
-                                    className="p-2 flex-shrink-0 h-12 w-12 flex items-center justify-center"
+                                    variant="secondary" 
+                                    className="aspect-square !p-0 w-[42px] h-[42px] flex items-center justify-center flex-shrink-0"
+                                    aria-label="Add New Customer"
                                 >
-                                    <Plus size={24} strokeWidth={3} />
+                                    <Plus size={24}/>
                                 </Button>
                             )}
                         </div>
                     </div>
                     
                     <DateInput
-                        label="Sale Date" 
+                        label="Sale Date"
                         value={saleDate} 
                         onChange={e => setSaleDate(e.target.value)} 
+                        className={mode === 'edit' ? 'opacity-50 cursor-not-allowed' : ''}
                         disabled={mode === 'edit'}
                     />
 
@@ -752,11 +765,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
             <Card title="Sale Items">
                 <div className="grid grid-cols-2 gap-3">
-                    <Button onClick={() => setIsSelectingProduct(true)} className="w-full justify-center">
-                        <Search size={18} className="mr-2"/> Select Product
+                    <Button onClick={() => setIsSelectingProduct(true)} className="w-full" disabled={!customerId}>
+                        <Search size={16} className="mr-2"/> Select Product
                     </Button>
-                    <Button onClick={() => setIsScanning(true)} className="w-full justify-center">
-                        <QrCode size={18} className="mr-2"/> Scan Product
+                    <Button onClick={() => setIsScanning(true)} className="w-full" disabled={!customerId}>
+                        <QrCode size={16} className="mr-2"/> Scan Product
                     </Button>
                 </div>
                 <div className="mt-4 space-y-2">
@@ -818,13 +831,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                     <option value="CHEQUE">Cheque</option>
                                 </select>
                             </div>
-                            
-                            <DateInput
-                                label="Payment Date"
-                                value={paymentDetails.date} 
-                                onChange={e => setPaymentDetails({...paymentDetails, date: e.target.value })}
-                            />
-
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
                                 <input type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" />

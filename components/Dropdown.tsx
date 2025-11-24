@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, ReactNode, useMemo } from 'react';
 import { ChevronDown, Search } from 'lucide-react';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
@@ -16,6 +17,7 @@ interface DropdownProps {
   disabled?: boolean;
   searchable?: boolean;
   searchPlaceholder?: string;
+  icon?: 'chevron' | 'search';
 }
 
 const Dropdown: React.FC<DropdownProps> = ({
@@ -25,7 +27,8 @@ const Dropdown: React.FC<DropdownProps> = ({
   placeholder = 'Select an option',
   disabled = false,
   searchable = false,
-  searchPlaceholder = 'Search...'
+  searchPlaceholder = 'Search...',
+  icon = 'chevron'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,6 +68,8 @@ const Dropdown: React.FC<DropdownProps> = ({
     setIsOpen(false);
   };
 
+  const TriggerIcon = icon === 'search' ? Search : ChevronDown;
+
   return (
     <div ref={dropdownRef} className={`relative w-full ${isOpen ? 'z-50' : ''}`}>
       <button
@@ -75,8 +80,12 @@ const Dropdown: React.FC<DropdownProps> = ({
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
-        <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />
+        <span className={`truncate ${!selectedOption ? 'text-gray-400 dark:text-gray-400' : ''}`}>
+            {selectedOption ? selectedOption.label : placeholder}
+        </span>
+        <TriggerIcon 
+            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${icon === 'chevron' && isOpen ? 'rotate-180' : ''}`} 
+        />
       </button>
       
       {isOpen && (

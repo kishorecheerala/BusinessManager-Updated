@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Home, Users, ShoppingCart, Package, FileText, Undo2, Boxes, Search, HelpCircle, Bell, Menu, Plus, UserPlus, PackagePlus, Download, X, Sun, Moon, Cloud, CloudOff, RefreshCw, Sparkles, BarChart2 } from 'lucide-react';
 
@@ -18,7 +19,6 @@ import NotificationsPanel from './components/NotificationsPanel';
 import MenuPanel from './components/MenuPanel';
 import ProfileModal from './components/ProfileModal';
 import AskAIModal from './components/AskAIModal';
-import FloatingActionButton from './components/FloatingActionButton';
 import { BeforeInstallPromptEvent, Page, SyncStatus } from './types';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useSwipe } from './hooks/useSwipe';
@@ -51,7 +51,7 @@ const NavItem: React.FC<{
 }> = ({ page, label, icon: Icon, onClick, isActive }) => (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-1 rounded-2xl transition-all duration-300 ${
+      className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 ${
         isActive 
           ? 'text-primary transform -translate-y-1' 
           : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
@@ -60,7 +60,7 @@ const NavItem: React.FC<{
       <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-primary/10' : ''}`}>
         <Icon className={`w-6 h-6 ${isActive ? 'fill-primary/20' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
       </div>
-      <span className={`text-[10px] font-semibold mt-1 transition-all duration-300 ${isActive ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
+      <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 transition-all duration-300 truncate w-full text-center leading-tight ${isActive ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
     </button>
 );
 
@@ -127,6 +127,7 @@ const MainApp: React.FC = () => {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
+  const [isMobileQuickAddOpen, setIsMobileQuickAddOpen] = useState(false);
   const [isAskAIOpen, setIsAskAIOpen] = useState(false);
   const [navConfirm, setNavConfirm] = useState<{ show: boolean, page: Page | null }>({ show: false, page: null });
 
@@ -136,11 +137,13 @@ const MainApp: React.FC = () => {
 
   const menuRef = useRef<HTMLDivElement>(null);
   const quickAddRef = useRef<HTMLDivElement>(null);
+  const mobileQuickAddRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
   useOnClickOutside(menuRef, () => setIsMenuOpen(false));
   useOnClickOutside(quickAddRef, () => setIsQuickAddOpen(false));
+  useOnClickOutside(mobileQuickAddRef, () => setIsMobileQuickAddOpen(false));
   useOnClickOutside(notificationsRef, () => setIsNotificationsOpen(false));
   useOnClickOutside(moreMenuRef, () => setIsMoreMenuOpen(false));
 
@@ -244,6 +247,9 @@ const MainApp: React.FC = () => {
       { page: 'INSIGHTS' as Page, label: 'Insights', icon: BarChart2 },
   ];
 
+  // For Mobile: Purchases is in the main bar now, so mobileMoreItems matches desktop moreNavItems
+  const mobileMoreItems = moreNavItems;
+
   return (
     <div className="flex flex-col h-screen font-sans text-slate-800 dark:text-slate-200 bg-transparent">
       <Toast />
@@ -252,7 +258,6 @@ const MainApp: React.FC = () => {
       <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
       <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={(p, id) => { dispatch({ type: 'SET_SELECTION', payload: { page: p, id } }); _setCurrentPage(p); setIsSearchOpen(false); }} />
       <ConfirmationModal isOpen={navConfirm.show} onClose={() => setNavConfirm({ show: false, page: null })} onConfirm={() => { if (navConfirm.page) { setIsDirty(false); _setCurrentPage(navConfirm.page); } setNavConfirm({ show: false, page: null }); }} title="Unsaved Changes">You have unsaved changes. Leave anyway?</ConfirmationModal>
-      <FloatingActionButton onNavigate={(page, action) => { dispatch({ type: 'SET_SELECTION', payload: { page, id: action || 'new' } }); _setCurrentPage(page); }} />
       
       {/* Dynamic Theme Header - Using bg-theme class which uses CSS variable */}
       <header className="bg-theme text-white shadow-lg p-3 px-4 flex items-center justify-between relative z-[60] sticky top-0">
@@ -341,31 +346,38 @@ const MainApp: React.FC = () => {
 
       {/* Glassmorphism Bottom Nav */}
       <nav className="fixed bottom-0 left-0 right-0 glass pb-[env(safe-area-inset-bottom)] z-50 border-t border-gray-200/50 dark:border-slate-700/50">
+        {/* Desktop View - unchanged */}
         <div className="hidden md:flex justify-center gap-8 p-2">
             {[...mainNavItems, ...moreNavItems].map(item => <NavItem key={item.page} page={item.page} label={item.label} icon={item.icon} onClick={() => setCurrentPage(item.page)} isActive={currentPage === item.page} />)}
         </div>
 
-        <div className="flex md:hidden justify-between items-end px-4 pt-2 pb-2 max-w-md mx-auto">
-            {mainNavItems.map(item => <NavItem key={item.page} page={item.page} label={item.label} icon={item.icon} onClick={() => setCurrentPage(item.page)} isActive={currentPage === item.page} />)}
+        {/* Mobile View - Custom Layout with Reordered Items and End FAB */}
+        <div className="flex md:hidden justify-between items-end px-1 pt-2 pb-2 mx-auto w-full max-w-md">
+            <NavItem page={'DASHBOARD'} label={'Home'} icon={Home} onClick={() => setCurrentPage('DASHBOARD')} isActive={currentPage === 'DASHBOARD'} />
+            <NavItem page={'CUSTOMERS'} label={'Customers'} icon={Users} onClick={() => setCurrentPage('CUSTOMERS')} isActive={currentPage === 'CUSTOMERS'} />
+            <NavItem page={'SALES'} label={'Sales'} icon={ShoppingCart} onClick={() => setCurrentPage('SALES')} isActive={currentPage === 'SALES'} />
+            <NavItem page={'PURCHASES'} label={'Purchases'} icon={Package} onClick={() => setCurrentPage('PURCHASES')} isActive={currentPage === 'PURCHASES'} />
+            
+            {/* More Menu */}
             <div className="relative flex flex-col items-center justify-center w-full" ref={moreMenuRef}>
                  <button
                     onClick={() => setIsMoreMenuOpen(prev => !prev)}
-                    className={`flex flex-col items-center justify-center w-full pt-3 pb-2 rounded-2xl transition-all duration-300 ${
-                        moreNavItems.some(i => i.page === currentPage) || isMoreMenuOpen 
+                    className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 ${
+                        mobileMoreItems.some(i => i.page === currentPage) || isMoreMenuOpen 
                         ? 'text-primary transform -translate-y-1' 
                         : 'text-gray-400 dark:text-gray-500'
                     }`}
                     >
-                    <div className={`p-1 rounded-full ${moreNavItems.some(i => i.page === currentPage) ? 'bg-primary/10' : ''}`}>
-                         <Menu className="w-6 h-6" strokeWidth={moreNavItems.some(i => i.page === currentPage) ? 2.5 : 2} />
+                    <div className={`p-1 rounded-full ${mobileMoreItems.some(i => i.page === currentPage) ? 'bg-primary/10' : ''}`}>
+                         <Menu className="w-6 h-6" strokeWidth={mobileMoreItems.some(i => i.page === currentPage) ? 2.5 : 2} />
                     </div>
-                    <span className="text-[10px] font-semibold mt-1">More</span>
+                    <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">More</span>
                 </button>
 
                 {isMoreMenuOpen && (
-                    <div className="absolute bottom-[calc(100%+16px)] right-0 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 z-50 animate-scale-in origin-bottom-right overflow-hidden ring-1 ring-black/5">
+                    <div className="absolute bottom-[calc(100%+16px)] right-0 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 z-50 animate-scale-in origin-bottom-right overflow-hidden ring-1 ring-black/5">
                         <div className="p-1.5 grid gap-1">
-                            {moreNavItems.map(item => (
+                            {mobileMoreItems.map(item => (
                                 <button 
                                     key={item.page} 
                                     onClick={() => { setCurrentPage(item.page); setIsMoreMenuOpen(false); }} 
@@ -382,6 +394,44 @@ const MainApp: React.FC = () => {
                         </div>
                     </div>
                 )}
+            </div>
+
+            {/* Quick Add at the end */}
+            <div className="relative flex flex-col items-center justify-center w-full" ref={mobileQuickAddRef}>
+                 <button 
+                    onClick={() => setIsMobileQuickAddOpen(!isMobileQuickAddOpen)}
+                    className="flex flex-col items-center justify-center w-full pt-2 pb-2"
+                 >
+                    <div className={`w-10 h-10 rounded-full bg-theme text-white shadow-lg shadow-primary/25 flex items-center justify-center transition-transform duration-300 ${isMobileQuickAddOpen ? 'rotate-45 scale-105' : ''}`}>
+                        <Plus size={22} strokeWidth={3} />
+                    </div>
+                    <span className={`text-[9px] sm:text-[10px] font-bold mt-1 leading-tight ${isMobileQuickAddOpen ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`}>Quick Add</span>
+                 </button>
+                 {isMobileQuickAddOpen && (
+                     <div className="absolute bottom-[calc(100%+4px)] right-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 p-2 animate-scale-in origin-bottom-right z-50 ring-1 ring-black/5">
+                        {[
+                            { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS' as Page, action: 'new' },
+                            { icon: ShoppingCart, label: 'New Sale', page: 'SALES' as Page },
+                            { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES' as Page, action: 'new' },
+                            { icon: Undo2, label: 'New Return', page: 'RETURNS' as Page },
+                        ].map((action, idx) => (
+                            <button
+                                key={idx}
+                                onClick={() => { 
+                                    dispatch({ type: 'SET_SELECTION', payload: { page: action.page, id: action.action || 'new' } }); 
+                                    setCurrentPage(action.page);
+                                    setIsMobileQuickAddOpen(false);
+                                }}
+                                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left group"
+                            >
+                                <div className="p-2 bg-gray-100 dark:bg-slate-700 group-hover:bg-white dark:group-hover:bg-slate-600 rounded-lg text-primary shadow-sm transition-colors">
+                                    <action.icon size={18} />
+                                </div>
+                                <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{action.label}</span>
+                            </button>
+                        ))}
+                     </div>
+                 )}
             </div>
         </div>
       </nav>

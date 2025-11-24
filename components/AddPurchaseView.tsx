@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Purchase, Supplier, Product, PurchaseItem } from '../types';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
@@ -288,15 +287,6 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   
   const [csvStatus, setCsvStatus] = useState<{ type: 'info' | 'success' | 'error', message: string } | null>(null);
 
-  // Custom Dropdown State
-  const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
-  const [supplierSearchTerm, setSupplierSearchTerm] = useState('');
-  const supplierDropdownRef = useRef<HTMLDivElement>(null);
-
-  useOnClickOutside(supplierDropdownRef, () => {
-      if (isSupplierDropdownOpen) setIsSupplierDropdownOpen(false);
-  });
-
   const isDirtyRef = useRef(false);
   
   // Initialize discount when editing based on total discrepancy if any
@@ -348,15 +338,11 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
     }
   }, [supplierId, items, discount, setIsDirty]);
 
-  const selectedSupplier = useMemo(() => suppliers.find(s => s.id === supplierId), [suppliers, supplierId]);
-
-  const filteredSuppliers = useMemo(() => 
-      suppliers.filter(s => 
-          s.name.toLowerCase().includes(supplierSearchTerm.toLowerCase()) || 
-          s.location.toLowerCase().includes(supplierSearchTerm.toLowerCase()) ||
-          s.phone.includes(supplierSearchTerm)
-      ).sort((a,b) => a.name.localeCompare(b.name)),
-  [suppliers, supplierSearchTerm]);
+  const supplierOptions = useMemo(() => suppliers.map(s => ({
+      value: s.id,
+      label: s.name,
+      searchText: `${s.name} ${s.location} ${s.phone}`
+  })).sort((a, b) => a.label.localeCompare(b.label)), [suppliers]);
   
   const handleItemUpdate = (productId: string, field: keyof PurchaseItem, value: string | number) => {
     setItems(items.map(item => item.productId === productId ? { ...item, [field]: value } : item));
@@ -599,59 +585,24 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
             <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Select Supplier</label>
                 <div className="flex gap-3 items-center">
-                    <div className="relative w-full" ref={supplierDropdownRef}>
-                        <div 
-                            onClick={() => !((mode === 'edit')) && setIsSupplierDropdownOpen(!isSupplierDropdownOpen)}
-                            className={`w-full p-3 pl-4 bg-white dark:bg-slate-800 border border-gray-200 dark:border-slate-700 rounded-xl flex items-center justify-between shadow-sm transition-all ${mode === 'edit' ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer hover:border-indigo-400'}`}
-                        >
-                            <span className={selectedSupplier ? 'text-gray-800 dark:text-white font-semibold' : 'text-gray-400'}>
-                                {selectedSupplier ? `${selectedSupplier.name} - ${selectedSupplier.location}` : 'Search or Select Supplier'}
-                            </span>
-                            <Search className="w-5 h-5 text-gray-400" />
-                        </div>
-
-                        {isSupplierDropdownOpen && (
-                            <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-gray-100 dark:border-slate-700 z-40 animate-scale-in origin-top overflow-hidden">
-                                <div className="p-2 border-b dark:border-slate-700 bg-gray-50 dark:bg-slate-800">
-                                    <input
-                                        type="text"
-                                        placeholder="Search by name, location, phone..."
-                                        value={supplierSearchTerm}
-                                        onChange={e => setSupplierSearchTerm(e.target.value)}
-                                        className="w-full p-2.5 bg-white dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none dark:text-white"
-                                        autoFocus
-                                    />
-                                </div>
-                                <ul className="max-h-60 overflow-y-auto" role="listbox">
-                                    {filteredSuppliers.map(s => (
-                                        <li
-                                            key={s.id}
-                                            onClick={() => {
-                                                setSupplierId(s.id);
-                                                setIsSupplierDropdownOpen(false);
-                                                setSupplierSearchTerm('');
-                                            }}
-                                            className="px-4 py-3 hover:bg-indigo-50 dark:hover:bg-slate-800 cursor-pointer border-b border-gray-50 dark:border-slate-800 last:border-0 transition-colors"
-                                        >
-                                            <div className="font-semibold text-gray-800 dark:text-gray-200">{s.name}</div>
-                                            <div className="text-xs text-gray-500">{s.location} • {s.phone}</div>
-                                        </li>
-                                    ))}
-                                    {filteredSuppliers.length === 0 && (
-                                        <li className="px-4 py-4 text-center text-gray-400 text-sm">No suppliers found.</li>
-                                    )}
-                                </ul>
-                            </div>
-                        )}
-                    </div>
+                    <Dropdown
+                        options={supplierOptions}
+                        value={supplierId}
+                        onChange={(val) => setSupplierId(val)}
+                        placeholder="Search or Select Supplier"
+                        searchable={true}
+                        searchPlaceholder="Search suppliers..."
+                        disabled={mode === 'edit'}
+                        icon="search"
+                    />
                     {mode === 'add' && (
                         <Button 
                             onClick={() => setIsAddingSupplier(true)} 
                             variant="secondary"
-                            className="p-2 flex-shrink-0 h-12 w-12 flex items-center justify-center"
+                            className="aspect-square !p-0 w-[42px] h-[42px] flex items-center justify-center flex-shrink-0"
                             aria-label="Add New Supplier"
                         >
-                            <Plus size={24} strokeWidth={3} />
+                            <Plus size={24} />
                         </Button>
                     )}
                 </div>
