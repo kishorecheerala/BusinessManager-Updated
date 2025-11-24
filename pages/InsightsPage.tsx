@@ -953,16 +953,16 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
     }
 
     const FinancialColumn = ({ title, sales, purchases, highlight = false }: any) => (
-        <div className={`p-4 rounded-lg border ${highlight ? 'bg-teal-50 border-teal-200 dark:bg-teal-900/20 dark:border-teal-800 ring-2 ring-teal-500 ring-opacity-20' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'} flex flex-col gap-3`}>
-            <h3 className={`text-xs font-bold uppercase tracking-wider ${highlight ? 'text-teal-700 dark:text-teal-300' : 'text-gray-500 dark:text-gray-400'}`}>{title}</h3>
+        <div className={`p-4 rounded-lg border ${highlight ? 'bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30 ring-2 ring-primary/20' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'} flex flex-col gap-3`}>
+            <h3 className={`text-xs font-bold uppercase tracking-wider ${highlight ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`}>{title}</h3>
             <div className="space-y-2">
                 <div>
                     <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Sales</p>
-                    <p className={`text-lg font-bold ${highlight ? 'text-teal-700 dark:text-teal-300' : 'text-gray-800 dark:text-white'}`}>₹{sales.toLocaleString('en-IN')}</p>
+                    <p className={`text-lg font-bold ${highlight ? 'text-primary' : 'text-gray-800 dark:text-white'}`}>₹{sales.toLocaleString('en-IN')}</p>
                 </div>
                 <div>
                      <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Purchases</p>
-                     <p className={`text-sm font-semibold ${highlight ? 'text-teal-600/80 dark:text-teal-400/80' : 'text-gray-600 dark:text-gray-400'}`}>₹{purchases.toLocaleString('en-IN')}</p>
+                     <p className={`text-sm font-semibold ${highlight ? 'text-primary/80' : 'text-gray-600 dark:text-gray-400'}`}>₹{purchases.toLocaleString('en-IN')}</p>
                 </div>
             </div>
         </div>
@@ -1187,7 +1187,7 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                          ) : topProducts.map((p, idx) => (
                             <div key={p.id} className="flex items-center justify-between">
                                 <div className="flex items-center gap-3 overflow-hidden">
-                                    <div className="w-6 h-6 rounded-full bg-teal-100 dark:bg-teal-900/50 text-teal-700 dark:text-teal-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                                    <div className="w-6 h-6 rounded-full bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary-300 flex items-center justify-center text-xs font-bold flex-shrink-0">
                                         {idx + 1}
                                     </div>
                                     <p className="text-sm font-medium truncate dark:text-gray-200">{p.name}</p>

@@ -113,7 +113,7 @@ const Dropdown: React.FC<DropdownProps> = ({
               <li
                 key={option.value}
                 onClick={() => handleOptionClick(option.value)}
-                className={`px-4 py-2 hover:bg-teal-50 dark:hover:bg-slate-700 cursor-pointer ${value === option.value ? 'bg-teal-100 dark:bg-teal-900' : ''}`}
+                className={`px-4 py-2 hover:bg-primary/5 dark:hover:bg-slate-700 cursor-pointer ${value === option.value ? 'bg-primary/10 font-semibold text-primary dark:bg-primary/20' : ''}`}
                 role="option"
                 aria-selected={value === option.value}
               >

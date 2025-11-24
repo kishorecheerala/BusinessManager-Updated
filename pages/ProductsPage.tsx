@@ -281,7 +281,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 {filteredProducts.map((product, index) => (
                     <div 
                         key={product.id} 
-                        className={`bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border transition-all animate-slide-up-fade flex items-center gap-3 ${isSelectMode && selectedProductIds.includes(product.id) ? 'border-primary ring-1 ring-primary bg-teal-50 dark:bg-teal-900/20' : 'border-gray-100 dark:border-slate-700 hover:shadow-md cursor-pointer'}`}
+                        className={`bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border transition-all animate-slide-up-fade flex items-center gap-3 ${isSelectMode && selectedProductIds.includes(product.id) ? 'border-primary ring-1 ring-primary bg-primary/10 dark:bg-primary/20' : 'border-gray-100 dark:border-slate-700 hover:shadow-md cursor-pointer'}`}
                         style={{ animationDelay: `${index * 30}ms` }}
                         onClick={() => handleProductClick(product)}
                     >

@@ -292,7 +292,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
       <Card className="w-full max-w-2xl h-[80vh] flex flex-col p-0 animate-scale-in overflow-hidden relative">
         {/* Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-4 flex justify-between items-center text-white shrink-0">
+        <div className="bg-theme p-4 flex justify-between items-center text-white shrink-0">
             <h2 className="font-bold text-lg flex items-center gap-2">
                {content.title}
             </h2>
@@ -314,7 +314,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ isOpen, onClose }) => {
         <div className="flex-grow overflow-y-auto p-5 space-y-6">
             {content.sections.map((section, index) => (
                 <div key={index} className="border-b border-gray-100 dark:border-slate-700 pb-4 last:border-0">
-                    <h3 className="text-lg font-bold text-teal-600 dark:text-teal-400 mb-2">{section.title}</h3>
+                    <h3 className="text-lg font-bold text-primary mb-2">{section.title}</h3>
                     <div className="text-gray-700 dark:text-gray-300 leading-relaxed">
                         {section.content}
                     </div>

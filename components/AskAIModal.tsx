@@ -240,7 +240,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
       <Card className="w-full max-w-lg h-[80vh] flex flex-col p-0 overflow-hidden animate-scale-in relative">
         {/* Header */}
-        <div className="bg-gradient-to-r from-teal-600 to-emerald-600 p-4 flex justify-between items-center text-white shrink-0">
+        <div className="bg-theme p-4 flex justify-between items-center text-white shrink-0">
             <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-white/20 rounded-lg backdrop-blur-sm">
                     <Sparkles size={18} className="text-yellow-300" />
@@ -258,7 +258,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                 <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[80%] rounded-2xl p-3 shadow-sm ${
                         msg.role === 'user' 
-                        ? 'bg-teal-600 text-white rounded-br-none' 
+                        ? 'bg-primary text-white rounded-br-none' 
                         : msg.isError 
                             ? 'bg-red-50 border border-red-200 text-red-800 dark:bg-red-900/20 dark:text-red-200'
                             : 'bg-white dark:bg-slate-800 border border-gray-100 dark:border-slate-700 text-gray-800 dark:text-gray-200 rounded-bl-none'
@@ -281,7 +281,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
             {isLoading && (
                 <div className="flex justify-start">
                     <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl rounded-bl-none shadow-sm flex items-center gap-2 border border-gray-100 dark:border-slate-700">
-                        <Loader2 size={16} className="animate-spin text-teal-600" />
+                        <Loader2 size={16} className="animate-spin text-primary" />
                         <span className="text-xs text-gray-500">Thinking...</span>
                     </div>
                 </div>
@@ -300,7 +300,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                     </Button>
                  </div>
             )}
-            <div className={`flex gap-2 items-end bg-gray-100 dark:bg-slate-900 p-2 rounded-xl border border-gray-200 dark:border-slate-700 focus-within:border-teal-500 focus-within:ring-1 focus-within:ring-teal-500 transition-all ${!isEnvConfigured && !showKeyButton ? 'opacity-50' : ''}`}>
+            <div className={`flex gap-2 items-end bg-gray-100 dark:bg-slate-900 p-2 rounded-xl border border-gray-200 dark:border-slate-700 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all ${!isEnvConfigured && !showKeyButton ? 'opacity-50' : ''}`}>
                 <textarea 
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
@@ -313,7 +313,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                 <button 
                     onClick={handleSend}
                     disabled={isLoading || !input.trim() || (!isEnvConfigured && !showKeyButton)}
-                    className="p-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-0.5"
+                    className="p-2 bg-primary text-white rounded-lg hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-0.5"
                 >
                     <Send size={18} />
                 </button>
