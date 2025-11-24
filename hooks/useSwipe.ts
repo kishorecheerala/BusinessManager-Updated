@@ -9,47 +9,48 @@ interface SwipeInput {
 export const useSwipe = ({ onSwipeLeft, onSwipeRight }: SwipeInput) => {
   const touchStartX = useRef<number | null>(null);
   const touchStartY = useRef<number | null>(null);
-  const touchEndX = useRef<number | null>(null);
-  const touchEndY = useRef<number | null>(null);
 
-  // The minimum distance in pixels for a swipe to be registered
+  // Thresholds
   const minSwipeDistance = 50;
+  const maxVerticalDistance = 60; // Allow some vertical movement naturally
 
   const onTouchStart = (e: React.TouchEvent) => {
-    touchEndX.current = null; 
-    touchEndY.current = null;
-    touchStartX.current = e.targetTouches[0].clientX;
-    touchStartY.current = e.targetTouches[0].clientY;
+    // We only care about the first touch
+    if (e.touches.length !== 1) return;
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
   };
 
-  const onTouchMove = (e: React.TouchEvent) => {
-    touchEndX.current = e.targetTouches[0].clientX;
-    touchEndY.current = e.targetTouches[0].clientY;
-  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
 
-  const onTouchEnd = () => {
-    if (!touchStartX.current || !touchStartY.current || !touchEndX.current || !touchEndY.current) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const touchEndY = e.changedTouches[0].clientY;
 
-    const distanceX = touchStartX.current - touchEndX.current;
-    const isLeftSwipe = distanceX > minSwipeDistance;
-    const isRightSwipe = distanceX < -minSwipeDistance;
+    const distanceX = touchStartX.current - touchEndX;
+    const distanceY = touchStartY.current - touchEndY;
 
-    const distanceY = Math.abs(touchStartY.current - touchEndY.current);
+    // Reset
+    touchStartX.current = null;
+    touchStartY.current = null;
 
-    // To be a valid swipe, the horizontal distance must be greater than the vertical distance
-    // This prevents triggering swipes when the user is scrolling vertically
-    if (Math.abs(distanceX) > distanceY) {
-      if (isLeftSwipe && onSwipeLeft) {
-        onSwipeLeft();
-      } else if (isRightSwipe && onSwipeRight) {
-        onSwipeRight();
-      }
+    // Check if vertical movement was too much (user probably scrolling)
+    if (Math.abs(distanceY) > maxVerticalDistance) return;
+
+    // Check if horizontal movement is enough
+    if (Math.abs(distanceX) > minSwipeDistance) {
+        if (distanceX > 0) {
+            // Swiped Left (Drag Content Left)
+            onSwipeLeft?.();
+        } else {
+            // Swiped Right (Drag Content Right)
+            onSwipeRight?.();
+        }
     }
   };
 
   return {
     onTouchStart,
-    onTouchMove,
     onTouchEnd,
   };
 };

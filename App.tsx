@@ -292,7 +292,7 @@ const MainApp: React.FC = () => {
 
   return (
     <div 
-        className="flex flex-col h-screen font-sans text-slate-800 dark:text-slate-200 bg-transparent"
+        className="flex flex-col h-screen font-sans text-slate-800 dark:text-slate-200 bg-transparent touch-pan-y"
         {...swipeHandlers}
     >
       <Toast />
