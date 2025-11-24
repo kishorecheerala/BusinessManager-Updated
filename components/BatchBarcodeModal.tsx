@@ -17,7 +17,7 @@ interface BatchBarcodeModalProps {
 
 const generateLabelCanvas = (product: { id: string, name: string, salePrice: number }, businessName: string): HTMLCanvasElement => {
     const labelCanvas = document.createElement('canvas');
-    const dpiScale = 6; // Upped to 6 for ~900 DPI on a 2x1 inch label
+    const dpiScale = 3.333; // Adjusted to ~3.333 for ~500 DPI on a 2x1 inch label (1000px width)
     labelCanvas.width = 300 * dpiScale;
     labelCanvas.height = 150 * dpiScale;
 
