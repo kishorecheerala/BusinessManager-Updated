@@ -293,12 +293,10 @@ const MainApp: React.FC = () => {
         // Prevent swipe if menus/modals are open
         if (isMenuOpen || isSearchOpen || isNotificationsOpen || isQuickAddOpen || isMobileQuickAddOpen || isMoreMenuOpen) return;
 
-        // If on a subpage, mimic Back button behavior
-        if (currentPage !== 'DASHBOARD') {
-            window.history.back();
-        } 
-        // Removed "Exit on Swipe" logic for Dashboard to prevent accidental closures.
-        // Now only Back Button / Edge Swipe (Native) triggers exit logic handled by popstate.
+        // Trigger back navigation. 
+        // If on Dashboard, this triggers the "Press Back again to exit" logic in popstate handler.
+        // If on Subpage, this goes back to Dashboard.
+        window.history.back();
     }
   });
 
