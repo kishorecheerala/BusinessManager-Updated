@@ -102,13 +102,21 @@ const QuickAddMenu: React.FC<{
 };
 
 const SyncIndicator: React.FC<{ status: SyncStatus, user: any }> = ({ status, user }) => {
-    // Keep this as a visual icon summary on the right
-    if (!user) return <CloudOff className="w-5 h-5 text-white/60" />;
+    if (!user) return <CloudOff className="w-5 h-5 text-white/50" />;
     
     if (status === 'syncing') return <RefreshCw className="w-5 h-5 text-white animate-spin" />;
-    if (status === 'error') return <CloudOff className="w-5 h-5 text-red-300" />;
     
-    return <Cloud className="w-5 h-5 text-white" />;
+    const isError = status === 'error';
+    const dotColor = isError ? 'bg-red-500' : 'bg-green-400';
+    
+    return (
+        <div className="relative flex items-center justify-center">
+            <Cloud className="w-5 h-5 text-white" />
+            <span 
+                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-transparent ${dotColor}`}
+            />
+        </div>
+    );
 };
 
 const formatTime = (timestamp: number | null) => {
