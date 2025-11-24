@@ -11,8 +11,7 @@ export const useSwipe = ({ onSwipeLeft, onSwipeRight }: SwipeInput) => {
   const touchStartY = useRef<number | null>(null);
 
   // Thresholds
-  const minSwipeDistance = 50;
-  const maxVerticalDistance = 60; // Allow some vertical movement naturally
+  const minSwipeDistance = 40;
 
   const onTouchStart = (e: React.TouchEvent) => {
     // We only care about the first touch
@@ -34,16 +33,16 @@ export const useSwipe = ({ onSwipeLeft, onSwipeRight }: SwipeInput) => {
     touchStartX.current = null;
     touchStartY.current = null;
 
-    // Check if vertical movement was too much (user probably scrolling)
-    if (Math.abs(distanceY) > maxVerticalDistance) return;
+    const absX = Math.abs(distanceX);
+    const absY = Math.abs(distanceY);
 
-    // Check if horizontal movement is enough
-    if (Math.abs(distanceX) > minSwipeDistance) {
+    // Check if horizontal movement is dominant and sufficient
+    if (absX > absY && absX > minSwipeDistance) {
         if (distanceX > 0) {
-            // Swiped Left (Drag Content Left)
+            // Swiped Left (Drag Content Left -> Move Right)
             onSwipeLeft?.();
         } else {
-            // Swiped Right (Drag Content Right)
+            // Swiped Right (Drag Content Right -> Move Left)
             onSwipeRight?.();
         }
     }

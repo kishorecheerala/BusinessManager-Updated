@@ -246,7 +246,11 @@ const MainApp: React.FC = () => {
             setCurrentPage('DASHBOARD');
         } else {
             if (exitAttempt) {
-                window.close();
+                try {
+                    window.close(); // Attempt to close
+                } catch(e) {}
+                // Fallback navigation out
+                window.history.back();
             } else {
                 showToast("Swipe again to exit", 'info');
                 setExitAttempt(true);
