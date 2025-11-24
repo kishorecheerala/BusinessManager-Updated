@@ -23,16 +23,16 @@ export const useSwipe = ({ onSwipeLeft, onSwipeRight }: SwipeInput) => {
       // Ensure we only track single-finger swipes to avoid conflict with pinch-zoom etc.
       if (e.touches.length !== 1) return;
       
-      // Use screen coordinates to avoid issues with scrolling affecting calculation
-      touchStartX.current = e.touches[0].screenX;
-      touchStartY.current = e.touches[0].screenY;
+      // Use client coordinates for viewport-relative tracking
+      touchStartX.current = e.touches[0].clientX;
+      touchStartY.current = e.touches[0].clientY;
     };
 
     const onTouchEnd = (e: TouchEvent) => {
       if (touchStartX.current === null || touchStartY.current === null) return;
 
-      const touchEndX = e.changedTouches[0].screenX;
-      const touchEndY = e.changedTouches[0].screenY;
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
 
       const distanceX = touchStartX.current - touchEndX;
       const distanceY = touchStartY.current - touchEndY;
@@ -41,16 +41,16 @@ export const useSwipe = ({ onSwipeLeft, onSwipeRight }: SwipeInput) => {
       const absY = Math.abs(distanceY);
       
       const minSwipeDistance = 50; // 50px threshold
-      const slope = 1.2; // Allow slightly diagonal swipes (X must be > 1.2 * Y)
 
-      // 1. Must be long enough
-      // 2. Must be dominantly horizontal
-      if (absX > minSwipeDistance && absX > absY * slope) {
+      // 1. Must be long enough (minSwipeDistance)
+      // 2. Must be dominantly horizontal (absX > absY)
+      // We use a relaxed slope check (1:1) to allow for natural diagonal thumb movements
+      if (absX > minSwipeDistance && absX > absY) {
         if (distanceX > 0) {
-          // Swiped Left (Finger moved Right to Left)
+          // Dragged from Right to Left (positive diff) -> Next
           if (handlersRef.current.onSwipeLeft) handlersRef.current.onSwipeLeft();
         } else {
-          // Swiped Right (Finger moved Left to Right)
+          // Dragged from Left to Right (negative diff) -> Back
           if (handlersRef.current.onSwipeRight) handlersRef.current.onSwipeRight();
         }
       }
@@ -65,15 +65,15 @@ export const useSwipe = ({ onSwipeLeft, onSwipeRight }: SwipeInput) => {
         touchStartY.current = null;
     };
 
-    // Attach listeners globally to window with passive: true for performance
-    window.addEventListener('touchstart', onTouchStart, { passive: true });
-    window.addEventListener('touchend', onTouchEnd, { passive: true });
-    window.addEventListener('touchcancel', onTouchCancel, { passive: true });
+    // Attach listeners globally to document with passive: true for performance
+    document.addEventListener('touchstart', onTouchStart, { passive: true });
+    document.addEventListener('touchend', onTouchEnd, { passive: true });
+    document.addEventListener('touchcancel', onTouchCancel, { passive: true });
 
     return () => {
-      window.removeEventListener('touchstart', onTouchStart);
-      window.removeEventListener('touchend', onTouchEnd);
-      window.removeEventListener('touchcancel', onTouchCancel);
+      document.removeEventListener('touchstart', onTouchStart);
+      document.removeEventListener('touchend', onTouchEnd);
+      document.removeEventListener('touchcancel', onTouchCancel);
     };
   }, []); // Empty dependency array ensures listeners are bound only once
 };

@@ -256,7 +256,7 @@ const MainApp: React.FC = () => {
             } else {
                 showToast("Swipe again to exit", 'info');
                 setExitAttempt(true);
-                setTimeout(() => setExitAttempt(false), 2000);
+                setTimeout(() => setExitAttempt(false), 3500);
             }
         }
     }
