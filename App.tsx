@@ -53,14 +53,17 @@ const NavItem: React.FC<{
 }> = ({ page, label, icon: Icon, onClick, isActive }) => (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 ${
+      className={`group flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 ${
         isActive 
           ? 'text-primary transform -translate-y-1' 
-          : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'
+          : 'text-gray-400 dark:text-gray-500 md:hover:text-gray-600 dark:md:hover:text-gray-300'
       }`}
     >
-      <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-primary/10' : ''}`}>
-        <Icon className={`w-6 h-6 ${isActive ? 'fill-primary/20' : ''}`} strokeWidth={isActive ? 2.5 : 2} />
+      <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-primary/10 scale-110' : 'group-hover:bg-gray-100 dark:group-hover:bg-slate-800'}`}>
+        <Icon 
+            className={`w-6 h-6 transition-transform duration-300 ${isActive ? 'fill-primary/20 -rotate-6' : 'group-hover:scale-110'}`} 
+            strokeWidth={isActive ? 2.5 : 2} 
+        />
       </div>
       <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 transition-all duration-300 truncate w-full text-center leading-tight ${isActive ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
     </button>
@@ -90,7 +93,7 @@ const QuickAddMenu: React.FC<{
                         onClick={() => onNavigate(action.page, action.action)}
                         className="w-full flex items-center gap-3 text-left p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-all duration-200 group"
                     >
-                        <div className={`p-2 rounded-lg bg-gray-50 dark:bg-slate-700 group-hover:bg-white dark:group-hover:bg-slate-600 shadow-sm ${action.color}`}>
+                        <div className={`p-2 rounded-lg bg-gray-50 dark:bg-slate-700 group-hover:bg-white dark:group-hover:bg-slate-600 shadow-sm ${action.color} transition-transform group-hover:scale-110`}>
                             <action.icon className="w-5 h-5" />
                         </div>
                         <span className="font-semibold text-sm text-gray-700 dark:text-gray-200">{action.label}</span>
@@ -261,6 +264,8 @@ const MainApp: React.FC = () => {
 
   // For Mobile: Purchases is in the main bar now, so mobileMoreItems matches desktop moreNavItems
   const mobileMoreItems = moreNavItems;
+  
+  const isMoreBtnActive = (mobileMoreItems.some(i => i.page === currentPage) || isMoreMenuOpen) && !isMobileQuickAddOpen;
 
   return (
     <div className="flex flex-col h-screen font-sans text-slate-800 dark:text-slate-200 bg-transparent">
@@ -282,7 +287,7 @@ const MainApp: React.FC = () => {
           <div className="flex items-center gap-1">
             <div className="relative" ref={menuRef}>
               <button onClick={() => setIsMenuOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95">
-                  <Menu className="w-6 h-6" />
+                  <Menu className={`w-6 h-6 transition-transform duration-300 ${isMenuOpen ? 'rotate-90' : ''}`} />
               </button>
               <MenuPanel 
                 isOpen={isMenuOpen} 
@@ -297,8 +302,8 @@ const MainApp: React.FC = () => {
             </button>
           </div>
           
-          <button onClick={() => setCurrentPage('DASHBOARD')} className="flex flex-col items-center justify-center min-w-0 mx-2 text-center">
-            <h1 className="text-lg font-bold leading-tight truncate max-w-[200px] drop-shadow-md">{state.profile?.name || 'Business Manager'}</h1>
+          <button onClick={() => setCurrentPage('DASHBOARD')} className="flex flex-col items-center justify-center min-w-0 mx-2 text-center group">
+            <h1 className="text-lg font-bold leading-tight truncate max-w-[200px] drop-shadow-md transition-transform group-active:scale-95">{state.profile?.name || 'Business Manager'}</h1>
             <div className="text-[10px] font-medium flex items-center gap-1 mt-0.5">
                 {state.googleUser ? (
                    <>
@@ -334,15 +339,15 @@ const MainApp: React.FC = () => {
              
              {/* Hidden on mobile, visible on desktop */}
              <div className="relative hidden md:block" ref={quickAddRef}>
-                <button onClick={() => setIsQuickAddOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95 bg-white/10 shadow-sm border border-white/10">
+                <button onClick={() => setIsQuickAddOpen(prev => !prev)} className={`p-2 rounded-full hover:bg-white/20 transition-all active:scale-95 bg-white/10 shadow-sm border border-white/10 ${isQuickAddOpen ? 'rotate-45' : ''}`}>
                     <Plus className="w-6 h-6" strokeWidth={3} />
                 </button>
                 <QuickAddMenu isOpen={isQuickAddOpen} onNavigate={(page, action) => { dispatch({ type: 'SET_SELECTION', payload: { page, id: 'new' } }); _setCurrentPage(page); setIsQuickAddOpen(false); }} />
             </div>
             <div className="relative" ref={notificationsRef}>
                  <button onClick={() => setIsNotificationsOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95">
-                    <Bell className="w-6 h-6" />
-                    {state.notifications.some(n => !n.read) && <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-50 border-2 border-white"></span>}
+                    <Bell className={`w-6 h-6 transition-transform ${state.notifications.some(n => !n.read) ? 'animate-swing' : ''}`} />
+                    {state.notifications.some(n => !n.read) && <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-50 border-2 border-white animate-bounce"></span>}
                 </button>
                  <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={(page) => { _setCurrentPage(page); setIsNotificationsOpen(false); }} />
             </div>
@@ -377,23 +382,23 @@ const MainApp: React.FC = () => {
 
         {/* Mobile View - Custom Layout with Reordered Items and End FAB */}
         <div className="flex md:hidden justify-between items-end px-1 pt-2 pb-2 mx-auto w-full max-w-md">
-            <NavItem page={'DASHBOARD'} label={'Home'} icon={Home} onClick={() => setCurrentPage('DASHBOARD')} isActive={currentPage === 'DASHBOARD'} />
-            <NavItem page={'CUSTOMERS'} label={'Customers'} icon={Users} onClick={() => setCurrentPage('CUSTOMERS')} isActive={currentPage === 'CUSTOMERS'} />
-            <NavItem page={'SALES'} label={'Sales'} icon={ShoppingCart} onClick={() => setCurrentPage('SALES')} isActive={currentPage === 'SALES'} />
-            <NavItem page={'PURCHASES'} label={'Purchases'} icon={Package} onClick={() => setCurrentPage('PURCHASES')} isActive={currentPage === 'PURCHASES'} />
+            <NavItem page={'DASHBOARD'} label={'Home'} icon={Home} onClick={() => setCurrentPage('DASHBOARD')} isActive={currentPage === 'DASHBOARD' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
+            <NavItem page={'CUSTOMERS'} label={'Customers'} icon={Users} onClick={() => setCurrentPage('CUSTOMERS')} isActive={currentPage === 'CUSTOMERS' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
+            <NavItem page={'SALES'} label={'Sales'} icon={ShoppingCart} onClick={() => setCurrentPage('SALES')} isActive={currentPage === 'SALES' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
+            <NavItem page={'PURCHASES'} label={'Purchases'} icon={Package} onClick={() => setCurrentPage('PURCHASES')} isActive={currentPage === 'PURCHASES' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
             
             {/* More Menu */}
             <div className="relative flex flex-col items-center justify-center w-full" ref={moreMenuRef}>
                  <button
-                    onClick={() => setIsMoreMenuOpen(prev => !prev)}
-                    className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 ${
-                        mobileMoreItems.some(i => i.page === currentPage) || isMoreMenuOpen 
+                    onClick={() => { setIsMoreMenuOpen(prev => !prev); setIsMobileQuickAddOpen(false); }}
+                    className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
+                        isMoreBtnActive 
                         ? 'text-primary transform -translate-y-1' 
                         : 'text-gray-400 dark:text-gray-500'
                     }`}
                     >
-                    <div className={`p-1 rounded-full ${mobileMoreItems.some(i => i.page === currentPage) ? 'bg-primary/10' : ''}`}>
-                         <Menu className="w-6 h-6" strokeWidth={mobileMoreItems.some(i => i.page === currentPage) ? 2.5 : 2} />
+                    <div className={`p-1 rounded-full transition-all duration-300 ${isMoreBtnActive ? 'bg-primary/10 scale-110' : ''}`}>
+                         <Menu className={`w-6 h-6 transition-transform duration-300 ${isMoreBtnActive ? 'rotate-90' : ''}`} strokeWidth={isMoreBtnActive ? 2.5 : 2} />
                     </div>
                     <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">More</span>
                 </button>
@@ -405,13 +410,13 @@ const MainApp: React.FC = () => {
                                 <button 
                                     key={item.page} 
                                     onClick={() => { setCurrentPage(item.page); setIsMoreMenuOpen(false); }} 
-                                    className={`w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-colors ${
+                                    className={`w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-all group ${
                                         currentPage === item.page 
                                             ? 'bg-primary/10 text-primary font-bold' 
                                             : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 text-gray-600 dark:text-gray-300'
                                     }`}
                                 >
-                                    <item.icon className="w-5 h-5" />
+                                    <item.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${currentPage === item.page ? 'scale-110' : ''}`} />
                                     <span className="text-sm">{item.label}</span>
                                 </button>
                             ))}
@@ -423,10 +428,10 @@ const MainApp: React.FC = () => {
             {/* Quick Add at the end */}
             <div className="relative flex flex-col items-center justify-center w-full" ref={mobileQuickAddRef}>
                  <button 
-                    onClick={() => setIsMobileQuickAddOpen(!isMobileQuickAddOpen)}
-                    className="flex flex-col items-center justify-center w-full pt-2 pb-2"
+                    onClick={() => { setIsMobileQuickAddOpen(!isMobileQuickAddOpen); setIsMoreMenuOpen(false); }}
+                    className="flex flex-col items-center justify-center w-full pt-2 pb-2 group"
                  >
-                    <div className={`w-10 h-10 rounded-full bg-theme text-white shadow-lg shadow-primary/25 flex items-center justify-center transition-transform duration-300 ${isMobileQuickAddOpen ? 'rotate-45 scale-105' : ''}`}>
+                    <div className={`w-10 h-10 rounded-full bg-theme text-white shadow-lg shadow-primary/25 flex items-center justify-center transition-all duration-300 ${isMobileQuickAddOpen ? 'rotate-45 scale-110' : 'group-active:scale-95'}`}>
                         <Plus size={22} strokeWidth={3} />
                     </div>
                     <span className={`text-[9px] sm:text-[10px] font-bold mt-1 leading-tight ${isMobileQuickAddOpen ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`}>Quick Add</span>
@@ -446,9 +451,9 @@ const MainApp: React.FC = () => {
                                     setCurrentPage(action.page);
                                     setIsMobileQuickAddOpen(false);
                                 }}
-                                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left group"
+                                className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left group/item"
                             >
-                                <div className="p-2 bg-gray-100 dark:bg-slate-700 group-hover:bg-white dark:group-hover:bg-slate-600 rounded-lg text-primary shadow-sm transition-colors">
+                                <div className="p-2 bg-gray-100 dark:bg-slate-700 group-hover/item:bg-white dark:group-hover/item:bg-slate-600 rounded-lg text-primary shadow-sm transition-transform group-hover/item:scale-110">
                                     <action.icon size={18} />
                                 </div>
                                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{action.label}</span>

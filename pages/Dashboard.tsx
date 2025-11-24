@@ -37,13 +37,13 @@ const MetricCard: React.FC<{
 }> = ({ icon: Icon, title, value, color, iconBgColor, textColor, unit = '₹', subValue, onClick, delay }) => (
     <div
         onClick={onClick}
-        className={`rounded-lg shadow-md p-5 flex items-center transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade`}
+        className={`rounded-lg shadow-md p-5 flex items-center transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group`}
         style={{ animationDelay: `${delay || 0}ms` }}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
     >
-        <div className={`p-4 ${iconBgColor} rounded-full flex-shrink-0`}>
+        <div className={`p-4 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
             <Icon className={`w-8 h-8 ${textColor}`} />
         </div>
         <div className="ml-5 flex-grow">
@@ -268,13 +268,13 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
     }, [sales, products, customers, purchases, returns]);
 
     return (
-        <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-primary/10 dark:border-slate-700 transition-all hover:shadow-xl animate-slide-up-fade">
+        <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-primary/10 dark:border-slate-700 transition-all hover:shadow-xl animate-slide-up-fade group">
             <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
             <div className="p-5">
                 <div className="flex flex-col gap-1 mb-4">
                     <div className="flex items-center gap-2">
-                        <div className="p-2 bg-primary/10 rounded-full animate-pulse-bg">
-                            <BrainCircuit className="w-6 h-6 text-primary" />
+                        <div className="p-2 bg-primary/10 rounded-full animate-pulse">
+                            <BrainCircuit className="w-6 h-6 text-primary transition-transform duration-700 group-hover:rotate-12" />
                         </div>
                         <h3 className="font-bold text-xl text-gray-800 dark:text-white">Smart Analyst</h3>
                         <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">AI Powered</span>
@@ -283,8 +283,8 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {insights.map((insight, idx) => (
-                        <div key={idx} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade" style={{ animationDelay: `${idx * 100}ms` }}>
-                            <div className="mt-1 flex-shrink-0">
+                        <div key={idx} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade group/item" style={{ animationDelay: `${idx * 100}ms` }}>
+                            <div className="mt-1 flex-shrink-0 transition-transform group-hover/item:scale-110 duration-300">
                                 <insight.icon className={`w-5 h-5 ${insight.color}`} />
                             </div>
                             <div>
@@ -344,8 +344,8 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null }> = ({ lastBa
     const Icon = current.icon;
 
     return (
-        <div className={`flex items-start p-4 rounded-lg border ${current.classes} mb-6`}>
-            <Icon className={`w-6 h-6 mr-3 flex-shrink-0 ${current.iconColor}`} />
+        <div className={`flex items-start p-4 rounded-lg border ${current.classes} mb-6 group`}>
+            <Icon className={`w-6 h-6 mr-3 flex-shrink-0 ${current.iconColor} transition-transform group-hover:scale-110`} />
             <div>
                 <h4 className="font-bold text-sm uppercase tracking-wide mb-1">{current.title}</h4>
                 <p className="text-sm opacity-90">{current.message}</p>
