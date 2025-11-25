@@ -241,12 +241,17 @@ const MainApp: React.FC = () => {
   // --- HISTORY TRAP & BACK BUTTON HANDLING ---
   // This Effect initializes the history stack to ensure we have a buffer before exiting.
   useEffect(() => {
-      // Only initialize if we haven't already setup the dashboard trap
-      if (!window.history.state || window.history.state.page !== 'DASHBOARD') {
-          // Using unique ID to prevent browser from collapsing identical states
-          window.history.replaceState({ page: 'DASHBOARD', id: 'root' }, '');
-          window.history.pushState({ page: 'DASHBOARD', id: 'trap' }, '');
-      }
+      const initHistory = () => {
+          // Only initialize if not already setup (prevents loops but ensures safety on refresh)
+          if (!window.history.state || window.history.state.id !== 'trap') {
+              // Replace current entry with root to normalize
+              window.history.replaceState({ page: 'DASHBOARD', id: 'root' }, '');
+              // Push trap immediately
+              window.history.pushState({ page: 'DASHBOARD', id: 'trap' }, '');
+          }
+      };
+      
+      initHistory();
   }, []);
 
   useEffect(() => {
@@ -256,9 +261,10 @@ const MainApp: React.FC = () => {
       if (currentPage === 'DASHBOARD') {
           if (exitAttempt) {
               // User confirmed exit (Double Back).
-              window.history.go(-1); 
+              // Go back one more time to exit the app (from 'root' state)
+              window.history.back(); 
           } else {
-              // Trap the user: Push state back immediately
+              // Trap the user: Push state back immediately to restore 'trap'
               window.history.pushState({ page: 'DASHBOARD', id: 'trap' }, '');
               
               showToast("Press Back again to exit", 'info');
@@ -270,6 +276,9 @@ const MainApp: React.FC = () => {
           if (!isDirtyRef.current) {
               _setCurrentPage('DASHBOARD');
           } else {
+              // If dirty, ideally we prevented this, but browsers don't allow cancelling popstate.
+              // We can just go to dashboard or handle confirm logic. 
+              // For now, just go to dashboard to avoid state mismatch.
               _setCurrentPage('DASHBOARD');
           }
       }
@@ -298,8 +307,8 @@ const MainApp: React.FC = () => {
         }
     }
   }, {
-      edgeThreshold: 120, // Increased activation area (pixels from left edge)
-      threshold: 60,      // Reduced minimum distance for easier triggering
+      edgeThreshold: 200, // Increased activation area (pixels from left edge)
+      threshold: 50,      // Reduced minimum distance for easier triggering
       timeout: 600        // Relaxed timeout for slower swipes
   });
 

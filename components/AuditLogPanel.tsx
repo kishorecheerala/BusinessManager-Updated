@@ -18,7 +18,7 @@ const AuditLogPanel: React.FC<AuditLogPanelProps> = ({ isOpen, onClose }) => {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-end z-[100] animate-fade-in-fast" onClick={onClose}>
       <div className="w-full max-w-md bg-white dark:bg-slate-900 h-full shadow-2xl flex flex-col animate-slide-in-right" onClick={e => e.stopPropagation()}>
-        <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-primary text-white">
+        <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-theme text-white">
           <h2 className="font-bold text-lg flex items-center gap-2"><Activity size={20} /> Activity Log</h2>
           <button onClick={onClose}><X size={24} /></button>
         </div>
