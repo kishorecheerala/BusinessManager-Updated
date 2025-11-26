@@ -101,7 +101,13 @@ export async function importData(data: any, merge: boolean = false): Promise<voi
             await store.clear();
         }
         
-        const items = (data as any)[storeName] || [];
+        let items = (data as any)[storeName] || [];
+
+        // Normalize single objects to array (Fix for Cloud Backup where profile is an object)
+        if (!Array.isArray(items) && items && typeof items === 'object') {
+            items = [items];
+        }
+        
         if (Array.isArray(items) && items.length > 0) {
             // Use Promise.all to ensure all put operations are queued within the transaction efficiently
             await Promise.all(items.map(item => {

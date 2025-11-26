@@ -254,8 +254,10 @@ const InvoiceDesigner: React.FC = () => {
     }, [config, selectedDocType, state.customFonts]);
 
     // Resize Handlers
-    const startResizing = useCallback((e: React.MouseEvent) => {
-        e.preventDefault();
+    const startResizing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+        if (e.type === 'mousedown') {
+            e.preventDefault(); // Prevent text selection on mouse
+        }
         setIsResizing(true);
     }, []);
 
@@ -264,10 +266,17 @@ const InvoiceDesigner: React.FC = () => {
     }, []);
 
     const resize = useCallback(
-        (mouseMoveEvent: MouseEvent) => {
+        (e: MouseEvent | TouchEvent) => {
             if (isResizing) {
-                // Account for typical padding/margins
-                const newWidth = mouseMoveEvent.clientX - 16; 
+                let clientX;
+                if ('touches' in e) {
+                    clientX = e.touches[0].clientX;
+                } else {
+                    clientX = (e as MouseEvent).clientX;
+                }
+                
+                // Account for typical padding/margins (approx 16px in layout)
+                const newWidth = clientX - 16; 
                 const constrainedWidth = Math.max(300, Math.min(newWidth, window.innerWidth * 0.7));
                 setSidebarWidth(constrainedWidth);
             }
@@ -279,17 +288,23 @@ const InvoiceDesigner: React.FC = () => {
         if (isResizing) {
             window.addEventListener("mousemove", resize);
             window.addEventListener("mouseup", stopResizing);
+            window.addEventListener("touchmove", resize);
+            window.addEventListener("touchend", stopResizing);
             document.body.style.cursor = 'col-resize';
             document.body.style.userSelect = 'none';
         } else {
             window.removeEventListener("mousemove", resize);
             window.removeEventListener("mouseup", stopResizing);
+            window.removeEventListener("touchmove", resize);
+            window.removeEventListener("touchend", stopResizing);
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
         }
         return () => {
             window.removeEventListener("mousemove", resize);
             window.removeEventListener("mouseup", stopResizing);
+            window.removeEventListener("touchmove", resize);
+            window.removeEventListener("touchend", stopResizing);
             document.body.style.cursor = '';
             document.body.style.userSelect = '';
         };
@@ -564,7 +579,7 @@ const InvoiceDesigner: React.FC = () => {
             {/* Left Control Panel */}
             <div 
                 style={isMd ? { width: sidebarWidth } : {}}
-                className={`flex-col bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 overflow-hidden ${mobileView === 'editor' ? 'flex flex-grow w-full' : 'hidden md:flex'} shrink-0 transition-all duration-0`}
+                className={`flex-col bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 overflow-hidden ${mobileView === 'editor' ? 'flex flex-grow w-full' : 'hidden md:flex'} shrink-0`}
             >
                 
                 {/* Document Type Selector */}
@@ -961,8 +976,9 @@ const InvoiceDesigner: React.FC = () => {
 
             {/* Resize Handle - Only Visible on MD+ */}
             <div
-                className="hidden md:flex w-4 cursor-col-resize items-center justify-center hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-colors z-20 shrink-0 select-none"
+                className="hidden md:flex w-4 cursor-col-resize items-center justify-center hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-colors z-20 shrink-0 select-none touch-none"
                 onMouseDown={startResizing}
+                onTouchStart={startResizing}
             >
                 <div className={`w-1 h-12 rounded-full transition-colors ${isResizing ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-slate-600'}`}></div>
             </div>
