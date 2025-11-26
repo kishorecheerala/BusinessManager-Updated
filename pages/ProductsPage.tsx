@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -23,13 +23,15 @@ interface ProductImageProps {
     alt: string;
     className?: string;
     onPreview: (src: string) => void;
+    enableInteract?: boolean;
 }
 
-const ProductImage: React.FC<ProductImageProps> = ({ src, alt, className, onPreview }) => {
+const ProductImage: React.FC<ProductImageProps> = ({ src, alt, className, onPreview, enableInteract = true }) => {
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const isLongPress = useRef(false);
 
     const handlePointerDown = (e: React.PointerEvent) => {
+        if (!enableInteract) return;
         if (e.pointerType === 'touch') {
             isLongPress.current = false;
             timerRef.current = setTimeout(() => {
@@ -43,6 +45,8 @@ const ProductImage: React.FC<ProductImageProps> = ({ src, alt, className, onPrev
     };
 
     const handlePointerUp = (e: React.PointerEvent) => {
+        if (!enableInteract) return;
+        
         if (timerRef.current) {
             clearTimeout(timerRef.current);
             timerRef.current = null;
@@ -524,14 +528,30 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 filteredProducts.length > 0 ? (
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in-up">
                         {filteredProducts.map((product) => (
-                            <div key={product.id} onClick={() => handleProductClick(product)} className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-md border border-gray-100 dark:border-slate-700 hover:shadow-xl transition-shadow flex flex-col h-full cursor-pointer">
-                                <div className="aspect-square w-full bg-gray-100 dark:bg-slate-700 relative overflow-hidden group">
+                            <div key={product.id} onClick={() => handleProductClick(product)} className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-md border border-gray-100 dark:border-slate-700 hover:shadow-xl transition-shadow flex flex-col h-full cursor-pointer group relative">
+                                <div className="aspect-square w-full bg-gray-100 dark:bg-slate-700 relative overflow-hidden">
                                     <ProductImage 
                                         src={product.image} 
                                         alt={product.name} 
                                         className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                         onPreview={setPreviewImage}
+                                        enableInteract={false} // Disable click-to-preview on the image directly
                                     />
+                                    
+                                    {/* Full Screen Button - Visible on Mobile, Hover on Desktop */}
+                                    {product.image && (
+                                        <button 
+                                            onClick={(e) => { 
+                                                e.stopPropagation(); 
+                                                setPreviewImage(product.image!); 
+                                            }}
+                                            className="absolute top-2 right-2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all duration-200 transform active:scale-95 md:hover:scale-110 z-10"
+                                            title="View Full Screen"
+                                        >
+                                            <Maximize2 size={16} />
+                                        </button>
+                                    )}
+
                                     {product.quantity < 1 && (
                                         <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
                                             <span className="bg-red-600 text-white px-3 py-1 text-xs font-bold uppercase tracking-widest rounded-sm">Out of Stock</span>
