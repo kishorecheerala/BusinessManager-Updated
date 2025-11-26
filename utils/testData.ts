@@ -111,6 +111,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   quotes: [],
   app_metadata: [],
   audit_logs: [],
+  customFonts: [],
   theme: 'light',
   themeColor: '#0d9488',
   themeGradient: '',
@@ -119,12 +120,20 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   devMode: false,
   invoiceTemplate: {
     id: 'invoiceTemplateConfig',
+    currencySymbol: '₹',
+    dateFormat: 'DD/MM/YYYY',
     colors: {
         primary: '#0d9488',
         secondary: '#333333',
         text: '#000000',
         tableHeaderBg: '#0d9488',
-        tableHeaderText: '#ffffff'
+        tableHeaderText: '#ffffff',
+        bannerBg: '#0d9488',
+        bannerText: '#ffffff',
+        footerBg: '#f3f4f6',
+        footerText: '#374151',
+        borderColor: '#e5e7eb',
+        alternateRowBg: '#f9fafb'
     },
     fonts: {
         headerSize: 22,
@@ -136,15 +145,86 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
         margin: 10,
         logoSize: 25,
         logoPosition: 'center',
+        logoOffsetX: 0,
+        logoOffsetY: 0,
         headerAlignment: 'center',
-        showWatermark: false
+        headerStyle: 'standard',
+        footerStyle: 'standard',
+        showWatermark: false,
+        watermarkOpacity: 0.1,
+        tableOptions: {
+            hideQty: false,
+            hideRate: false,
+            stripedRows: false,
+            bordered: false,
+            compact: false
+        }
     },
     content: {
         titleText: 'TAX INVOICE',
         showTerms: true,
         showQr: true,
         termsText: '',
-        footerText: 'Thank you for your business!'
+        footerText: 'Thank you for your business!',
+        showBusinessDetails: true,
+        showCustomerDetails: true,
+        showSignature: true,
+        signatureText: 'Authorized Signatory',
+        showAmountInWords: false,
+        showStatusStamp: false,
+        labels: {
+            billedTo: "Billed To",
+            invoiceNo: "Invoice No",
+            date: "Date",
+            item: "Item",
+            qty: "Qty",
+            rate: "Rate",
+            amount: "Amount",
+            subtotal: "Subtotal",
+            discount: "Discount",
+            gst: "GST",
+            grandTotal: "Grand Total",
+            paid: "Paid",
+            balance: "Balance"
+        },
+        qrType: 'INVOICE_ID',
+        bankDetails: ''
     }
+  },
+  estimateTemplate: {
+    id: 'estimateTemplateConfig',
+    currencySymbol: '₹',
+    dateFormat: 'DD/MM/YYYY',
+    colors: { primary: '#4f46e5', secondary: '#333333', text: '#000000', tableHeaderBg: '#4f46e5', tableHeaderText: '#ffffff', bannerBg: '#4f46e5' },
+    fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
+    layout: { 
+        margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1,
+        tableOptions: { hideQty: false, hideRate: false, stripedRows: false }
+    },
+    content: { titleText: 'ESTIMATE', showTerms: true, showQr: false, termsText: '', footerText: 'Valid for 7 days.', showBusinessDetails: true, showCustomerDetails: true, showSignature: true }
+  },
+  debitNoteTemplate: {
+    id: 'debitNoteTemplateConfig',
+    currencySymbol: '₹',
+    dateFormat: 'DD/MM/YYYY',
+    colors: { primary: '#000000', secondary: '#333333', text: '#000000', tableHeaderBg: '#333333', tableHeaderText: '#ffffff', bannerBg: '#333333' },
+    fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
+    layout: { 
+        margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1,
+        tableOptions: { hideQty: false, hideRate: false, stripedRows: false }
+    },
+    content: { titleText: 'DEBIT NOTE', showTerms: false, showQr: false, termsText: '', footerText: '', showBusinessDetails: true, showCustomerDetails: true, showSignature: true }
+  },
+  receiptTemplate: {
+    id: 'receiptTemplateConfig',
+    currencySymbol: 'Rs.',
+    dateFormat: 'DD/MM/YYYY',
+    colors: { primary: '#000000', secondary: '#000000', text: '#000000', tableHeaderBg: '#ffffff', tableHeaderText: '#000000' },
+    fonts: { headerSize: 12, bodySize: 8, titleFont: 'helvetica', bodyFont: 'helvetica' },
+    layout: { 
+        margin: 2, logoSize: 15, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1,
+        tableOptions: { hideQty: false, hideRate: false, stripedRows: false }
+    },
+    content: { titleText: 'RECEIPT', showTerms: true, showQr: true, termsText: '', footerText: 'Thank You!', showBusinessDetails: true, showCustomerDetails: true, showSignature: false }
   },
 };

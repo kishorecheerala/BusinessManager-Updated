@@ -15,7 +15,7 @@ interface State {
 class ErrorBoundary extends React.Component<Props, State> {
   public state: State = {
     hasError: false,
-    error: null,
+    error: null
   };
 
   static getDerivedStateFromError(error: Error): State {
@@ -55,8 +55,7 @@ class ErrorBoundary extends React.Component<Props, State> {
       );
     }
 
-    // Type cast 'this' to any to bypass potential TS error where props is not recognized on the class instance
-    return (this as any).props.children;
+    return this.props.children;
   }
 }
 

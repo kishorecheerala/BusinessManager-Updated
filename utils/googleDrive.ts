@@ -178,36 +178,57 @@ export const findFileByName = async (accessToken: string, folderId: string, file
   return data && data.files && data.files.length > 0 ? data.files[0] : null;
 };
 
+// RESUMABLE UPLOAD IMPLEMENTATION (Required for large files/images > 5MB)
 export const uploadFile = async (accessToken: string, folderId: string, content: any, filename: string, existingFileId?: string) => {
   const fileContent = JSON.stringify(content);
-  const metadata = {
+  const contentType = 'application/json';
+  
+  const metadata: any = {
     name: filename,
-    mimeType: 'application/json',
-    parents: existingFileId ? undefined : [folderId],
+    mimeType: contentType
   };
+  
+  if (!existingFileId) {
+      metadata.parents = [folderId];
+  }
 
-  const form = new FormData();
-  form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-  form.append('file', new Blob([fileContent], { type: 'application/json' }));
-
-  let url = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart';
+  // 1. Initiate Resumable Session
+  let initUrl = 'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable';
   let method = 'POST';
 
   if (existingFileId) {
-    url = `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=multipart`;
+    initUrl = `https://www.googleapis.com/upload/drive/v3/files/${existingFileId}?uploadType=resumable`;
     method = 'PATCH';
   }
 
-  const response = await fetch(url, {
+  const initResponse = await fetch(initUrl, {
     method: method,
-    headers: { 'Authorization': `Bearer ${accessToken}` },
-    body: form,
-    cache: 'no-store'
+    headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+        // 'X-Upload-Content-Type': contentType,
+        // 'X-Upload-Content-Length': new Blob([fileContent]).size.toString()
+    },
+    body: JSON.stringify(metadata)
   });
+
+  if (!initResponse.ok) await handleApiError(initResponse, "Init Upload Failed");
   
-  if (!response.ok) await handleApiError(response, "Upload Failed");
-  
-  return await safeJsonParse(response);
+  const sessionUri = initResponse.headers.get('Location');
+  if (!sessionUri) throw new Error("Resumable upload initiation failed: No Location header");
+
+  // 2. Upload Actual Content
+  const uploadResponse = await fetch(sessionUri, {
+      method: 'PUT',
+      headers: {
+          'Content-Type': contentType,
+      },
+      body: fileContent
+  });
+
+  if (!uploadResponse.ok) await handleApiError(uploadResponse, "File Data Upload Failed");
+
+  return await safeJsonParse(uploadResponse);
 };
 
 export const renameFile = async (accessToken: string, fileId: string, newName: string) => {
@@ -429,10 +450,12 @@ export const DriveService = {
      * Writes data to Drive using Daily File Strategy.
      * Creates a file named 'BusinessManager_Backup_YYYY-MM-DD.json'.
      * Updates the file if it already exists for today.
+     * Uses RESUMABLE UPLOAD for robust large file handling.
      */
     async write(accessToken: string, data: any): Promise<void> {
         let folderId = localStorage.getItem('gdrive_folder_id');
 
+        // Re-validate folder ID presence or find it if missing
         if (!folderId) {
              const config = await locateDriveConfig(accessToken);
              folderId = config.folderId;
