@@ -329,7 +329,13 @@ const MainApp: React.FC = () => {
         if (isMenuOpen || isSearchOpen || isNotificationsOpen || isQuickAddOpen || isMobileQuickAddOpen || isMoreMenuOpen || isAppLocked) return;
 
         if (currentPage === 'DASHBOARD') {
-            return;
+            if (exitAttempt) {
+                window.history.back();
+            } else {
+                showToast("Press Back again to exit", 'info');
+                setExitAttempt(true);
+                setTimeout(() => setExitAttempt(false), 3500);
+            }
         } else {
             window.history.back();
         }
