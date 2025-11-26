@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Trash2, Calendar, Filter, Receipt, DollarSign, X } from 'lucide-react';
+import { Plus, Trash2, Calendar, Filter, Receipt, DollarSign, X, Camera, Image as ImageIcon, Eye } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Expense, ExpenseCategory } from '../types';
 import Card from '../components/Card';
@@ -38,6 +38,34 @@ const PAYMENT_METHODS = [
     { value: 'CHEQUE', label: 'Cheque' }
 ];
 
+// Helper for image compression
+const compressImage = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = (event) => {
+            const img = new Image();
+            if (event.target?.result) {
+                img.src = event.target.result as string;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    const scaleSize = MAX_WIDTH / img.width;
+                    canvas.width = MAX_WIDTH;
+                    canvas.height = img.height * scaleSize;
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        resolve(canvas.toDataURL('image/jpeg', 0.7));
+                    } else {
+                        resolve(img.src);
+                    }
+                }
+            }
+        }
+    })
+}
+
 const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
     const { state, dispatch, showToast } = useAppContext();
     const [amount, setAmount] = useState('');
@@ -46,24 +74,38 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
     const [note, setNote] = useState('');
     const [paymentMethod, setPaymentMethod] = useState<'CASH'|'UPI'|'CHEQUE'>('CASH');
     const [isAdding, setIsAdding] = useState(false);
+    const [receiptImage, setReceiptImage] = useState<string | null>(null);
     
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterMonth, setFilterMonth] = useState(new Date().getMonth().toString());
     const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
+    const [viewImageModal, setViewImageModal] = useState<string | null>(null);
 
     const isDirtyRef = useRef(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        const formIsDirty = isAdding && (!!amount || !!note);
+        const formIsDirty = isAdding && (!!amount || !!note || !!receiptImage);
         if (formIsDirty !== isDirtyRef.current) {
             isDirtyRef.current = formIsDirty;
             setIsDirty(formIsDirty);
         }
-    }, [isAdding, amount, note, setIsDirty]);
+    }, [isAdding, amount, note, receiptImage, setIsDirty]);
 
     useEffect(() => {
         return () => setIsDirty(false);
     }, [setIsDirty]);
+
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            try {
+                const base64 = await compressImage(e.target.files[0]);
+                setReceiptImage(base64);
+            } catch (error) {
+                alert("Error processing image.");
+            }
+        }
+    };
 
     const handleAddExpense = () => {
         if (!amount || parseFloat(amount) <= 0) {
@@ -77,7 +119,8 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
             category,
             date: new Date(date).toISOString(),
             note: note.trim(),
-            paymentMethod
+            paymentMethod,
+            receiptImage: receiptImage || undefined
         };
 
         dispatch({ type: 'ADD_EXPENSE', payload: newExpense });
@@ -88,6 +131,7 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
         setNote('');
         setCategory('Other');
         setDate(getLocalDateString());
+        setReceiptImage(null);
         setIsAdding(false);
     };
 
@@ -121,6 +165,15 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
 
     return (
         <div className="space-y-6 animate-fade-in-fast">
+            {viewImageModal && (
+                <div className="fixed inset-0 bg-black/80 z-[150] flex items-center justify-center p-4" onClick={() => setViewImageModal(null)}>
+                    <div className="relative max-w-full max-h-full">
+                        <button className="absolute -top-10 right-0 text-white p-2" onClick={() => setViewImageModal(null)}><X size={24}/></button>
+                        <img src={viewImageModal} alt="Receipt" className="max-w-full max-h-[90vh] rounded-lg" />
+                    </div>
+                </div>
+            )}
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
@@ -177,15 +230,45 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note (Optional)</label>
-                            <input 
-                                type="text" 
-                                value={note} 
-                                onChange={e => setNote(e.target.value)} 
-                                className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                                placeholder="Description..."
-                            />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note (Optional)</label>
+                                <input 
+                                    type="text" 
+                                    value={note} 
+                                    onChange={e => setNote(e.target.value)} 
+                                    className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                    placeholder="Description..."
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Receipt Photo</label>
+                                <div className="flex gap-2 items-center">
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        capture="environment" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        onChange={handleImageUpload}
+                                    />
+                                    <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full">
+                                        <Camera size={16} className="mr-2" /> 
+                                        {receiptImage ? 'Change Photo' : 'Attach Photo'}
+                                    </Button>
+                                    {receiptImage && (
+                                        <div className="relative w-10 h-10 flex-shrink-0">
+                                            <img src={receiptImage} alt="Preview" className="w-full h-full object-cover rounded" />
+                                            <button 
+                                                onClick={() => setReceiptImage(null)}
+                                                className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full p-0.5"
+                                            >
+                                                <X size={10} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
 
                         <Button onClick={handleAddExpense} className="w-full bg-rose-600 hover:bg-rose-700 focus:ring-rose-600">
@@ -252,6 +335,11 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-3">
+                                    {expense.receiptImage && (
+                                        <button onClick={() => setViewImageModal(expense.receiptImage!)} className="text-blue-600 hover:bg-blue-50 p-1 rounded-full">
+                                            <ImageIcon size={18} />
+                                        </button>
+                                    )}
                                     <span className="font-bold text-rose-600 dark:text-rose-400">₹{expense.amount.toLocaleString('en-IN')}</span>
                                     <DeleteButton variant="delete" onClick={() => handleDelete(expense.id)} />
                                 </div>

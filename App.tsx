@@ -13,6 +13,7 @@ import ReturnsPage from './pages/ReturnsPage';
 import ProductsPage from './pages/ProductsPage';
 import InsightsPage from './pages/InsightsPage';
 import ExpensesPage from './pages/ExpensesPage';
+import QuotationsPage from './pages/QuotationsPage';
 import UniversalSearch from './components/UniversalSearch';
 import HelpModal from './components/HelpModal';
 import AppSkeletonLoader from './components/AppSkeletonLoader';
@@ -325,6 +326,7 @@ const MainApp: React.FC = () => {
       case 'PRODUCTS': return <ProductsPage {...commonProps} />;
       case 'INSIGHTS': return <InsightsPage setCurrentPage={setCurrentPage} />;
       case 'EXPENSES': return <ExpensesPage {...commonProps} />;
+      case 'QUOTATIONS': return <QuotationsPage />;
       default: return <Dashboard setCurrentPage={setCurrentPage} />;
     }
   };

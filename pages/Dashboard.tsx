@@ -6,7 +6,7 @@ import * as db from '../utils/db';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import { DataImportModal } from '../components/DataImportModal';
-import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataBackup } from '../types';
+import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataBackup, Expense } from '../types';
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
 import PinModal from '../components/PinModal';
@@ -54,7 +54,15 @@ const MetricCard: React.FC<{
     </div>
 );
 
-const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers: Customer[], purchases: Purchase[], returns: Return[], ownerName: string }> = ({ sales, products, customers, purchases, returns, ownerName }) => {
+const SmartAnalystCard: React.FC<{ 
+    sales: Sale[], 
+    products: Product[], 
+    customers: Customer[], 
+    purchases: Purchase[], 
+    returns: Return[], 
+    expenses: Expense[], 
+    ownerName: string 
+}> = ({ sales, products, customers, purchases, returns, expenses, ownerName }) => {
     
     const insights = useMemo(() => {
         const list: { icon: React.ElementType, text: string, color: string, type: string }[] = [];
@@ -109,7 +117,25 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
             }
         }
 
-        // 3. Dead Stock
+        // 3. Operational Expense Alert
+        const thisMonthExpenses = expenses.filter(e => {
+            const d = new Date(e.date);
+            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        }).reduce((sum, e) => sum + e.amount, 0);
+
+        if (currentRevenue > 0 && thisMonthExpenses > 0) {
+            const ratio = (thisMonthExpenses / currentRevenue) * 100;
+            if (ratio > 40) {
+                 list.push({
+                    icon: Receipt,
+                    type: 'High Overhead',
+                    text: `Operational costs are ${ratio.toFixed(0)}% of revenue this month. Check if you can reduce expenses.`,
+                    color: 'text-rose-600 dark:text-rose-400'
+                });
+            }
+        }
+
+        // 4. Dead Stock
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
         const activeProductIds = new Set();
@@ -130,7 +156,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
             });
         }
 
-        // 4. Weekend Surge Analysis
+        // 5. Weekend Surge Analysis
         let weekendSales = 0, weekdaySales = 0;
         let weekendDays = 0, weekdayDays = 0;
         
@@ -158,7 +184,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
             });
         }
 
-        // 5. Category Trends
+        // 6. Category Trends
         const categoryCounts: Record<string, number> = {};
         thisMonthSales.forEach(s => {
             s.items.forEach(i => {
@@ -180,7 +206,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
             });
         }
 
-        // 6. Fast Moving Item (Velocity Risk)
+        // 7. Fast Moving Item (Velocity Risk)
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const recentSales = sales.filter(s => new Date(s.date) >= sevenDaysAgo);
@@ -213,7 +239,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
             });
         }
 
-        // 7. High Return Rate (Last 30 days)
+        // 8. High Return Rate (Last 30 days)
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentReturnsVal = returns
@@ -235,7 +261,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
             }
         }
 
-        // 8. Top Customer of the Month
+        // 9. Top Customer of the Month
         const customerSpend: Record<string, number> = {};
         thisMonthSales.forEach(s => {
             customerSpend[s.customerId] = (customerSpend[s.customerId] || 0) + Number(s.totalAmount);
@@ -265,7 +291,7 @@ const SmartAnalystCard: React.FC<{ sales: Sale[], products: Product[], customers
         }
 
         return list;
-    }, [sales, products, customers, purchases, returns]);
+    }, [sales, products, customers, purchases, returns, expenses]);
 
     return (
         <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-primary/10 dark:border-slate-700 transition-all hover:shadow-xl animate-slide-up-fade group">
@@ -594,7 +620,7 @@ const LowStockCard: React.FC<{ products: Product[]; onNavigate: (id: string) => 
 
 const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     const { state, dispatch, showToast } = useAppContext();
-    const { customers, sales, purchases, products, app_metadata, suppliers, returns, profile } = state;
+    const { customers, sales, purchases, products, app_metadata, suppliers, returns, profile, expenses } = state;
     const { showConfirm, showAlert } = useDialog();
     
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
@@ -805,6 +831,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 customers={customers} 
                 purchases={purchases} 
                 returns={returns} 
+                expenses={expenses}
                 ownerName={profile?.ownerName || 'Owner'}
             />
             

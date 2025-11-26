@@ -112,6 +112,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   purchases,
   returns,
   expenses,
+  quotes: [],
   app_metadata: [],
   audit_logs: [],
   theme: 'light',

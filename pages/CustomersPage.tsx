@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, User, Phone, MapPin, Search, Edit, Save, X, Trash2, IndianRupee, ShoppingCart, Download, Share2 } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Search, Edit, Save, X, Trash2, IndianRupee, ShoppingCart, Download, Share2, ChevronDown, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Payment, Sale, Page } from '../types';
 import Card from '../components/Card';
@@ -10,10 +10,6 @@ import DeleteButton from '../components/DeleteButton';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
-import { generateThermalInvoicePDF, generateA4InvoicePdf } from '../utils/pdfGenerator';
-import DateInput from '../components/DateInput';
-import DatePill from '../components/DatePill';
-import Dropdown from '../components/Dropdown';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -46,12 +42,6 @@ const PaymentModal: React.FC<{
     const amountPaid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
     const dueAmount = Number(sale.totalAmount) - amountPaid;
 
-    const paymentMethodOptions = [
-        { value: 'CASH', label: 'Cash' },
-        { value: 'UPI', label: 'UPI' },
-        { value: 'CHEQUE', label: 'Cheque' }
-    ];
-
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast">
             <Card title="Add Payment" className="w-full max-w-sm animate-scale-in">
@@ -64,23 +54,25 @@ const PaymentModal: React.FC<{
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Method</label>
-                        <Dropdown
-                            options={paymentMethodOptions}
-                            value={paymentDetails.method}
-                            onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
+                        <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any })} className="w-full p-2 border rounded custom-select">
+                            <option value="CASH">Cash</option>
+                            <option value="UPI">UPI</option>
+                            <option value="CHEQUE">Cheque</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700">Payment Date</label>
+                        <input 
+                            type="date" 
+                            value={paymentDetails.date} 
+                            onChange={e => setPaymentDetails({ ...paymentDetails, date: e.target.value })} 
+                            className="w-full p-2 border rounded"
                         />
                     </div>
-                    
-                    <DateInput
-                        label="Payment Date"
-                        value={paymentDetails.date} 
-                        onChange={e => setPaymentDetails({ ...paymentDetails, date: e.target.value })} 
-                    />
-
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Payment Reference (Optional)</label>
                         <input 
-                            type="text"
+                            type="text" 
                             placeholder="e.g. UPI ID, Cheque No."
                             value={paymentDetails.reference}
                             onChange={e => setPaymentDetails({ ...paymentDetails, reference: e.target.value })}
@@ -109,6 +101,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     const [isAdding, setIsAdding] = useState(false);
     const [newCustomer, setNewCustomer] = useState({ id: '', name: '', phone: '', address: '', area: '', reference: '' });
     const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+    const [activeSaleId, setActiveSaleId] = useState<string | null>(null);
     const [actionMenuSaleId, setActionMenuSaleId] = useState<string | null>(null);
 
     const [isEditing, setIsEditing] = useState(false);
@@ -173,6 +166,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     useEffect(() => {
         if (selectedCustomer) {
             setEditedCustomer(selectedCustomer);
+            setActiveSaleId(null); // Close any open accordion when customer changes
         }
         setIsEditing(false);
     }, [selectedCustomer]);
@@ -277,18 +271,251 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     const handleDownloadThermalReceipt = async (sale: Sale) => {
         if (!selectedCustomer) return;
+
+        let qrCodeBase64: string | null = null;
         try {
-            const doc = await generateThermalInvoicePDF(sale, selectedCustomer, state.profile);
-            doc.save(`Invoice-${sale.id}.pdf`);
+            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(sale.id)}&size=50x50&margin=0`;
+            qrCodeBase64 = await fetchImageAsBase64(qrCodeUrl);
         } catch (error) {
-            console.error("Thermal receipt generation failed", error);
-            alert("Failed to generate thermal receipt.");
+            console.error("Failed to fetch QR code", error);
         }
+
+        const renderContentOnDoc = (doc: jsPDF) => {
+            const customer = selectedCustomer;
+            const subTotal = Number(sale.totalAmount) + Number(sale.discount);
+            const paidAmountOnSale = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
+
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const centerX = pageWidth / 2;
+            const margin = 5;
+            const maxLineWidth = pageWidth - margin * 2;
+            let y = 5;
+
+            y = 10;
+            doc.setFont('times', 'italic');
+            doc.setFontSize(12);
+            doc.setTextColor('#000000');
+            doc.text('Om Namo Venkatesaya', centerX, y, { align: 'center' });
+            y += 7;
+            
+            doc.setFont('times', 'bold');
+            doc.setFontSize(16);
+            doc.setTextColor('#0d9488'); // Primary Color
+            doc.text(state.profile?.name || 'Business Manager', centerX, y, { align: 'center' });
+            y += 7;
+
+            doc.setDrawColor('#cccccc');
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 6;
+
+            doc.setFont('Helvetica', 'normal');
+            doc.setFontSize(8);
+            doc.setTextColor('#000000');
+            
+            const invoiceTextTopY = y - 3; // Approximate top of the text line
+            doc.text(`Invoice: ${sale.id}`, margin, y);
+            y += 4;
+            doc.text(`Date: ${new Date(sale.date).toLocaleString()}`, margin, y);
+            
+            if (qrCodeBase64) {
+                const qrSize = 15; // 15mm
+                doc.addImage(qrCodeBase64, 'PNG', pageWidth - margin - qrSize, invoiceTextTopY, qrSize, qrSize);
+                
+                // Ensure y position is below the QR code for subsequent content
+                const qrBottom = invoiceTextTopY + qrSize;
+                if (qrBottom > y) {
+                    y = qrBottom;
+                }
+            }
+            y += 5;
+            
+            doc.setFont('Helvetica', 'bold');
+            doc.text('Billed To:', margin, y);
+            y += 4;
+            doc.setFont('Helvetica', 'normal');
+            doc.text(customer.name, margin, y);
+            y += 4;
+            const addressLines = doc.splitTextToSize(customer.address, maxLineWidth);
+            doc.text(addressLines, margin, y);
+            y += (addressLines.length * 4);
+            y += 2;
+
+            doc.setDrawColor('#000000');
+            doc.line(margin, y, pageWidth - margin, y); 
+            y += 5;
+            doc.setFont('Helvetica', 'bold');
+            doc.text('Purchase Details', centerX, y, { align: 'center' });
+            y += 5;
+            doc.line(margin, y, pageWidth - margin, y); 
+            y += 5;
+
+            doc.setFont('Helvetica', 'bold');
+            doc.text('Item', margin, y);
+            doc.text('Total', pageWidth - margin, y, { align: 'right' });
+            y += 2;
+            doc.setDrawColor('#cccccc');
+            doc.line(margin, y, pageWidth - margin, y);
+            y += 5;
+            
+            doc.setFont('Helvetica', 'normal');
+            sale.items.forEach(item => {
+                const itemTotal = Number(item.price) * Number(item.quantity);
+                doc.setFontSize(9);
+                const splitName = doc.splitTextToSize(item.productName, maxLineWidth - 20);
+                doc.text(splitName, margin, y);
+                doc.text(`Rs. ${itemTotal.toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
+                y += (splitName.length * 4);
+                doc.setFontSize(7);
+                doc.setTextColor('#666666');
+                doc.text(`(x${item.quantity} @ Rs. ${Number(item.price).toLocaleString('en-IN')})`, margin, y);
+                y += 6;
+                doc.setTextColor('#000000');
+            });
+            
+            y -= 2;
+            doc.setDrawColor('#cccccc');
+            doc.line(margin, y, pageWidth - margin, y); 
+            y += 5;
+
+            const totals = [
+                { label: 'Subtotal', value: subTotal },
+                { label: 'GST', value: Number(sale.gstAmount) },
+                { label: 'Discount', value: -Number(sale.discount) },
+                { label: 'Total', value: Number(sale.totalAmount), bold: true },
+                { label: 'Paid', value: paidAmountOnSale },
+                { label: 'Due', value: dueAmountOnSale, bold: true },
+            ];
+            
+            const totalsX = pageWidth - margin;
+            totals.forEach(({label, value, bold = false}) => {
+                doc.setFont('Helvetica', bold ? 'bold' : 'normal');
+                doc.setFontSize(bold ? 10 : 8);
+                doc.text(label, totalsX - 25, y, { align: 'right' });
+                doc.text(`Rs. ${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, y, { align: 'right' });
+                y += (bold ? 5 : 4);
+            });
+          
+            return y;
+        };
+        
+        const dummyDoc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, 500] });
+        const finalY = renderContentOnDoc(dummyDoc);
+
+        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, finalY + 5] });
+        renderContentOnDoc(doc);
+        
+        doc.save(`${sale.id}.pdf`);
     };
 
+    const generateA4InvoicePdf = async (sale: Sale, customer: Customer) => {
+        const doc = new jsPDF();
+        const profile = state.profile;
+        let currentY = 15;
+    
+        if (profile) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(20);
+            doc.setTextColor('#0d9488');
+            doc.text(profile.name, 105, currentY, { align: 'center' });
+            currentY += 8;
+            doc.setFontSize(10);
+            doc.setTextColor('#333333');
+            const addressLines = doc.splitTextToSize(profile.address, 180);
+            doc.text(addressLines, 105, currentY, { align: 'center' });
+            currentY += (addressLines.length * 5);
+            doc.text(`Phone: ${profile.phone} | GSTIN: ${profile.gstNumber}`, 105, currentY, { align: 'center' });
+            currentY += 5;
+        }
+    
+        doc.setDrawColor('#cccccc');
+        doc.line(14, currentY, 196, currentY);
+        currentY += 10;
+        
+        doc.setFontSize(16);
+        doc.setFont('helvetica', 'bold');
+        doc.text('TAX INVOICE', 105, currentY, { align: 'center' });
+        currentY += 10;
+        
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Billed To:', 14, currentY);
+        doc.text('Invoice Details:', 120, currentY);
+        currentY += 5;
+    
+        doc.setFont('helvetica', 'normal');
+        doc.text(customer.name, 14, currentY);
+        doc.text(`Invoice ID: ${sale.id}`, 120, currentY);
+        currentY += 5;
+        
+        const customerAddressLines = doc.splitTextToSize(customer.address, 80);
+        doc.text(customerAddressLines, 14, currentY);
+        doc.text(`Date: ${new Date(sale.date).toLocaleString()}`, 120, currentY);
+        currentY += (customerAddressLines.length * 5) + 5;
+        
+        const subTotal = Number(sale.totalAmount) + Number(sale.discount);
+        autoTable(doc, {
+            startY: currentY,
+            head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
+            body: sale.items.map((item, index) => [
+                index + 1,
+                item.productName,
+                item.quantity,
+                `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
+                `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
+            ]),
+            theme: 'grid',
+            headStyles: { fillColor: [13, 148, 136] },
+            columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+        });
+        
+        currentY = (doc as any).lastAutoTable.finalY + 10;
+        
+        const paidAmount = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+        const dueAmount = Number(sale.totalAmount) - paidAmount;
+        
+        const totalsX = 196;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text('Subtotal:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+    
+        doc.text('Discount:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`- Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+    
+        doc.text('GST Included:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+        
+        doc.setFont('helvetica', 'bold');
+        doc.text('Grand Total:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+    
+        doc.setFont('helvetica', 'normal');
+        doc.text('Paid:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        currentY += 7;
+    
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor(dueAmount > 0.01 ? '#dc2626' : '#16a34a');
+        doc.text('Amount Due:', totalsX - 30, currentY, { align: 'right' });
+        doc.text(`Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, currentY, { align: 'right' });
+        
+        currentY = doc.internal.pageSize.height - 20;
+        doc.setFontSize(10);
+        doc.setTextColor('#888888');
+        doc.text('Thank you for your business!', 105, currentY, { align: 'center' });
+    
+        return doc;
+    };
+    
     const handlePrintA4Invoice = async (sale: Sale) => {
         if (!selectedCustomer) return;
-        const doc = await generateA4InvoicePdf(sale, selectedCustomer, state.profile);
+        const doc = await generateA4InvoicePdf(sale, selectedCustomer);
         doc.autoPrint();
         const pdfUrl = doc.output('bloburl');
         window.open(pdfUrl, '_blank');
@@ -296,23 +523,18 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     const handleShareInvoice = async (sale: Sale) => {
         if (!selectedCustomer) return;
-        try {
-            const doc = await generateThermalInvoicePDF(sale, selectedCustomer, state.profile);
-            const pdfBlob = doc.output('blob');
-            const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
-            const businessName = state.profile?.name || 'Invoice';
+        const doc = await generateA4InvoicePdf(sale, selectedCustomer);
+        const pdfBlob = doc.output('blob');
+        const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
+        const businessName = state.profile?.name || 'Invoice';
 
-            if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
-                await navigator.share({
-                    title: `${businessName} - Invoice ${sale.id}`,
-                    files: [pdfFile],
-                });
-            } else {
-                doc.save(`Invoice-${sale.id}.pdf`);
-            }
-        } catch (error) {
-            console.error("Share invoice failed", error);
-            alert("Failed to generate or share invoice.");
+        if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
+            await navigator.share({
+                title: `${businessName} - Invoice ${sale.id}`,
+                files: [pdfFile],
+            });
+        } else {
+            doc.save(`Invoice-${sale.id}.pdf`);
         }
     };
 
@@ -405,6 +627,124 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         }
     };
 
+    const generateStatementPDF = async () => {
+        if (!selectedCustomer) return;
+
+        const doc = new jsPDF();
+        const profile = state.profile;
+        let currentY = 15;
+
+        // --- Header ---
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(20);
+        doc.setTextColor('#0d9488');
+        doc.text('Statement of Accounts', 105, currentY, { align: 'center' });
+        currentY += 8;
+
+        if (profile) {
+            doc.setFontSize(10);
+            doc.setTextColor('#333333');
+            doc.setFont('helvetica', 'bold');
+            doc.text(profile.name, 105, currentY, { align: 'center' });
+            currentY += 5;
+            doc.setFont('helvetica', 'normal');
+            doc.text(profile.address, 105, currentY, { align: 'center' });
+            currentY += 5;
+            doc.text(`Phone: ${profile.phone}`, 105, currentY, { align: 'center' });
+            currentY += 10;
+        }
+
+        // --- Customer Details ---
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor('#000000');
+        doc.text('Statement For:', 14, currentY);
+        currentY += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.text(selectedCustomer.name, 14, currentY);
+        currentY += 5;
+        doc.text(selectedCustomer.address, 14, currentY);
+        doc.text(`Generated on: ${new Date().toLocaleDateString()}`, 196, currentY - 10, { align: 'right' });
+        currentY += 10;
+
+        // --- Logic for Ledger ---
+        const customerSales = state.sales.filter(s => s.customerId === selectedCustomer.id);
+        
+        type LedgerEntry = {
+            date: Date;
+            ref: string;
+            description: string;
+            debit: number; // Sale
+            credit: number; // Payment
+        };
+
+        let ledger: LedgerEntry[] = [];
+
+        customerSales.forEach(sale => {
+            // 1. Add the Sale Invoice (Debit)
+            ledger.push({
+                date: new Date(sale.date),
+                ref: sale.id,
+                description: 'Invoice',
+                debit: Number(sale.totalAmount),
+                credit: 0
+            });
+
+            // 2. Add Payments (Credit)
+            sale.payments.forEach(payment => {
+                ledger.push({
+                    date: new Date(payment.date),
+                    ref: payment.id, // Or sale.id if preferred for tracking
+                    description: `Payment (${payment.method})`,
+                    debit: 0,
+                    credit: Number(payment.amount)
+                });
+            });
+        });
+
+        // Sort Chronologically
+        ledger.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+        // Build Table Rows with Running Balance
+        let runningBalance = 0;
+        const tableBody = ledger.map(entry => {
+            runningBalance = runningBalance + entry.debit - entry.credit;
+            return [
+                entry.date.toLocaleDateString(),
+                entry.ref,
+                entry.description,
+                entry.debit > 0 ? entry.debit.toLocaleString('en-IN') : '-',
+                entry.credit > 0 ? entry.credit.toLocaleString('en-IN') : '-',
+                runningBalance.toLocaleString('en-IN')
+            ];
+        });
+
+        autoTable(doc, {
+            startY: currentY,
+            head: [['Date', 'Reference', 'Description', 'Debit (Sale)', 'Credit (Paid)', 'Balance']],
+            body: tableBody,
+            theme: 'grid',
+            headStyles: { fillColor: [13, 148, 136] },
+            columnStyles: { 
+                3: { halign: 'right' }, 
+                4: { halign: 'right' },
+                5: { halign: 'right', fontStyle: 'bold' } 
+            }
+        });
+
+        // --- Footer ---
+        currentY = (doc as any).lastAutoTable.finalY + 15;
+        doc.setFontSize(12);
+        doc.setFont('helvetica', 'bold');
+        doc.setTextColor('#0d9488');
+        doc.text(
+            `Closing Balance: Rs. ${runningBalance.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`,
+            196, currentY, { align: 'right' }
+        );
+
+        doc.save(`Statement-${selectedCustomer.id}.pdf`);
+    };
+
 
     const filteredCustomers = state.customers.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -474,115 +814,128 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                             {selectedCustomer.reference && <p><strong>Reference:</strong> {selectedCustomer.reference}</p>}
                         </div>
                     )}
-                     <div className="mt-4 pt-4 border-t">
-                        <Button onClick={handleShareDuesSummary} className="w-full">
+                     <div className="mt-4 pt-4 border-t grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Button onClick={handleShareDuesSummary} className="w-full" variant="secondary">
                             <Share2 size={16} className="mr-2" />
                             Share Dues Summary
+                        </Button>
+                        <Button onClick={generateStatementPDF} className="w-full bg-indigo-600 hover:bg-indigo-700 focus:ring-indigo-600">
+                            <FileText size={16} className="mr-2" />
+                            Download Full Statement
                         </Button>
                     </div>
                 </Card>
                 <Card title="Sales History">
                     {customerSales.length > 0 ? (
-                        <div className="space-y-4">
+                        <div className="space-y-2">
                             {customerSales.slice().reverse().map(sale => {
                                 const amountPaid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
                                 const dueAmount = Number(sale.totalAmount) - amountPaid;
                                 const isPaid = dueAmount <= 0.01;
                                 const subTotal = Number(sale.totalAmount) + Number(sale.discount);
+                                const isExpanded = activeSaleId === sale.id;
 
                                 return (
-                                <div key={sale.id} className="bg-white dark:bg-slate-800 rounded-lg border dark:border-slate-700 shadow-sm overflow-hidden">
-                                    <div className="bg-gray-50 dark:bg-slate-700/50 p-3 border-b dark:border-slate-600 flex justify-between items-center">
+                                <div key={sale.id} className="bg-gray-50 rounded-lg border overflow-hidden transition-all duration-300">
+                                    <button 
+                                        onClick={() => setActiveSaleId(isExpanded ? null : sale.id)}
+                                        className="w-full text-left p-3 flex justify-between items-center hover:bg-gray-100 focus:outline-none focus:bg-gray-100 transition-colors"
+                                    >
                                         <div className="flex-1">
-                                            <p className="font-semibold text-gray-800 dark:text-gray-200">{sale.id}</p>
-                                            <p className="text-xs text-gray-600 dark:text-gray-400">{new Date(sale.date).toLocaleString()}</p>
+                                            <p className="font-semibold text-gray-800">{sale.id}</p>
+                                            <p className="text-xs text-gray-600">{new Date(sale.date).toLocaleString()}</p>
                                         </div>
                                         <div className="text-right mx-2">
                                             <p className="font-bold text-lg text-primary">₹{Number(sale.totalAmount).toLocaleString('en-IN')}</p>
-                                            <p className={`text-sm font-semibold ${isPaid ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                            <p className={`text-sm font-semibold ${isPaid ? 'text-green-600' : 'text-red-600'}`}>
                                                 {isPaid ? 'Paid' : `Due: ₹${dueAmount.toLocaleString('en-IN')}`}
                                             </p>
                                         </div>
-                                    </div>
+                                        <ChevronDown className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
+                                    </button>
                                     
-                                    <div className="p-3">
-                                        <div className="flex justify-end items-center gap-2 mb-3">
-                                            <button onClick={() => handleEditSale(sale.id)} className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/20 dark:text-blue-300 dark:hover:bg-blue-900/40 rounded-full transition-colors" aria-label="Edit Sale"><Edit size={16} /></button>
-                                                <div className="relative" ref={actionMenuSaleId === sale.id ? actionMenuRef : undefined}>
-                                                <button onClick={() => setActionMenuSaleId(sale.id)} className="p-2 text-teal-600 bg-teal-50 hover:bg-teal-100 dark:bg-teal-900/20 dark:text-teal-300 dark:hover:bg-teal-900/40 rounded-full transition-colors" aria-label="Share or Download Invoice">
-                                                    <Share2 size={16} />
-                                                </button>
-                                                {actionMenuSaleId === sale.id && (
-                                                    <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 text-text dark:text-slate-200 z-10 animate-scale-in origin-top-right">
-                                                        <button onClick={() => { handlePrintA4Invoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700">Print (A4)</button>
-                                                        <button onClick={() => { handleDownloadThermalReceipt(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700">Download Receipt</button>
-                                                        <button onClick={() => { handleShareInvoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100 dark:hover:bg-slate-700">Share Invoice</button>
+                                    {isExpanded && (
+                                        <div className="p-3 border-t bg-white animate-slide-down-fade">
+                                            <div className="flex justify-end items-start mb-2">
+                                                <div className="flex items-center gap-1">
+                                                    <button onClick={() => handleEditSale(sale.id)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full" aria-label="Edit Sale"><Edit size={16} /></button>
+                                                     <div className="relative" ref={actionMenuSaleId === sale.id ? actionMenuRef : undefined}>
+                                                        <button onClick={() => setActionMenuSaleId(sale.id)} className="p-2 text-blue-600 hover:bg-blue-100 rounded-full" aria-label="Share or Download Invoice">
+                                                            <Share2 size={16} />
+                                                        </button>
+                                                        {actionMenuSaleId === sale.id && (
+                                                            <div className="absolute top-full right-0 mt-1 w-48 bg-white rounded-md shadow-lg border text-text z-10 animate-scale-in origin-top-right">
+                                                                <button onClick={() => { handlePrintA4Invoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Print (A4)</button>
+                                                                <button onClick={() => { handleDownloadThermalReceipt(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Download Receipt</button>
+                                                                <button onClick={() => { handleShareInvoice(sale); setActionMenuSaleId(null); }} className="w-full text-left px-4 py-2 text-sm hover:bg-gray-100">Share Invoice</button>
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
-                                            </div>
-                                            <DeleteButton 
-                                                variant="delete" 
-                                                onClick={(e) => { e.stopPropagation(); handleDeleteSale(sale.id); }} 
-                                            />
-                                        </div>
-                                        <div className="space-y-3">
-                                            <div>
-                                                <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-1">Items Purchased:</h4>
-                                                <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                                                    {sale.items.map((item, index) => (
-                                                        <li key={index}>
-                                                            {item.productName} (x{item.quantity}) @ ₹{Number(item.price).toLocaleString('en-IN')} each
-                                                        </li>
-                                                    ))}
-                                                </ul>
-                                            </div>
-                                            <div className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-md text-sm border dark:border-slate-600">
-                                                <h4 className="font-semibold text-gray-700 dark:text-gray-300 mb-2">Transaction Details:</h4>
-                                                <div className="space-y-1 text-gray-600 dark:text-gray-400">
-                                                    <div className="flex justify-between"><span>Subtotal:</span> <span>₹{subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-                                                    <div className="flex justify-between"><span>Discount:</span> <span>- ₹{Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-                                                    <div className="flex justify-between"><span>GST Included:</span> <span>₹{Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-                                                    <div className="flex justify-between font-bold border-t dark:border-slate-500 pt-1 mt-1 text-gray-800 dark:text-white"><span>Grand Total:</span> <span>₹{Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                    <DeleteButton 
+                                                        variant="delete" 
+                                                        onClick={(e) => { e.stopPropagation(); handleDeleteSale(sale.id); }} 
+                                                    />
                                                 </div>
                                             </div>
-                                            <div>
-                                                <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-1">Payments Made:</h4>
-                                                {sale.payments.length > 0 ? (
-                                                    <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
-                                                        {sale.payments.map(payment => (
-                                                            <li key={payment.id}>
-                                                                ₹{Number(payment.amount).toLocaleString('en-IN')} {payment.method === 'RETURN_CREDIT' ? <span className="text-blue-600 dark:text-blue-400 font-semibold">(Return Credit)</span> : `via ${payment.method}`} on {new Date(payment.date).toLocaleDateString()}
-                                                                {payment.reference && <span className="text-xs text-gray-500 dark:text-gray-500 block">Ref: {payment.reference}</span>}
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <h4 className="font-semibold text-sm text-gray-700 mb-1">Items Purchased:</h4>
+                                                    <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                                                        {sale.items.map((item, index) => (
+                                                            <li key={index}>
+                                                                {item.productName} (x{item.quantity}) @ ₹{Number(item.price).toLocaleString('en-IN')} each
                                                             </li>
                                                         ))}
                                                     </ul>
-                                                ) : <p className="text-sm text-gray-500 dark:text-gray-400">No payments made yet.</p>}
-                                            </div>
-                                            {!isPaid && (
-                                                <div className="pt-2">
-                                                    <Button onClick={() => setPaymentModalState({ isOpen: true, saleId: sale.id })} className="w-full">
-                                                        <Plus size={16} className="mr-2"/> Add Payment
-                                                    </Button>
                                                 </div>
-                                            )}
+                                                <div className="p-2 bg-white rounded-md text-sm border">
+                                                    <h4 className="font-semibold text-gray-700 mb-2">Transaction Details:</h4>
+                                                    <div className="space-y-1">
+                                                        <div className="flex justify-between"><span>Subtotal:</span> <span>₹{subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                        <div className="flex justify-between"><span>Discount:</span> <span>- ₹{Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                        <div className="flex justify-between"><span>GST Included:</span> <span>₹{Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                        <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Grand Total:</span> <span>₹{Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <h4 className="font-semibold text-sm text-gray-700 mb-1">Payments Made:</h4>
+                                                    {sale.payments.length > 0 ? (
+                                                        <ul className="list-disc list-inside text-sm text-gray-600 space-y-1">
+                                                            {sale.payments.map(payment => (
+                                                                <li key={payment.id}>
+                                                                    ₹{Number(payment.amount).toLocaleString('en-IN')} {payment.method === 'RETURN_CREDIT' ? <span className="text-blue-600 font-semibold">(Return Credit)</span> : `via ${payment.method}`} on {new Date(payment.date).toLocaleDateString()}
+                                                                    {payment.reference && <span className="text-xs text-gray-500 block">Ref: {payment.reference}</span>}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : <p className="text-sm text-gray-500">No payments made yet.</p>}
+                                                </div>
+                                                {!isPaid && (
+                                                    <div className="pt-2">
+                                                        <Button onClick={() => setPaymentModalState({ isOpen: true, saleId: sale.id })} className="w-full">
+                                                            <Plus size={16} className="mr-2"/> Add Payment
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             )})}
                         </div>
                     ) : (
-                        <p className="text-gray-500 dark:text-gray-400">No sales recorded for this customer.</p>
+                        <p className="text-gray-500">No sales recorded for this customer.</p>
                     )}
                 </Card>
                  <Card title="Returns History">
                     {customerReturns.length > 0 ? (
                          <div className="space-y-3">
                             {customerReturns.slice().reverse().map(ret => (
-                                <div key={ret.id} className="p-3 bg-gray-50 dark:bg-slate-700/30 rounded-lg border dark:border-slate-700">
+                                <div key={ret.id} className="p-3 bg-gray-50 rounded-lg border">
                                     <div className="flex justify-between items-start">
                                         <div>
-                                            <p className="font-semibold dark:text-slate-200">Return on {new Date(ret.returnDate).toLocaleDateString()}</p>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">Original Invoice: {ret.referenceId}</p>
+                                            <p className="font-semibold">Return on {new Date(ret.returnDate).toLocaleDateString()}</p>
+                                            <p className="text-xs text-gray-500">Original Invoice: {ret.referenceId}</p>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             <p className="font-semibold text-primary">Refunded: ₹{Number(ret.amount).toLocaleString('en-IN')}</p>
@@ -591,8 +944,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                             </Button>
                                         </div>
                                     </div>
-                                    <div className="mt-2 pt-2 border-t dark:border-slate-600">
-                                        <ul className="text-sm list-disc list-inside text-gray-600 dark:text-gray-400">
+                                    <div className="mt-2 pt-2 border-t">
+                                        <ul className="text-sm list-disc list-inside text-gray-600">
                                             {ret.items.map((item, idx) => (
                                                 <li key={idx}>{item.productName} (x{item.quantity})</li>
                                             ))}
@@ -602,7 +955,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                             ))}
                         </div>
                     ) : (
-                        <p className="text-gray-500 dark:text-gray-400">No returns recorded for this customer.</p>
+                        <p className="text-gray-500">No returns recorded for this customer.</p>
                     )}
                 </Card>
             </div>
@@ -612,11 +965,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     return (
         <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-primary">Customers</h1>
-                    <DatePill />
-                </div>
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-primary">Customers</h1>
                 <Button onClick={() => setIsAdding(!isAdding)}>
                     <Plus className="w-4 h-4 mr-2" />
                     {isAdding ? 'Cancel' : 'Add Customer'}
@@ -627,9 +977,9 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                 <Card title="New Customer Form">
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Customer ID</label>
+                            <label className="block text-sm font-medium text-gray-700">Customer ID</label>
                             <div className="flex items-center mt-1">
-                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-gray-400">
+                                <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
                                     CUST-
                                 </span>
                                 <input 
@@ -637,15 +987,15 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                     placeholder="Enter unique ID" 
                                     value={newCustomer.id} 
                                     onChange={e => setNewCustomer({ ...newCustomer, id: e.target.value })} 
-                                    className="w-full p-2 border rounded-r-md dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" 
+                                    className="w-full p-2 border rounded-r-md" 
                                 />
                             </div>
                         </div>
-                        <input type="text" placeholder="Name" value={newCustomer.name} onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
-                        <input type="text" placeholder="Phone" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
-                        <input type="text" placeholder="Address" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
-                        <input type="text" placeholder="Area/Location" value={newCustomer.area} onChange={e => setNewCustomer({ ...newCustomer, area: e.target.value })} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
-                        <input type="text" placeholder="Reference (Optional)" value={newCustomer.reference} onChange={e => setNewCustomer({ ...newCustomer, reference: e.target.value })} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
+                        <input type="text" placeholder="Name" value={newCustomer.name} onChange={e => setNewCustomer({ ...newCustomer, name: e.target.value })} className="w-full p-2 border rounded" />
+                        <input type="text" placeholder="Phone" value={newCustomer.phone} onChange={e => setNewCustomer({ ...newCustomer, phone: e.target.value })} className="w-full p-2 border rounded" />
+                        <input type="text" placeholder="Address" value={newCustomer.address} onChange={e => setNewCustomer({ ...newCustomer, address: e.target.value })} className="w-full p-2 border rounded" />
+                        <input type="text" placeholder="Area/Location" value={newCustomer.area} onChange={e => setNewCustomer({ ...newCustomer, area: e.target.value })} className="w-full p-2 border rounded" />
+                        <input type="text" placeholder="Reference (Optional)" value={newCustomer.reference} onChange={e => setNewCustomer({ ...newCustomer, reference: e.target.value })} className="w-full p-2 border rounded" />
                         <Button onClick={handleAddCustomer} className="w-full">Save Customer</Button>
                     </div>
                 </Card>
@@ -658,7 +1008,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                     placeholder="Search customers by name, phone, or area..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full p-2 pl-10 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                    className="w-full p-2 pl-10 border rounded-lg"
                 />
             </div>
 
@@ -679,15 +1029,15 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="font-bold text-lg text-primary flex items-center gap-2"><User size={16}/> {customer.name}</p>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 flex items-center gap-2"><Phone size={14}/> {customer.phone}</p>
-                                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center gap-2"><MapPin size={14}/> {customer.area}</p>
+                                    <p className="text-sm text-gray-600 flex items-center gap-2"><Phone size={14}/> {customer.phone}</p>
+                                    <p className="text-sm text-gray-500 flex items-center gap-2"><MapPin size={14}/> {customer.area}</p>
                                 </div>
                                 <div className="text-right flex-shrink-0 ml-4">
-                                    <div className="flex items-center justify-end gap-1 text-green-600 dark:text-green-400">
+                                    <div className="flex items-center justify-end gap-1 text-green-600">
                                         <ShoppingCart size={14} />
                                         <span className="font-semibold">₹{totalPurchase.toLocaleString('en-IN')}</span>
                                     </div>
-                                     <div className={`flex items-center justify-end gap-1 ${totalDue > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                                     <div className={`flex items-center justify-end gap-1 ${totalDue > 0 ? 'text-red-600' : 'text-gray-600'}`}>
                                         <IndianRupee size={14} />
                                         <span className="font-semibold">₹{totalDue.toLocaleString('en-IN')}</span>
                                     </div>

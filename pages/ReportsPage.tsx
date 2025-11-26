@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { Download, XCircle, Users, Package } from 'lucide-react';
+import { Download, XCircle, Users, Package, TrendingUp, BarChart } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -22,7 +22,7 @@ interface ReportsPageProps {
 
 const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const { state, dispatch } = useAppContext();
-    const [activeTab, setActiveTab] = useState<'customer' | 'supplier'>('customer');
+    const [activeTab, setActiveTab] = useState<'customer' | 'supplier' | 'inventory'>('customer');
 
     // --- Customer Filters ---
     const [areaFilter, setAreaFilter] = useState('all');
@@ -272,6 +272,26 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
         link.click();
     };
 
+    // --- Inventory Valuation Logic ---
+    const inventoryValuation = useMemo(() => {
+        const products = state.products;
+        let totalCostValue = 0;
+        let totalRetailValue = 0;
+        let totalItems = 0;
+
+        products.forEach(p => {
+            const qty = Math.max(0, p.quantity);
+            totalItems += qty;
+            totalCostValue += qty * p.purchasePrice;
+            totalRetailValue += qty * p.salePrice;
+        });
+
+        const potentialProfit = totalRetailValue - totalCostValue;
+        const margin = totalRetailValue > 0 ? (potentialProfit / totalRetailValue) * 100 : 0;
+
+        return { totalItems, totalCostValue, totalRetailValue, potentialProfit, margin };
+    }, [state.products]);
+
     return (
         <div className="space-y-6">
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -294,6 +314,12 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                         className={`py-2 px-1 border-b-2 font-semibold flex items-center gap-2 ${activeTab === 'supplier' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}`}
                     >
                         <Package size={16} /> Supplier Reports
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('inventory')} 
+                        className={`py-2 px-1 border-b-2 font-semibold flex items-center gap-2 ${activeTab === 'inventory' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}`}
+                    >
+                        <BarChart size={16} /> Inventory Valuation
                     </button>
                 </nav>
             </div>
@@ -479,6 +505,54 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                                     ))}
                                 </tbody>
                             </table>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            {activeTab === 'inventory' && (
+                <div className="animate-fade-in-fast space-y-6">
+                    <Card title="Inventory Valuation" className="border-l-4 border-indigo-500">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900">
+                                <p className="text-sm text-indigo-600 dark:text-indigo-300 font-bold uppercase tracking-wider">Total Items</p>
+                                <p className="text-3xl font-extrabold text-indigo-900 dark:text-indigo-100 mt-1">{inventoryValuation.totalItems.toLocaleString()}</p>
+                                <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">Units in stock</p>
+                            </div>
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900">
+                                <p className="text-sm text-blue-600 dark:text-blue-300 font-bold uppercase tracking-wider">Asset Value (Cost)</p>
+                                <p className="text-3xl font-extrabold text-blue-900 dark:text-blue-100 mt-1">₹{inventoryValuation.totalCostValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                                <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">Based on purchase price</p>
+                            </div>
+                            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-900">
+                                <p className="text-sm text-emerald-600 dark:text-emerald-300 font-bold uppercase tracking-wider">Potential Revenue</p>
+                                <p className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100 mt-1">₹{inventoryValuation.totalRetailValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                                <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-1">Based on sale price</p>
+                            </div>
+                            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-900">
+                                <p className="text-sm text-amber-600 dark:text-amber-300 font-bold uppercase tracking-wider">Projected Profit</p>
+                                <p className="text-3xl font-extrabold text-amber-900 dark:text-amber-100 mt-1">₹{inventoryValuation.potentialProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
+                                <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">~{inventoryValuation.margin.toFixed(1)}% Margin</p>
+                            </div>
+                        </div>
+                        
+                        <div className="mt-6">
+                            <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-4 overflow-hidden flex">
+                                <div 
+                                    className="bg-blue-500 h-full" 
+                                    style={{ width: `${(inventoryValuation.totalCostValue / inventoryValuation.totalRetailValue) * 100}%` }} 
+                                    title="Cost Value"
+                                ></div>
+                                <div 
+                                    className="bg-amber-500 h-full" 
+                                    style={{ width: `${(inventoryValuation.potentialProfit / inventoryValuation.totalRetailValue) * 100}%` }} 
+                                    title="Profit Value"
+                                ></div>
+                            </div>
+                            <div className="flex justify-between text-xs mt-2 text-gray-600 dark:text-gray-400 font-medium">
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> Cost: {((inventoryValuation.totalCostValue / inventoryValuation.totalRetailValue) * 100).toFixed(1)}%</span>
+                                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-500 rounded-full"></div> Profit: {((inventoryValuation.potentialProfit / inventoryValuation.totalRetailValue) * 100).toFixed(1)}%</span>
+                            </div>
                         </div>
                     </Card>
                 </div>

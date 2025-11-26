@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt } from 'lucide-react';
+import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText } from 'lucide-react';
 import { Page } from '../types';
 import { useAppContext } from '../context/AppContext';
 import AuditLogPanel from './AuditLogPanel';
@@ -213,6 +213,12 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                     <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
                 
+                <button onClick={() => onNavigate('QUOTATIONS')} className="menu-item">
+                    <FileText className="w-5 h-5 text-indigo-500" />
+                    <span className="flex-grow text-sm font-medium">Quotations / Estimates</span>
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                </button>
+
                 <button onClick={() => onNavigate('INSIGHTS')} className="menu-item">
                     <BarChart2 className="w-5 h-5 text-purple-500" />
                     <span className="flex-grow text-sm font-medium">Business Insights</span>

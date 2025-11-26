@@ -1,6 +1,6 @@
 
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useRef } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Payment, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, AppMetadataPin, Theme, GoogleUser, AuditLogEntry, SyncStatus, AppMetadataTheme, Expense } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Payment, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, AppMetadataPin, Theme, GoogleUser, AuditLogEntry, SyncStatus, AppMetadataTheme, Expense, Quote } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
@@ -19,12 +19,13 @@ export interface AppState {
   purchases: Purchase[];
   returns: Return[];
   expenses: Expense[];
+  quotes: Quote[];
   app_metadata: AppMetadata[];
   notifications: Notification[];
   audit_logs: AuditLogEntry[];
   profile: ProfileData | null;
   toast: ToastState;
-  selection: { page: Page; id: string; action?: 'edit' } | null;
+  selection: { page: Page; id: string; action?: 'edit' | 'new'; data?: any } | null;
   installPromptEvent: BeforeInstallPromptEvent | null;
   pin: string | null;
   theme: Theme;
@@ -66,12 +67,15 @@ type Action =
   | { type: 'UPDATE_RETURN'; payload: { oldReturn: Return, updatedReturn: Return } }
   | { type: 'ADD_EXPENSE'; payload: Expense }
   | { type: 'DELETE_EXPENSE'; payload: string }
+  | { type: 'ADD_QUOTE'; payload: Quote }
+  | { type: 'UPDATE_QUOTE'; payload: Quote }
+  | { type: 'DELETE_QUOTE'; payload: string }
   | { type: 'ADD_PAYMENT_TO_SALE'; payload: { saleId: string; payment: Payment } }
   | { type: 'ADD_PAYMENT_TO_PURCHASE'; payload: { purchaseId: string; payment: Payment } }
   | { type: 'SHOW_TOAST'; payload: { message: string; type?: 'success' | 'info' } }
   | { type: 'HIDE_TOAST' }
   | { type: 'SET_LAST_BACKUP_DATE'; payload: string }
-  | { type: 'SET_SELECTION'; payload: { page: Page; id: string; action?: 'edit' } }
+  | { type: 'SET_SELECTION'; payload: { page: Page; id: string; action?: 'edit' | 'new'; data?: any } }
   | { type: 'CLEAR_SELECTION' }
   | { type: 'SET_INSTALL_PROMPT_EVENT'; payload: BeforeInstallPromptEvent | null }
   | { type: 'ADD_NOTIFICATION'; payload: Notification }
@@ -145,6 +149,7 @@ const initialState: AppState = {
   purchases: [],
   returns: [],
   expenses: [],
+  quotes: [],
   app_metadata: [],
   notifications: [],
   audit_logs: [],
@@ -391,6 +396,12 @@ const appReducer = (state: AppState, action: Action): AppState => {
       return { ...state, expenses: [...state.expenses, action.payload], ...touch };
     case 'DELETE_EXPENSE':
       return { ...state, expenses: state.expenses.filter(e => e.id !== action.payload), ...touch };
+    case 'ADD_QUOTE':
+        return { ...state, quotes: [...state.quotes, action.payload], ...touch };
+    case 'UPDATE_QUOTE':
+        return { ...state, quotes: state.quotes.map(q => q.id === action.payload.id ? action.payload : q), ...touch };
+    case 'DELETE_QUOTE':
+        return { ...state, quotes: state.quotes.filter(q => q.id !== action.payload), ...touch };
     case 'ADD_PAYMENT_TO_SALE':
       return { ...state, sales: state.sales.map(sale => sale.id === action.payload.saleId ? { ...sale, payments: [...(sale.payments || []), action.payload.payment] } : sale), ...touch };
     case 'ADD_PAYMENT_TO_PURCHASE':
@@ -795,7 +806,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [customers, suppliers, products, sales, purchases, returns, expenses, app_metadata, notifications, profile, audit_logs] = await Promise.all([
+        const [customers, suppliers, products, sales, purchases, returns, expenses, quotes, app_metadata, notifications, profile, audit_logs] = await Promise.all([
           db.getAll('customers'),
           db.getAll('suppliers'),
           db.getAll('products'),
@@ -803,6 +814,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           db.getAll('purchases'),
           db.getAll('returns'),
           db.getAll('expenses'),
+          db.getAll('quotes'),
           db.getAll('app_metadata'),
           db.getAll('notifications'),
           db.getAll('profile'),
@@ -821,6 +833,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             purchases: (Array.isArray(purchases) ? purchases : []).map((p: any) => ({ ...p, payments: p.payments || [] })),
             returns: Array.isArray(returns) ? returns : [],
             expenses: Array.isArray(expenses) ? expenses : [],
+            quotes: Array.isArray(quotes) ? quotes : [],
             app_metadata: validatedMetadata,
             audit_logs: Array.isArray(audit_logs) ? audit_logs : [],
             theme: themeData?.theme || getInitialTheme(),
@@ -849,6 +862,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => { if (isDbLoaded) db.saveCollection('purchases', state.purchases); }, [state.purchases, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('returns', state.returns); }, [state.returns, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('expenses', state.expenses); }, [state.expenses, isDbLoaded]);
+  useEffect(() => { if (isDbLoaded) db.saveCollection('quotes', state.quotes); }, [state.quotes, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('app_metadata', state.app_metadata); }, [state.app_metadata, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('notifications', state.notifications); }, [state.notifications, isDbLoaded]);
   useEffect(() => { if (isDbLoaded && state.profile) db.saveCollection('profile', [state.profile]); }, [state.profile, isDbLoaded]);

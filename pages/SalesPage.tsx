@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -218,22 +219,32 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
     
-    // Effect to handle switching to edit mode from another page
+    // Effect to handle switching to edit mode OR loading a Quote
     useEffect(() => {
-        if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
-            const sale = state.sales.find(s => s.id === state.selection.id);
-            if (sale) {
-                setSaleToEdit(sale);
-                setMode('edit');
-                setCustomerId(sale.customerId);
-                setItems(sale.items.map(item => ({...item}))); // Deep copy
-                setDiscount(sale.discount.toString());
-                setSaleDate(getLocalDateString(new Date(sale.date)));
-                setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
+        if (state.selection?.page === 'SALES') {
+            if (state.selection.action === 'edit') {
+                const sale = state.sales.find(s => s.id === state.selection?.id);
+                if (sale) {
+                    setSaleToEdit(sale);
+                    setMode('edit');
+                    setCustomerId(sale.customerId);
+                    setItems(sale.items.map(item => ({...item}))); // Deep copy
+                    setDiscount(sale.discount.toString());
+                    setSaleDate(getLocalDateString(new Date(sale.date)));
+                    setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
+                    dispatch({ type: 'CLEAR_SELECTION' });
+                }
+            } else if (state.selection.id === 'new' && state.selection.data) {
+                // Pre-fill from Quote
+                const data = state.selection.data;
+                setCustomerId(data.customerId || '');
+                setItems(data.items || []);
+                setDiscount(data.discount ? data.discount.toString() : '0');
                 dispatch({ type: 'CLEAR_SELECTION' });
+                showToast("Quote loaded successfully. Verify details and save.");
             }
         }
-    }, [state.selection, state.sales, dispatch]);
+    }, [state.selection, state.sales, dispatch, showToast]);
 
     useEffect(() => {
         const dateIsDirty = mode === 'add' && saleDate !== getLocalDateString();
@@ -355,13 +366,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     }, [items, discount, state.products]);
 
     const selectedCustomer = useMemo(() => customerId ? state.customers.find(c => c.id === customerId) : null, [customerId, state.customers]);
-
-    const filteredCustomers = useMemo(() => 
-        state.customers.filter(c => 
-            c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || 
-            c.area.toLowerCase().includes(customerSearchTerm.toLowerCase())
-        ).sort((a,b) => a.name.localeCompare(b.name)),
-    [state.customers, customerSearchTerm]);
 
     const customerOptions = useMemo(() => state.customers.map(c => ({
         value: c.id,

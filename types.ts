@@ -1,7 +1,7 @@
 
 import { ReactNode } from "react";
 
-export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS' | 'EXPENSES';
+export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS' | 'EXPENSES' | 'QUOTATIONS';
 export type Theme = 'light' | 'dark';
 
 export interface GoogleUser {
@@ -77,6 +77,26 @@ export interface Sale {
   payments: Payment[];
 }
 
+export interface QuoteItem {
+  productId: string;
+  productName: string;
+  quantity: number;
+  price: number;
+}
+
+export interface Quote {
+  id: string;
+  customerId: string;
+  items: QuoteItem[];
+  totalAmount: number;
+  discount: number;
+  gstAmount: number;
+  date: string; // ISO string
+  validUntil?: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CONVERTED';
+  convertedSaleId?: string;
+}
+
 export interface PurchaseItem {
   productId: string;
   productName: string;
@@ -126,6 +146,7 @@ export interface Expense {
   date: string; // ISO string
   note?: string;
   paymentMethod: 'CASH' | 'UPI' | 'CHEQUE';
+  receiptImage?: string; // Base64 encoded image
 }
 
 export interface BeforeInstallPromptEvent extends Event {

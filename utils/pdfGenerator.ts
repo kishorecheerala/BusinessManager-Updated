@@ -1,6 +1,7 @@
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Sale, Customer, ProfileData, Purchase, Supplier, Return } from '../types';
+import { Sale, Customer, ProfileData, Purchase, Supplier, Return, Quote } from '../types';
 
 // --- Helper: Fetch QR Code ---
 export const getQrCodeBase64 = async (data: string): Promise<string> => {
@@ -299,6 +300,85 @@ export const generateA4InvoicePdf = async (sale: Sale, customer: Customer, profi
     doc.setFontSize(9);
     doc.setTextColor('#888888');
     doc.text('Thank you for your business!', 105, pageHeight - 10, { align: 'center' });
+
+    return doc;
+};
+
+// --- Estimate/Quotation Generator ---
+export const generateEstimatePDF = async (quote: Quote, customer: Customer, profile: ProfileData | null): Promise<jsPDF> => {
+    const doc = new jsPDF();
+    let startY = addBusinessHeader(doc, profile);
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor('#000000');
+    doc.text('ESTIMATE / QUOTATION', 105, startY, { align: 'center' });
+    startY += 10;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Estimate For:', 14, startY);
+    doc.text('Estimate Details:', 120, startY);
+    startY += 5;
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(customer.name, 14, startY);
+    doc.text(`Estimate No: ${quote.id}`, 120, startY);
+    startY += 5;
+
+    const customerAddr = doc.splitTextToSize(customer.address || '', 80);
+    doc.text(customerAddr, 14, startY);
+    doc.text(`Date: ${new Date(quote.date).toLocaleDateString()}`, 120, startY);
+    
+    if (quote.validUntil) {
+        startY += 5;
+        doc.text(`Valid Until: ${new Date(quote.validUntil).toLocaleDateString()}`, 120, startY);
+        startY -= 5; // correct for next calc
+    }
+    
+    startY += Math.max((customerAddr.length * 5), 10) + 5;
+
+    autoTable(doc, {
+        startY: startY,
+        head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
+        body: quote.items.map((item, index) => [
+            index + 1,
+            item.productName,
+            item.quantity,
+            `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
+            `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
+        ]),
+        theme: 'grid',
+        headStyles: { fillColor: [100, 116, 139] }, // Slate/Grey for Estimate
+        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
+    });
+
+    let finalY = (doc as any).lastAutoTable.finalY + 10;
+
+    const subTotal = quote.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+
+    const totalsX = 196;
+    const labelX = totalsX - 40;
+    
+    const addTotalRow = (label: string, value: string, isBold: boolean = false, color: string = '#000000') => {
+        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+        doc.setTextColor(color);
+        doc.text(label, labelX, finalY, { align: 'right' });
+        doc.text(value, totalsX, finalY, { align: 'right' });
+        finalY += 6;
+    };
+
+    addTotalRow('Subtotal:', `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    addTotalRow('Discount:', `- Rs. ${Number(quote.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    addTotalRow('GST Included:', `Rs. ${Number(quote.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    
+    finalY += 2;
+    addTotalRow('Total Estimate:', `Rs. ${Number(quote.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, true);
+    
+    const pageHeight = doc.internal.pageSize.getHeight();
+    doc.setFontSize(9);
+    doc.setTextColor('#888888');
+    doc.text('This is an estimate only, not a valid invoice for tax purposes.', 105, pageHeight - 10, { align: 'center' });
 
     return doc;
 };

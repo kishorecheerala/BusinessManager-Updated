@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, X, UserPlus, ShoppingCart, PackagePlus, Undo2 } from 'lucide-react';
+import { Plus, X, UserPlus, ShoppingCart, PackagePlus, Undo2, FileText } from 'lucide-react';
 import { Page } from '../types';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 
@@ -93,6 +94,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onNavigate 
         { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS', action: 'new' },
         { icon: ShoppingCart, label: 'New Sale', page: 'SALES' },
         { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES', action: 'new' },
+        { icon: FileText, label: 'New Estimate', page: 'QUOTATIONS' },
         { icon: Undo2, label: 'New Return', page: 'RETURNS' },
     ];
     

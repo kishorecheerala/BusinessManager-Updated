@@ -849,6 +849,18 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
             .sort((a, b) => b.value - a.value);
     }, [filteredSales]);
 
+    // --- Expense Category Data ---
+    const expenseCategoryData = useMemo(() => {
+        const cats: Record<string, number> = {};
+        filteredExpenses.forEach(e => {
+            cats[e.category] = (cats[e.category] || 0) + e.amount;
+        });
+        const total = Object.values(cats).reduce((a, b) => a + b, 0);
+        return Object.entries(cats)
+            .map(([name, value]) => ({ name, value, percent: total > 0 ? (value / total) * 100 : 0 }))
+            .sort((a, b) => b.value - a.value);
+    }, [filteredExpenses]);
+
     // --- Payment Method Analysis ---
     const paymentStats = useMemo(() => {
         let cash = 0, upi = 0, cheque = 0;
@@ -978,7 +990,9 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
         );
     }
 
-    const FinancialColumn = ({ title, financials, highlight = false }: { title: string, financials: any, highlight?: boolean }) => (
+    const FinancialColumn = ({ title, financials, highlight = false }: { title: string, financials: any, highlight?: boolean }) => {
+        const margin = financials.revenue > 0 ? (financials.netProfit / financials.revenue) * 100 : 0;
+        return (
         <div className={`p-4 rounded-lg border ${highlight ? 'bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30 ring-2 ring-primary/20' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'} flex flex-col gap-2 min-w-[140px]`}>
             <h3 className={`text-xs font-bold uppercase tracking-wider border-b pb-2 mb-1 ${highlight ? 'text-primary border-primary/20' : 'text-gray-500 dark:text-gray-400 border-gray-100 dark:border-slate-700'}`}>{title}</h3>
             
@@ -998,11 +1012,14 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
             </div>
 
             <div className={`flex justify-between items-end pt-2 mt-1 border-t ${highlight ? 'border-primary/10' : 'border-gray-100 dark:border-slate-700'}`}>
-                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Net Profit</p>
+                <div>
+                    <p className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Net Profit</p>
+                    <p className="text-[9px] text-gray-400 font-medium">{margin.toFixed(0)}% Margin</p>
+                </div>
                 <p className={`text-base font-extrabold ${financials.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'}`}>₹{financials.netProfit.toLocaleString('en-IN')}</p>
             </div>
         </div>
-    );
+    )};
 
     const KPICard = ({ title, value, icon: Icon, prefix = '', colorClass = 'text-gray-800 dark:text-white' }: any) => (
         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-md border border-gray-100 dark:border-slate-700">
@@ -1172,25 +1189,23 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                     </div>
                 </Card>
                 
-                <Card title="Payment Analysis" className="lg:col-span-1">
-                    <div className="space-y-4">
-                        {[
-                            { label: 'Cash', value: paymentStats.cash, color: 'bg-green-500', icon: Wallet },
-                            { label: 'UPI', value: paymentStats.upi, color: 'bg-blue-500', icon: Activity },
-                            { label: 'Cheque', value: paymentStats.cheque, color: 'bg-yellow-500', icon: FileText },
-                            { label: 'Credit (Due)', value: paymentStats.credit, color: 'bg-red-500', icon: CreditCard },
-                        ].map((item) => (
-                            <div key={item.label}>
-                                <div className="flex justify-between text-sm mb-1">
-                                    <span className="flex items-center gap-2 text-gray-700 dark:text-gray-300">
-                                        <item.icon size={14} className="text-gray-400" /> {item.label}
-                                    </span>
-                                    <span className="font-medium dark:text-white">₹{item.value.toLocaleString()}</span>
+                <Card title="Expense Breakdown" className="lg:col-span-1">
+                    <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+                         {expenseCategoryData.length === 0 ? (
+                            <div className="h-48 flex flex-col items-center justify-center text-gray-400">
+                                <Receipt size={32} className="mb-2 opacity-50"/>
+                                <p className="text-sm">No expense data available.</p>
+                            </div>
+                         ) : expenseCategoryData.map((cat) => (
+                            <div key={cat.name}>
+                                <div className="flex justify-between text-xs mb-1">
+                                    <span className="font-medium dark:text-gray-300">{cat.name}</span>
+                                    <span className="text-gray-500">₹{cat.value.toLocaleString()} ({cat.percent.toFixed(1)}%)</span>
                                 </div>
-                                <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2.5">
+                                <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2">
                                     <div 
-                                        className={`h-2.5 rounded-full ${item.color}`} 
-                                        style={{ width: `${currentMetrics.revenue > 0 ? (item.value / currentMetrics.revenue) * 100 : 0}%` }}
+                                        className="h-2 rounded-full bg-rose-500" 
+                                        style={{ width: `${cat.percent}%` }}
                                     ></div>
                                 </div>
                             </div>
