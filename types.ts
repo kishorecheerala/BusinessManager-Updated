@@ -1,7 +1,7 @@
 
 import { ReactNode } from "react";
 
-export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS';
+export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS' | 'EXPENSES';
 export type Theme = 'light' | 'dark';
 
 export interface GoogleUser {
@@ -115,6 +115,17 @@ export interface Return {
   amount: number; // Amount refunded to customer or credited from supplier
   reason?: string;
   notes?: string;
+}
+
+export type ExpenseCategory = 'Rent' | 'Salary' | 'Electricity' | 'Transport' | 'Maintenance' | 'Marketing' | 'Food' | 'Other';
+
+export interface Expense {
+  id: string;
+  category: ExpenseCategory;
+  amount: number;
+  date: string; // ISO string
+  note?: string;
+  paymentMethod: 'CASH' | 'UPI' | 'CHEQUE';
 }
 
 export interface BeforeInstallPromptEvent extends Event {

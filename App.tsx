@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Home, Users, ShoppingCart, Package, FileText, Undo2, Boxes, Search, HelpCircle, Bell, Menu, Plus, UserPlus, PackagePlus, Download, X, Sun, Moon, Cloud, CloudOff, RefreshCw, Sparkles, BarChart2 } from 'lucide-react';
+import { Home, Users, ShoppingCart, Package, FileText, Undo2, Boxes, Search, HelpCircle, Bell, Menu, Plus, UserPlus, PackagePlus, Download, X, Sun, Moon, Cloud, CloudOff, RefreshCw, Sparkles, BarChart2, Receipt } from 'lucide-react';
 
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -12,6 +12,7 @@ import ReportsPage from './pages/ReportsPage';
 import ReturnsPage from './pages/ReturnsPage';
 import ProductsPage from './pages/ProductsPage';
 import InsightsPage from './pages/InsightsPage';
+import ExpensesPage from './pages/ExpensesPage';
 import UniversalSearch from './components/UniversalSearch';
 import HelpModal from './components/HelpModal';
 import AppSkeletonLoader from './components/AppSkeletonLoader';
@@ -79,7 +80,7 @@ const QuickAddMenu: React.FC<{
         { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS' as Page, action: 'new' as const, color: 'text-blue-500' },
         { icon: ShoppingCart, label: 'New Sale', page: 'SALES' as Page, color: 'text-emerald-500' },
         { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES' as Page, action: 'new' as const, color: 'text-amber-500' },
-        { icon: Undo2, label: 'New Return', page: 'RETURNS' as Page, color: 'text-rose-500' },
+        { icon: Receipt, label: 'Add Expense', page: 'EXPENSES' as Page, color: 'text-rose-500' },
     ];
 
     return (
@@ -323,6 +324,7 @@ const MainApp: React.FC = () => {
       case 'RETURNS': return <ReturnsPage {...commonProps} />;
       case 'PRODUCTS': return <ProductsPage {...commonProps} />;
       case 'INSIGHTS': return <InsightsPage setCurrentPage={setCurrentPage} />;
+      case 'EXPENSES': return <ExpensesPage {...commonProps} />;
       default: return <Dashboard setCurrentPage={setCurrentPage} />;
     }
   };
@@ -335,6 +337,7 @@ const MainApp: React.FC = () => {
   ];
 
   const moreNavItems = [
+      { page: 'EXPENSES' as Page, label: 'Expenses', icon: Receipt },
       { page: 'PRODUCTS' as Page, label: 'Products', icon: Boxes },
       { page: 'RETURNS' as Page, label: 'Returns', icon: Undo2 },
       { page: 'REPORTS' as Page, label: 'Reports', icon: FileText },
@@ -529,6 +532,7 @@ const MainApp: React.FC = () => {
                             { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS' as Page, action: 'new' },
                             { icon: ShoppingCart, label: 'New Sale', page: 'SALES' as Page },
                             { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES' as Page, action: 'new' },
+                            { icon: Receipt, label: 'Add Expense', page: 'EXPENSES' as Page },
                             { icon: Undo2, label: 'New Return', page: 'RETURNS' as Page },
                         ].map((action, idx) => (
                             <button

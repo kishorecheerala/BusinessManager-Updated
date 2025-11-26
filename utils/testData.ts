@@ -1,6 +1,6 @@
 
 import { AppState } from '../context/AppContext';
-import { ProfileData, Customer, Supplier, Product, Purchase, Sale, Return } from '../types';
+import { ProfileData, Customer, Supplier, Product, Purchase, Sale, Return, Expense } from '../types';
 
 // Utility to create dates relative to today
 const daysAgo = (days: number): string => {
@@ -93,6 +93,13 @@ const returns: Return[] = [
     { id: 'RET-20240720-100000', type: 'CUSTOMER', referenceId: 'SALE-20240710-113000', partyId: 'CUST-001', items: [{ productId: 'BM-KAN-001', productName: 'Kanchi Pattu - Peacock Blue', quantity: 1, price: 6500 }], returnDate: daysAgo(30), amount: 6300, reason: 'Color mismatch' }
 ];
 
+const expenses: Expense[] = [
+    { id: 'EXP-001', category: 'Rent', amount: 15000, date: daysAgo(30), note: 'Shop Rent', paymentMethod: 'UPI' },
+    { id: 'EXP-002', category: 'Electricity', amount: 2500, date: daysAgo(25), note: 'Electric Bill', paymentMethod: 'UPI' },
+    { id: 'EXP-003', category: 'Transport', amount: 500, date: daysAgo(10), note: 'Auto charges', paymentMethod: 'CASH' },
+    { id: 'EXP-004', category: 'Food', amount: 150, date: daysAgo(2), note: 'Tea & Snacks', paymentMethod: 'CASH' },
+];
+
 // This is a simplified static dataset. In a real generation script, you'd calculate final stock.
 // For this static file, the quantities in the `products` array are pre-calculated for simplicity.
 // (Total Purchases) - (Total Sales) + (Total Customer Returns)
@@ -104,6 +111,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   sales,
   purchases,
   returns,
+  expenses,
   app_metadata: [],
   audit_logs: [],
   theme: 'light',

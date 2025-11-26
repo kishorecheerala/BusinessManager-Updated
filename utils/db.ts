@@ -1,13 +1,13 @@
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, AppMetadata, AuditLogEntry } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, AppMetadata, AuditLogEntry, Expense } from '../types';
 import { AppState } from '../context/AppContext';
 
 const DB_NAME = 'business-manager-db';
-const DB_VERSION = 5; // Bump version for Audit Logs
+const DB_VERSION = 6; // Bump version for Expenses
 
-export type StoreName = 'customers' | 'suppliers' | 'products' | 'sales' | 'purchases' | 'returns' | 'app_metadata' | 'notifications' | 'profile' | 'audit_logs';
-const STORE_NAMES: StoreName[] = ['customers', 'suppliers', 'products', 'sales', 'purchases', 'returns', 'app_metadata', 'notifications', 'profile', 'audit_logs'];
+export type StoreName = 'customers' | 'suppliers' | 'products' | 'sales' | 'purchases' | 'returns' | 'app_metadata' | 'notifications' | 'profile' | 'audit_logs' | 'expenses';
+const STORE_NAMES: StoreName[] = ['customers', 'suppliers', 'products', 'sales', 'purchases', 'returns', 'app_metadata', 'notifications', 'profile', 'audit_logs', 'expenses'];
 
 interface BusinessManagerDB extends DBSchema {
   customers: { key: string; value: Customer; };
@@ -20,6 +20,7 @@ interface BusinessManagerDB extends DBSchema {
   notifications: { key: string; value: Notification; };
   profile: { key: string; value: ProfileData; };
   audit_logs: { key: string; value: AuditLogEntry; };
+  expenses: { key: string; value: Expense; };
 }
 
 let dbPromise: Promise<IDBPDatabase<BusinessManagerDB>>;

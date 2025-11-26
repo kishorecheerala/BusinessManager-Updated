@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, XCircle, CheckCircle, Info, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, ArrowRight, Zap, BrainCircuit, TrendingDown, Wallet, CalendarClock, Tag, Undo2, Crown, Calendar } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, XCircle, CheckCircle, Info, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, ArrowRight, Zap, BrainCircuit, TrendingDown, Wallet, CalendarClock, Tag, Undo2, Crown, Calendar, Receipt } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -601,14 +601,11 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
     const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     
-    // State for secure PIN verification
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
-    // Dummy state for "generating" report to show visual feedback
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
 
-    // FIX: Cast result to AppMetadataBackup to access .date
     const lastBackupDate = (app_metadata.find(m => m.id === 'lastBackup') as AppMetadataBackup | undefined)?.date || null;
     
     const getYears = useMemo(() => {
@@ -629,17 +626,11 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     const stats = useMemo(() => {
         const yearInt = parseInt(selectedYear);
         
-        // 1. All Time
-        const allTimeSales = sales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
-        const allTimePurchases = purchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
-
-        // 2. Yearly
+        // 1. Yearly
         const filteredYearSales = sales.filter(s => new Date(s.date).getFullYear() === yearInt);
         const filteredYearPurchases = purchases.filter(p => new Date(p.date).getFullYear() === yearInt);
-        const yearSalesTotal = filteredYearSales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
-        const yearPurchasesTotal = filteredYearPurchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
-
-        // 3. Monthly (or All Months if selected)
+        
+        // 2. Monthly (or All Months if selected)
         let filteredMonthSales = [];
         let filteredMonthPurchases = [];
 
@@ -668,10 +659,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         }, 0);
 
         return { 
-            allTimeSales, 
-            allTimePurchases,
-            yearSalesTotal,
-            yearPurchasesTotal,
             monthSalesTotal,
             monthPurchasesTotal,
             totalCustomerDues, 
@@ -705,7 +692,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            // Use dynamic name based on profile or default to 'business_manager'
             const filename = (state.profile?.name || 'business_manager').toLowerCase().replace(/\s+/g, '_');
             a.download = `${filename}_backup_${new Date().toISOString().split('T')[0]}.json`;
             document.body.appendChild(a);
@@ -734,12 +720,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         if (confirmed) {
             setIsGeneratingReport(true);
             try {
-                // Prepare data object for importData
-                // testData matches the structure expected by importData (mostly)
                 await db.importData(testData as any);
                 await db.saveCollection('profile', [testProfile]);
-                
-                // Force reload to re-initialize state from IndexedDB
                 window.location.reload();
             } catch (error) {
                 console.error("Failed to load test data:", error);
@@ -778,7 +760,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         };
 
         runSecureAction(processRestore);
-        e.target.value = ''; // Reset input to allow re-selection
+        e.target.value = ''; 
     };
 
     return (
@@ -797,9 +779,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 />
             )}
             
-            {/* Header Section - Inline Layout */}
+            {/* Header Section */}
             <div className="flex flex-row items-center justify-between gap-2 relative mb-6">
-                {/* Left: Greeting */}
                 <div className="flex-shrink-0">
                      <span className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm cursor-default flex items-center gap-1 max-w-full">
                         <span className="text-gray-500 dark:text-gray-400">{getTimeBasedGreeting()},</span>
@@ -807,20 +788,17 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     </span>
                 </div>
 
-                {/* Center: Title - Hidden on very small screens if needed, or flexible */}
                 <div className="flex-grow text-center">
                     <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
                         Dashboard
                     </h1>
                 </div>
                 
-                {/* Right: Date */}
                 <div className="flex-shrink-0">
                     <DatePill />
                 </div>
             </div>
             
-            {/* New Smart Analyst AI Card (Top) */}
             <SmartAnalystCard 
                 sales={sales} 
                 products={products} 
@@ -858,7 +836,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     icon={IndianRupee} 
                     title="Sales" 
                     value={stats.monthSalesTotal} 
-                    subValue={`${stats.salesCount} orders this period`}
+                    subValue={`${stats.salesCount} orders`}
                     color="bg-primary/5 dark:bg-primary/10" 
                     iconBgColor="bg-primary/20" 
                     textColor="text-primary" 
@@ -869,7 +847,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     icon={Package} 
                     title="Purchases" 
                     value={stats.monthPurchasesTotal} 
-                    subValue="This period"
+                    subValue="Inventory cost"
                     color="bg-blue-50 dark:bg-blue-900/20" 
                     iconBgColor="bg-blue-100 dark:bg-blue-800" 
                     textColor="text-blue-700 dark:text-blue-100" 
@@ -878,20 +856,20 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 />
                 <MetricCard 
                     icon={User} 
-                    title="Customer Dues" 
+                    title="Cust. Dues" 
                     value={stats.totalCustomerDues} 
-                    subValue="Total Pending"
+                    subValue="Total Receivable"
                     color="bg-purple-50 dark:bg-purple-900/20" 
                     iconBgColor="bg-purple-100 dark:bg-purple-800" 
                     textColor="text-purple-700 dark:text-purple-100" 
-                    onClick={() => setCurrentPage('REPORTS')}
+                    onClick={() => setCurrentPage('CUSTOMERS')}
                     delay={200}
                 />
                 <MetricCard 
                     icon={ShoppingCart} 
-                    title="My Dues" 
+                    title="My Payables" 
                     value={stats.totalSupplierDues} 
-                    subValue="To Suppliers"
+                    subValue="Total Payable"
                     color="bg-amber-50 dark:bg-amber-900/20" 
                     iconBgColor="bg-amber-100 dark:bg-amber-800" 
                     textColor="text-amber-700 dark:text-amber-100" 
@@ -899,7 +877,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     delay={300}
                 />
             </div>
-
+            
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <OverdueDuesCard sales={sales} customers={customers} onNavigate={(id) => handleNavigate('CUSTOMERS', id)} />
                 <UpcomingPurchaseDuesCard purchases={purchases} suppliers={suppliers} onNavigate={(id) => handleNavigate('PURCHASES', id)} />

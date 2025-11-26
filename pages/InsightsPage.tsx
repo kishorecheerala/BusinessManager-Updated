@@ -5,7 +5,7 @@ import {
   Calendar, Download, ArrowUp, ArrowDown, 
   CreditCard, Wallet, FileText, Activity, Users, Lightbulb, Target, Zap, Scale, ShieldCheck,
   PackagePlus, UserMinus, PieChart as PieIcon, BarChart2, AlertTriangle, ShieldAlert,
-  Trophy, Medal, Timer, ArrowRight, Edit, Sparkles, AlertCircle, Lock, Package
+  Trophy, Medal, Timer, ArrowRight, Edit, Sparkles, AlertCircle, Lock, Package, Receipt
 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import Card from '../components/Card';
@@ -13,7 +13,7 @@ import Button from '../components/Button';
 import PinModal from '../components/PinModal';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Page, Sale, Customer, Product, AppMetadataRevenueGoal, Purchase } from '../types';
+import { Page, Sale, Customer, Product, AppMetadataRevenueGoal, Purchase, Expense } from '../types';
 import DatePill from '../components/DatePill';
 
 interface InsightsPageProps {
@@ -666,7 +666,7 @@ const RiskAnalysisCard: React.FC<{ customers: Customer[], sales: Sale[], onNavig
 
 const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
     const { state, dispatch } = useAppContext();
-    const { sales, products, customers, purchases, pin, app_metadata, profile } = state;
+    const { sales, products, customers, purchases, expenses, pin, app_metadata, profile } = state;
 
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
     const [selectedMonth, setSelectedMonth] = useState<string>('all');
@@ -702,32 +702,44 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
         { value: '9', label: 'October' }, { value: '10', label: 'November' }, { value: '11', label: 'December' },
     ];
 
+    // Helper to get financials for a set of sales/expenses
+    const getFinancials = (salesList: Sale[], expenseList: Expense[], productList: Product[]) => {
+        const revenue = salesList.reduce((sum, s) => sum + Number(s.totalAmount), 0);
+        let cogs = 0;
+        salesList.forEach(s => {
+            s.items.forEach(i => {
+                 const p = productList.find(prod => prod.id === i.productId);
+                 const cost = p ? p.purchasePrice : (i.price * 0.7);
+                 cogs += cost * i.quantity;
+            });
+        });
+        const grossProfit = revenue - cogs;
+        const operationalExpenses = expenseList.reduce((sum, e) => sum + Number(e.amount), 0);
+        const netProfit = grossProfit - operationalExpenses;
+        return { revenue, cogs, grossProfit, operationalExpenses, netProfit };
+    };
+
     // --- Data Filtering & Aggregation ---
 
-    // 1. All Time
-    const allTimeSales = useMemo(() => sales.reduce((sum, s) => sum + Number(s.totalAmount), 0), [sales]);
-    const allTimePurchases = useMemo(() => purchases.reduce((sum, p) => sum + Number(p.totalAmount), 0), [purchases]);
-
-    // 2. Yearly
+    // 1. Yearly Data
     const filteredYearSales = useMemo(() => sales.filter(s => new Date(s.date).getFullYear().toString() === selectedYear), [sales, selectedYear]);
-    const filteredYearPurchases = useMemo(() => purchases.filter(p => new Date(p.date).getFullYear().toString() === selectedYear), [purchases, selectedYear]);
-    const yearSalesTotal = useMemo(() => filteredYearSales.reduce((sum, s) => sum + Number(s.totalAmount), 0), [filteredYearSales]);
-    const yearPurchasesTotal = useMemo(() => filteredYearPurchases.reduce((sum, p) => sum + Number(p.totalAmount), 0), [filteredYearPurchases]);
-
-    // 3. Monthly
+    const filteredYearExpenses = useMemo(() => expenses.filter(e => new Date(e.date).getFullYear().toString() === selectedYear), [expenses, selectedYear]);
+    
+    // 2. Monthly Data
     const filteredMonthSales = useMemo(() => {
-        if (selectedMonth === 'all') return []; // Only applicable if a month is selected
+        if (selectedMonth === 'all') return []; 
         return filteredYearSales.filter(s => new Date(s.date).getMonth().toString() === selectedMonth);
     }, [filteredYearSales, selectedMonth]);
     
-    const filteredMonthPurchases = useMemo(() => {
+    const filteredMonthExpenses = useMemo(() => {
         if (selectedMonth === 'all') return [];
-        return filteredYearPurchases.filter(p => new Date(p.date).getMonth().toString() === selectedMonth);
-    }, [filteredYearPurchases, selectedMonth]);
+        return filteredYearExpenses.filter(e => new Date(e.date).getMonth().toString() === selectedMonth);
+    }, [filteredYearExpenses, selectedMonth]);
 
-    const monthSalesTotal = useMemo(() => filteredMonthSales.reduce((sum, s) => sum + Number(s.totalAmount), 0), [filteredMonthSales]);
-    const monthPurchasesTotal = useMemo(() => filteredMonthPurchases.reduce((sum, p) => sum + Number(p.totalAmount), 0), [filteredMonthPurchases]);
-
+    // 3. Financials for Columns
+    const allTimeFinancials = useMemo(() => getFinancials(sales, expenses, products), [sales, expenses, products]);
+    const yearFinancials = useMemo(() => getFinancials(filteredYearSales, filteredYearExpenses, products), [filteredYearSales, filteredYearExpenses, products]);
+    const monthFinancials = useMemo(() => getFinancials(filteredMonthSales, filteredMonthExpenses, products), [filteredMonthSales, filteredMonthExpenses, products]);
 
     // Determine main filtered dataset for charts based on dropdowns
     const filteredSales = useMemo(() => {
@@ -738,28 +750,25 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
             return yearMatch && monthMatch;
         });
     }, [sales, selectedYear, selectedMonth]);
+    
+    const filteredExpenses = useMemo(() => {
+        return expenses.filter(e => {
+            const d = new Date(e.date);
+            const yearMatch = d.getFullYear().toString() === selectedYear;
+            const monthMatch = selectedMonth === 'all' || d.getMonth().toString() === selectedMonth;
+            return yearMatch && monthMatch;
+        });
+    }, [expenses, selectedYear, selectedMonth]);
 
     // Calculate Metrics for the KPI cards
-    const calculateMetrics = (data: typeof sales) => {
-        const revenue = data.reduce((sum, s) => sum + Number(s.totalAmount), 0);
-        let cost = 0;
-        data.forEach(s => {
-            s.items.forEach(item => {
-                const product = products.find(p => p.id === item.productId);
-                const itemCost = product ? Number(product.purchasePrice) : (Number(item.price) * 0.7); 
-                cost += itemCost * Number(item.quantity);
-            });
-        });
-        const profit = revenue - cost;
-        const orders = data.length;
-        const aov = orders > 0 ? revenue / orders : 0;
-        
-        return { revenue, profit, orders, aov };
-    };
+    const currentMetrics = useMemo(() => {
+        const financials = getFinancials(filteredSales, filteredExpenses, products);
+        const orders = filteredSales.length;
+        const aov = orders > 0 ? financials.revenue / orders : 0;
+        return { ...financials, orders, aov };
+    }, [filteredSales, filteredExpenses, products]);
 
-    const currentMetrics = useMemo(() => calculateMetrics(filteredSales), [filteredSales, products]);
-
-    // --- Chart Data Logic (Fixed) ---
+    // --- Chart Data Logic ---
     const chartData = useMemo(() => {
         if (selectedMonth === 'all') {
             // Year View: 12 Buckets
@@ -777,11 +786,18 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                     const p = products.find(prod => prod.id === i.productId);
                     cost += (p ? Number(p.purchasePrice) : Number(i.price) * 0.7) * Number(i.quantity);
                 });
+                // Gross Profit per sale
                 data[m].profit += (Number(s.totalAmount) - cost);
             });
+            // Subtract Expenses from Profit for each month
+            filteredExpenses.forEach(e => {
+                const m = new Date(e.date).getMonth();
+                data[m].profit -= e.amount;
+            });
+
             return data;
         } else {
-            // Month View: Daily Buckets (1 to 31)
+            // Month View: Daily Buckets
             const year = parseInt(selectedYear);
             const month = parseInt(selectedMonth);
             const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -804,9 +820,17 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                     data[d].profit += (Number(s.totalAmount) - cost);
                 }
             });
+            
+            filteredExpenses.forEach(e => {
+                const d = new Date(e.date).getDate() - 1;
+                if (data[d]) {
+                    data[d].profit -= e.amount;
+                }
+            });
+
             return data;
         }
-    }, [filteredSales, selectedMonth, selectedYear, products]);
+    }, [filteredSales, filteredExpenses, selectedMonth, selectedYear, products]);
 
     const maxChartValue = Math.max(...chartData.map(d => d.sales), 1);
 
@@ -877,7 +901,9 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
             head: [['Metric', 'Value']],
             body: [
                 ['Total Revenue', `Rs. ${currentMetrics.revenue.toLocaleString()}`],
-                ['Gross Profit', `Rs. ${currentMetrics.profit.toLocaleString()}`],
+                ['Cost of Goods', `Rs. ${currentMetrics.cogs.toLocaleString()}`],
+                ['Operational Expenses', `Rs. ${currentMetrics.operationalExpenses.toLocaleString()}`],
+                ['Net Profit', `Rs. ${currentMetrics.netProfit.toLocaleString()}`],
                 ['Total Orders', currentMetrics.orders.toString()],
                 ['Avg Order Value', `Rs. ${currentMetrics.aov.toLocaleString()}`]
             ],
@@ -952,28 +978,38 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
         );
     }
 
-    const FinancialColumn = ({ title, sales, purchases, highlight = false }: any) => (
-        <div className={`p-4 rounded-lg border ${highlight ? 'bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30 ring-2 ring-primary/20' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'} flex flex-col gap-3`}>
-            <h3 className={`text-xs font-bold uppercase tracking-wider ${highlight ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`}>{title}</h3>
-            <div className="space-y-2">
-                <div>
-                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Sales</p>
-                    <p className={`text-lg font-bold ${highlight ? 'text-primary' : 'text-gray-800 dark:text-white'}`}>₹{sales.toLocaleString('en-IN')}</p>
-                </div>
-                <div>
-                     <p className="text-[10px] text-gray-500 dark:text-gray-400 mb-0.5">Purchases</p>
-                     <p className={`text-sm font-semibold ${highlight ? 'text-primary/80' : 'text-gray-600 dark:text-gray-400'}`}>₹{purchases.toLocaleString('en-IN')}</p>
-                </div>
+    const FinancialColumn = ({ title, financials, highlight = false }: { title: string, financials: any, highlight?: boolean }) => (
+        <div className={`p-4 rounded-lg border ${highlight ? 'bg-primary/5 border-primary/20 dark:bg-primary/10 dark:border-primary/30 ring-2 ring-primary/20' : 'bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-700'} flex flex-col gap-2 min-w-[140px]`}>
+            <h3 className={`text-xs font-bold uppercase tracking-wider border-b pb-2 mb-1 ${highlight ? 'text-primary border-primary/20' : 'text-gray-500 dark:text-gray-400 border-gray-100 dark:border-slate-700'}`}>{title}</h3>
+            
+            <div className="flex justify-between items-end">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">Revenue</p>
+                <p className={`text-sm font-bold ${highlight ? 'text-primary' : 'text-gray-800 dark:text-white'}`}>₹{financials.revenue.toLocaleString('en-IN')}</p>
+            </div>
+            
+            <div className="flex justify-between items-end">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">COGS</p>
+                <p className="text-xs font-medium text-gray-600 dark:text-gray-400">-₹{financials.cogs.toLocaleString('en-IN')}</p>
+            </div>
+
+            <div className="flex justify-between items-end">
+                <p className="text-[10px] text-gray-500 dark:text-gray-400">Expenses</p>
+                <p className="text-xs font-medium text-red-500">-₹{financials.operationalExpenses.toLocaleString('en-IN')}</p>
+            </div>
+
+            <div className={`flex justify-between items-end pt-2 mt-1 border-t ${highlight ? 'border-primary/10' : 'border-gray-100 dark:border-slate-700'}`}>
+                <p className="text-[10px] font-bold text-gray-600 dark:text-gray-300">Net Profit</p>
+                <p className={`text-base font-extrabold ${financials.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'}`}>₹{financials.netProfit.toLocaleString('en-IN')}</p>
             </div>
         </div>
     );
 
-    const KPICard = ({ title, value, icon: Icon, prefix = '' }: any) => (
+    const KPICard = ({ title, value, icon: Icon, prefix = '', colorClass = 'text-gray-800 dark:text-white' }: any) => (
         <div className="bg-white dark:bg-slate-800 p-4 rounded-lg shadow-md border border-gray-100 dark:border-slate-700">
             <div className="flex justify-between items-start">
                 <div>
                     <p className="text-sm text-gray-500 dark:text-gray-400 mb-1">{title}</p>
-                    <h3 className="text-2xl font-bold text-gray-800 dark:text-white">{prefix}{value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
+                    <h3 className={`text-2xl font-bold ${colorClass}`}>{prefix}{value.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</h3>
                 </div>
                 <div className={`p-2 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400`}>
                     <Icon size={20} />
@@ -1046,26 +1082,23 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 sm:gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 overflow-x-auto pb-2">
                     <FinancialColumn 
                         title="All Time" 
-                        sales={allTimeSales} 
-                        purchases={allTimePurchases} 
+                        financials={allTimeFinancials} 
                     />
                     <FinancialColumn 
                         title={`Year (${selectedYear})`} 
-                        sales={yearSalesTotal} 
-                        purchases={yearPurchasesTotal} 
+                        financials={yearFinancials} 
                     />
                     {selectedMonth !== 'all' ? (
                         <FinancialColumn 
                             title={`${months[parseInt(selectedMonth)+1].label.substring(0,3)} ${selectedYear}`} 
-                            sales={monthSalesTotal} 
-                            purchases={monthPurchasesTotal}
+                            financials={monthFinancials}
                             highlight={true}
                         />
                     ) : (
-                        <div className="p-4 rounded-lg border bg-gray-50 dark:bg-slate-800 border-dashed border-gray-300 dark:border-slate-600 flex flex-col justify-center items-center text-gray-400 dark:text-gray-500 text-center">
+                        <div className="p-4 rounded-lg border bg-gray-50 dark:bg-slate-800 border-dashed border-gray-300 dark:border-slate-600 flex flex-col justify-center items-center text-gray-400 dark:text-gray-500 text-center min-h-[160px]">
                              <Calendar size={20} className="mb-2 opacity-50"/>
                              <p className="text-xs">Select a month<br/>to see details</p>
                         </div>
@@ -1094,16 +1127,22 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
             {/* Filtered KPI Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <KPICard title="Filtered Revenue" value={currentMetrics.revenue} icon={DollarSign} prefix="₹" />
-                <KPICard title="Est. Gross Profit" value={currentMetrics.profit} icon={TrendingUp} prefix="₹" />
+                <KPICard 
+                    title="Net Profit" 
+                    value={currentMetrics.netProfit} 
+                    icon={Wallet} 
+                    prefix="₹" 
+                    colorClass={currentMetrics.netProfit >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600'}
+                />
                 <KPICard title="Orders Count" value={currentMetrics.orders} icon={ShoppingCart} />
-                <KPICard title="Avg Order Value" value={currentMetrics.aov} icon={Activity} prefix="₹" />
+                <KPICard title="Operational Exp." value={currentMetrics.operationalExpenses} icon={Receipt} prefix="₹" colorClass="text-orange-600" />
             </div>
             
             {/* Risk Section */}
             <RiskAnalysisCard customers={customers} sales={sales} onNavigate={handleNavigateCustomer} />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <Card title={selectedMonth === 'all' ? 'Monthly Sales Trend' : 'Daily Sales Trend'} className="lg:col-span-2">
+                <Card title={selectedMonth === 'all' ? 'Monthly Sales & Profit Trend' : 'Daily Sales & Profit Trend'} className="lg:col-span-2">
                     <div className="h-64 flex items-end gap-2 pt-4 overflow-x-auto pb-2">
                         {chartData.map((d, i) => {
                             // Use 80% max height to leave room for labels
@@ -1123,7 +1162,7 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-20 bg-black text-white text-xs p-2 rounded whitespace-nowrap shadow-lg pointer-events-none">
                                             <p className="font-bold">{d.label}</p>
                                             <p>Sales: ₹{d.sales.toLocaleString()}</p>
-                                            <p>Profit: ₹{d.profit.toLocaleString()}</p>
+                                            <p>Net Profit: ₹{d.profit.toLocaleString()}</p>
                                         </div>
                                     </div>
                                     <span className="text-[10px] text-gray-500 dark:text-gray-400 mt-1 truncate w-full text-center">{d.label}</span>
