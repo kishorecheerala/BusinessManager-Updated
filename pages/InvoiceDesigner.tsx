@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, RotateCcw, Type, Layout, Palette, FileText, Image as ImageIcon, RefreshCw } from 'lucide-react';
+import { Save, RotateCcw, Type, Layout, Palette, FileText, Image as ImageIcon, RefreshCw, Eye, Edit3 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { InvoiceTemplateConfig } from '../types';
 import Card from '../components/Card';
@@ -34,8 +34,28 @@ const dummySale = {
 
 const InvoiceDesigner: React.FC = () => {
     const { state, dispatch, showToast } = useAppContext();
-    const [config, setConfig] = useState<InvoiceTemplateConfig>(state.invoiceTemplate);
+    
+    // Safe defaults
+    const defaults: InvoiceTemplateConfig = {
+        id: 'invoiceTemplateConfig',
+        colors: { primary: '#0d9488', secondary: '#333333', text: '#000000', tableHeaderBg: '#0d9488', tableHeaderText: '#ffffff' },
+        fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
+        layout: { margin: 10, logoSize: 25, logoPosition: 'center', headerAlignment: 'center', showWatermark: false },
+        content: { titleText: 'TAX INVOICE', showTerms: true, showQr: true, termsText: '', footerText: 'Thank you for your business!' }
+    };
+
+    // Deep merge to safely handle potential missing properties from saved state
+    const [config, setConfig] = useState<InvoiceTemplateConfig>({
+        ...defaults,
+        ...state.invoiceTemplate,
+        colors: { ...defaults.colors, ...state.invoiceTemplate?.colors },
+        fonts: { ...defaults.fonts, ...state.invoiceTemplate?.fonts },
+        layout: { ...defaults.layout, ...state.invoiceTemplate?.layout },
+        content: { ...defaults.content, ...state.invoiceTemplate?.content },
+    });
+
     const [activeTab, setActiveTab] = useState<'layout' | 'colors' | 'fonts' | 'content'>('layout');
+    const [mobileView, setMobileView] = useState<'editor' | 'preview'>('editor');
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [colorPickerTarget, setColorPickerTarget] = useState<keyof InvoiceTemplateConfig['colors'] | null>(null);
@@ -47,6 +67,11 @@ const InvoiceDesigner: React.FC = () => {
         }, 500);
         return () => clearTimeout(timer);
     }, [config]);
+
+    // Initial generation
+    useEffect(() => {
+        generatePreview();
+    }, []);
 
     const generatePreview = async () => {
         setIsGenerating(true);
@@ -68,13 +93,6 @@ const InvoiceDesigner: React.FC = () => {
 
     const handleReset = () => {
         if (window.confirm("Reset to default settings?")) {
-            const defaults: InvoiceTemplateConfig = {
-                id: 'invoiceTemplateConfig',
-                colors: { primary: '#0d9488', secondary: '#333333', text: '#000000', tableHeaderBg: '#0d9488', tableHeaderText: '#ffffff' },
-                fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
-                layout: { margin: 10, logoSize: 25, logoPosition: 'center', headerAlignment: 'center', showWatermark: false },
-                content: { titleText: 'TAX INVOICE', showTerms: true, showQr: true, termsText: '', footerText: 'Thank you for your business!' }
-            };
             setConfig(defaults);
         }
     };
@@ -90,9 +108,26 @@ const InvoiceDesigner: React.FC = () => {
     };
 
     return (
-        <div className="h-[calc(100vh-80px)] flex flex-col md:flex-row gap-4 overflow-hidden">
-            {/* Left Control Panel */}
-            <div className="w-full md:w-1/3 lg:w-1/4 flex flex-col bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 overflow-hidden">
+        <div className="flex flex-col h-full w-full md:flex-row gap-4 overflow-hidden">
+            
+            {/* Mobile View Switcher */}
+            <div className="md:hidden flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg shrink-0 border dark:border-slate-700">
+                <button 
+                    onClick={() => setMobileView('editor')}
+                    className={`flex-1 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${mobileView === 'editor' ? 'bg-white dark:bg-slate-600 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                    <Edit3 size={16} /> Editor
+                </button>
+                <button 
+                    onClick={() => setMobileView('preview')}
+                    className={`flex-1 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${mobileView === 'preview' ? 'bg-white dark:bg-slate-600 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}
+                >
+                    <Eye size={16} /> Preview
+                </button>
+            </div>
+
+            {/* Left Control Panel - Hidden on Mobile when in Preview mode */}
+            <div className={`w-full md:w-1/3 lg:w-1/4 flex-col bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 overflow-hidden ${mobileView === 'editor' ? 'flex flex-grow' : 'hidden md:flex'}`}>
                 <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/50">
                     <h2 className="font-bold text-lg text-primary">Invoice Designer</h2>
                     <div className="flex gap-2">
@@ -290,8 +325,8 @@ const InvoiceDesigner: React.FC = () => {
                 </div>
             </div>
 
-            {/* Right Preview Panel */}
-            <div className="flex-grow bg-gray-200 dark:bg-slate-900 rounded-xl border border-gray-300 dark:border-slate-700 flex flex-col relative overflow-hidden">
+            {/* Right Preview Panel - Hidden on Mobile when in Editor mode */}
+            <div className={`flex-grow bg-gray-200 dark:bg-slate-900 rounded-xl border border-gray-300 dark:border-slate-700 flex-col relative overflow-hidden ${mobileView === 'preview' ? 'flex' : 'hidden md:flex'}`}>
                 <div className="absolute top-0 left-0 right-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur p-2 flex justify-between items-center border-b border-gray-200 dark:border-slate-700 z-10">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Live Preview</span>
                     {isGenerating && <span className="text-xs text-primary flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Updating...</span>}

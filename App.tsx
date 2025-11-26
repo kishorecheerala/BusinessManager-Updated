@@ -519,15 +519,20 @@ const MainApp: React.FC = () => {
             </div>
         )}
 
-        <main className="flex-grow overflow-y-auto p-4 pb-24" style={{ WebkitOverflowScrolling: 'touch' }}>
-            <div key={currentPage} className="animate-fade-in-up max-w-6xl mx-auto w-full">
+        {/* Main Content - Updated to handle full height for Invoice Designer */}
+        <main 
+            className={`flex-grow flex flex-col ${currentPage === 'INVOICE_DESIGNER' ? 'overflow-hidden p-0 sm:p-4 pb-0 sm:pb-0' : 'overflow-y-auto p-4 pb-24'}`} 
+            style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+            <div key={currentPage} className={`animate-fade-in-up w-full ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'max-w-6xl mx-auto'}`}>
                 <Suspense fallback={<AppSkeletonLoader />}>
                     {renderPage()}
                 </Suspense>
             </div>
         </main>
 
-        {/* Glassmorphism Bottom Nav */}
+        {/* Glassmorphism Bottom Nav - Hidden on Invoice Designer */}
+        {currentPage !== 'INVOICE_DESIGNER' && (
         <nav className="fixed bottom-0 left-0 right-0 glass pb-[env(safe-area-inset-bottom)] z-50 border-t border-gray-200/50 dark:border-slate-700/50">
             {/* Desktop View - unchanged */}
             <div className="hidden md:flex justify-center gap-8 p-2">
@@ -619,6 +624,7 @@ const MainApp: React.FC = () => {
                 </div>
             </div>
         </nav>
+        )}
     </div>
     </>
   );
