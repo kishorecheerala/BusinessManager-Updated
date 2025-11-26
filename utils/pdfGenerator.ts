@@ -103,7 +103,6 @@ interface InvoiceSettings {
 
 // --- Thermal Receipt Generator ---
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, settings?: InvoiceSettings): Promise<jsPDF> => {
-    // (Logic remains mostly same for Thermal as it's constrained physically)
     const terms = settings?.terms || '';
     const footer = settings?.footer || 'Thank You! Visit Again.';
     const showQr = settings?.showQr ?? true;
@@ -266,26 +265,49 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     return doc;
 };
 
-// --- Fully Configurable A4 Invoice Generator ---
-export const generateA4InvoicePdf = async (
-    sale: Sale, 
-    customer: Customer, 
-    profile: ProfileData | null, 
+interface GenericDocumentData {
+    id: string;
+    date: string;
+    recipient: {
+        label: string; // e.g. "Billed To:"
+        name: string;
+        address: string;
+        contact?: string;
+    };
+    sender: {
+        label: string; // e.g. "Invoice Details:"
+        idLabel: string; // e.g. "Invoice No:"
+    };
+    items: {
+        name: string;
+        quantity: number;
+        rate: number;
+        amount: number;
+    }[];
+    totals: {
+        label: string;
+        value: string; // Formatted value
+        isBold?: boolean;
+        color?: string;
+        size?: number;
+    }[];
+    watermarkText?: string;
+}
+
+// --- Core Configurable PDF Engine ---
+const _generateConfigurablePDF = async (
+    data: GenericDocumentData,
+    profile: ProfileData | null,
     templateConfig: InvoiceTemplateConfig
 ): Promise<jsPDF> => {
     
     const doc = new jsPDF();
-    const { 
-        colors, 
-        fonts, 
-        layout, 
-        content 
-    } = templateConfig;
+    const { colors, fonts, layout, content } = templateConfig;
 
     // Conversions
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = layout.margin; // mm
+    const margin = layout.margin;
     const centerX = pageWidth / 2;
     let currentY = margin;
 
@@ -305,7 +327,6 @@ export const generateA4InvoicePdf = async (
 
             doc.addImage(logoToUse, format, logoX, currentY, layout.logoSize, layout.logoSize);
             
-            // Push content down only if logo is big or centered/blocking
             if (layout.logoPosition === 'center') {
                 currentY += layout.logoSize + 5;
             }
@@ -314,16 +335,8 @@ export const generateA4InvoicePdf = async (
 
     // Business Details
     const headerAlign = layout.headerAlignment;
-    // Determine X position based on alignment
     const headerX = headerAlign === 'center' ? centerX : (headerAlign === 'right' ? pageWidth - margin : margin);
-    
-    // If logo is left and text is left, we need to offset text Y or X. 
-    // Simplest approach: If aligned left/right, text starts at top (next to logo if space permits).
-    // For simplicity in this engine, we'll stack text below logo if center, else distinct.
-    
     let textY = layout.logoPosition === 'center' ? currentY : margin;
-    
-    // Adjust text X offset if logo is left and alignment is left to avoid overlap
     let textXOffset = (layout.logoPosition === 'left' && headerAlign === 'left') ? (layout.logoSize + 5) : 0;
     
     if (profile) {
@@ -332,7 +345,7 @@ export const generateA4InvoicePdf = async (
         doc.setTextColor(colors.primary);
         doc.text(profile.name, headerX + textXOffset, textY, { align: headerAlign });
         
-        textY += (fonts.headerSize * 0.4) + 2; // Line height approx
+        textY += (fonts.headerSize * 0.4) + 2;
         
         doc.setFont(fonts.bodyFont, 'normal');
         doc.setFontSize(fonts.bodySize);
@@ -351,76 +364,71 @@ export const generateA4InvoicePdf = async (
         textY += 6;
     }
 
-    // Update main cursor Y to be below the lowest element (logo or text)
     currentY = Math.max(currentY, textY, layout.logoPosition !== 'center' ? margin + layout.logoSize + 5 : 0);
 
-    // Separator
     doc.setDrawColor(colors.secondary);
     doc.setLineWidth(0.5);
     doc.line(margin, currentY, pageWidth - margin, currentY);
     currentY += 10;
 
-    // --- 2. TITLE & INVOICE METADATA ---
+    // --- 2. TITLE & METADATA ---
     doc.setFont(fonts.titleFont, 'bold');
     doc.setFontSize(16);
     doc.setTextColor(colors.text);
     doc.text(content.titleText, centerX, currentY, { align: 'center' });
     currentY += 10;
 
-    // Two Columns: Billed To (Left), Invoice Details (Right)
     const colWidth = (pageWidth - (margin * 2)) / 2;
     
-    // Left Col
+    // Left Col (Recipient)
     doc.setFontSize(11);
     doc.setFont(fonts.bodyFont, 'bold');
     doc.setTextColor(colors.primary);
-    doc.text('Billed To:', margin, currentY);
+    doc.text(data.recipient.label, margin, currentY);
     
     doc.setFont(fonts.bodyFont, 'normal');
     doc.setFontSize(fonts.bodySize);
     doc.setTextColor(colors.text);
-    const custY = currentY + 5;
-    doc.text(customer.name, margin, custY);
-    const custAddrLines = doc.splitTextToSize(customer.address || '', colWidth - 5);
-    doc.text(custAddrLines, margin, custY + 5);
+    const recipientY = currentY + 5;
+    doc.text(data.recipient.name, margin, recipientY);
+    const recipientAddrLines = doc.splitTextToSize(data.recipient.address || '', colWidth - 5);
+    doc.text(recipientAddrLines, margin, recipientY + 5);
     
-    // Right Col
+    // Right Col (Doc Details)
     const rightColX = pageWidth - margin;
     doc.setFont(fonts.bodyFont, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(colors.primary);
-    doc.text('Invoice Details:', rightColX, currentY, { align: 'right' });
+    doc.text(data.sender.label, rightColX, currentY, { align: 'right' });
     
     doc.setFont(fonts.bodyFont, 'normal');
     doc.setFontSize(fonts.bodySize);
     doc.setTextColor(colors.text);
-    doc.text(`Invoice No: ${sale.id}`, rightColX, custY, { align: 'right' });
-    doc.text(`Date: ${new Date(sale.date).toLocaleDateString()}`, rightColX, custY + 5, { align: 'right' });
+    doc.text(`${data.sender.idLabel} ${data.id}`, rightColX, recipientY, { align: 'right' });
+    doc.text(`Date: ${new Date(data.date).toLocaleDateString()}`, rightColX, recipientY + 5, { align: 'right' });
 
-    // QR Code (if enabled) - Positioned in the white space of right column if possible
     if (content.showQr) {
         try {
-            const qrBase64 = await getQrCodeBase64(sale.id);
+            const qrBase64 = await getQrCodeBase64(data.id);
             if (qrBase64) {
-                // Place QR to the left of the Invoice Details text
                 doc.addImage(qrBase64, 'PNG', rightColX - 55, currentY, 20, 20);
             }
         } catch (e) {}
     }
 
-    currentY = Math.max(custY + 5 + (custAddrLines.length * 4), custY + 25) + 5;
+    currentY = Math.max(recipientY + 5 + (recipientAddrLines.length * 4), recipientY + 25) + 5;
 
-    // --- 3. ITEMS TABLE ---
+    // --- 3. TABLE ---
     autoTable(doc, {
         startY: currentY,
         margin: { left: margin, right: margin },
         head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
-        body: sale.items.map((item, index) => [
+        body: data.items.map((item, index) => [
             index + 1,
-            item.productName,
+            item.name,
             item.quantity,
-            `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
-            `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
+            `Rs. ${item.rate.toLocaleString('en-IN')}`,
+            `Rs. ${item.amount.toLocaleString('en-IN')}`
         ]),
         theme: 'grid',
         styles: {
@@ -445,41 +453,25 @@ export const generateA4InvoicePdf = async (
 
     // --- 4. TOTALS ---
     let finalY = (doc as any).lastAutoTable.finalY + 10;
-    
-    const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
-    const paidAmount = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-    const dueAmount = Number(sale.totalAmount) - paidAmount;
-
     const totalsX = pageWidth - margin;
     const labelX = totalsX - 40;
     
-    const addTotalRow = (label: string, value: string, isBold: boolean = false, colorOverride?: string, sizeOverride?: number) => {
-        doc.setFont(fonts.bodyFont, isBold ? 'bold' : 'normal');
-        doc.setFontSize(sizeOverride || fonts.bodySize);
-        doc.setTextColor(colorOverride || colors.text);
-        doc.text(label, labelX, finalY, { align: 'right' });
-        doc.text(value, totalsX, finalY, { align: 'right' });
-        finalY += 6;
-    };
+    data.totals.forEach((row, index) => {
+        // Draw line before the last item (usually Grand Total or Balance) if it's bold
+        if (row.isBold && index === data.totals.length - 1) {
+             doc.setDrawColor(colors.secondary);
+             doc.line(labelX - 20, finalY - 4, totalsX, finalY - 4);
+        }
 
-    addTotalRow('Subtotal:', `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-    addTotalRow('Discount:', `- Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-    addTotalRow('GST Included:', `Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-    
-    finalY += 2;
-    // Draw line above Grand Total
-    doc.setDrawColor(colors.secondary);
-    doc.line(labelX - 20, finalY - 4, totalsX, finalY - 4);
-
-    addTotalRow('Grand Total:', `Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, true, colors.primary, fonts.bodySize + 2);
-    addTotalRow('Paid:', `Rs. ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-    
-    const dueColor = dueAmount > 0.01 ? '#dc2626' : '#16a34a'; // Red if due, Green if clear
-    addTotalRow('Amount Due:', `Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, true, dueColor, fonts.bodySize + 2);
+        doc.setFont(fonts.bodyFont, row.isBold ? 'bold' : 'normal');
+        doc.setFontSize(row.size || fonts.bodySize);
+        doc.setTextColor(row.color || colors.text);
+        doc.text(row.label, labelX, finalY, { align: 'right' });
+        doc.text(row.value, totalsX, finalY, { align: 'right' });
+        finalY += (row.size && row.size > fonts.bodySize ? 8 : 6);
+    });
 
     // --- 5. TERMS & FOOTER ---
-    
-    // Ensure we have space for terms, else new page
     if (pageHeight - finalY < 40) {
         doc.addPage();
         finalY = margin;
@@ -500,17 +492,16 @@ export const generateA4InvoicePdf = async (
         doc.text(termsLines, margin, finalY);
     }
 
-    // Watermark (optional)
     if (layout.showWatermark) {
         doc.saveGraphicsState();
         doc.setGState(new doc.GState({ opacity: 0.1 }));
         doc.setFontSize(60);
         doc.setTextColor(colors.primary);
-        doc.text(profile?.name || 'INVOICE', pageWidth/2, pageHeight/2, { align: 'center', angle: 45 });
+        const watermark = data.watermarkText || profile?.name || 'INVOICE';
+        doc.text(watermark, pageWidth/2, pageHeight/2, { align: 'center', angle: 45 });
         doc.restoreGraphicsState();
     }
 
-    // Footer
     doc.setFontSize(9);
     doc.setTextColor(colors.secondary);
     doc.text(content.footerText, centerX, pageHeight - 10, { align: 'center' });
@@ -518,120 +509,118 @@ export const generateA4InvoicePdf = async (
     return doc;
 };
 
-// --- Estimate Generator (Wraps the Invoice Logic with minimal tweaks) ---
-export const generateEstimatePDF = async (quote: Quote, customer: Customer, profile: ProfileData | null): Promise<jsPDF> => {
-    // Legacy/Simple fallback for estimates or create a separate template config later
-    // For now, using the standard function but just hardcoding the title.
-    const doc = new jsPDF();
-    let startY = addBusinessHeader(doc, profile);
+// --- Public Generators ---
 
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor('#000000');
-    doc.text('ESTIMATE / QUOTATION', 105, startY, { align: 'center' });
-    startY += 10;
-    // ... (Rest of legacy logic kept for safety, or can be upgraded to use new engine with config override)
-    // Keeping legacy logic for Estimate to avoid breaking changes in this specific file update request
-    // unless explicitly asked to upgrade estimates too.
-    
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Estimate For:', 14, startY);
-    doc.text('Estimate Details:', 120, startY);
-    startY += 5;
+export const generateA4InvoicePdf = async (
+    sale: Sale, 
+    customer: Customer, 
+    profile: ProfileData | null, 
+    templateConfig: InvoiceTemplateConfig
+): Promise<jsPDF> => {
+    const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
+    const paidAmount = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+    const dueAmount = Number(sale.totalAmount) - paidAmount;
+    const dueColor = dueAmount > 0.01 ? '#dc2626' : '#16a34a';
 
-    doc.setFont('helvetica', 'normal');
-    doc.text(customer.name, 14, startY);
-    doc.text(`Estimate No: ${quote.id}`, 120, startY);
-    startY += 5;
+    const data: GenericDocumentData = {
+        id: sale.id,
+        date: sale.date,
+        recipient: {
+            label: 'Billed To:',
+            name: customer.name,
+            address: customer.address
+        },
+        sender: {
+            label: 'Invoice Details:',
+            idLabel: 'Invoice No:'
+        },
+        items: sale.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            rate: Number(item.price),
+            amount: Number(item.quantity) * Number(item.price)
+        })),
+        totals: [
+            { label: 'Subtotal:', value: `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'Discount:', value: `- Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'GST Included:', value: `Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'Grand Total:', value: `Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 },
+            { label: 'Paid:', value: `Rs. ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'Amount Due:', value: `Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: dueColor, size: templateConfig.fonts.bodySize + 2 }
+        ]
+    };
 
-    const customerAddr = doc.splitTextToSize(customer.address || '', 80);
-    doc.text(customerAddr, 14, startY);
-    doc.text(`Date: ${new Date(quote.date).toLocaleDateString()}`, 120, startY);
-    
-    if (quote.validUntil) {
-        startY += 5;
-        doc.text(`Valid Until: ${new Date(quote.validUntil).toLocaleDateString()}`, 120, startY);
-        startY -= 5;
-    }
-    
-    startY += Math.max((customerAddr.length * 5), 10) + 5;
-
-    autoTable(doc, {
-        startY: startY,
-        head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
-        body: quote.items.map((item, index) => [
-            index + 1,
-            item.productName,
-            item.quantity,
-            `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
-            `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: [100, 116, 139] },
-        columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
-    });
-
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
-    const subTotal = quote.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
-    const totalsX = 196;
-    const labelX = totalsX - 40;
-    
-    doc.text('Subtotal:', labelX, finalY, { align: 'right' });
-    doc.text(`Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, finalY, { align: 'right' });
-    
-    return doc;
+    return _generateConfigurablePDF(data, profile, templateConfig);
 };
 
-// --- Debit Note Generator ---
-export const generateDebitNotePDF = async (returnData: Return, supplier: Supplier | undefined, profile: ProfileData | null): Promise<jsPDF> => {
-    const doc = new jsPDF();
-    let startY = addBusinessHeader(doc, profile);
+export const generateEstimatePDF = async (
+    quote: Quote, 
+    customer: Customer, 
+    profile: ProfileData | null,
+    templateConfig: InvoiceTemplateConfig
+): Promise<jsPDF> => {
+    const subTotal = quote.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
 
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor('#000000');
-    doc.text('DEBIT NOTE', 105, startY, { align: 'center' });
-    startY += 10;
+    const data: GenericDocumentData = {
+        id: quote.id,
+        date: quote.date,
+        recipient: {
+            label: 'Estimate For:',
+            name: customer.name,
+            address: customer.address
+        },
+        sender: {
+            label: 'Estimate Details:',
+            idLabel: 'Estimate No:'
+        },
+        items: quote.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            rate: Number(item.price),
+            amount: Number(item.quantity) * Number(item.price)
+        })),
+        totals: [
+            { label: 'Subtotal:', value: `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'Discount:', value: `- Rs. ${Number(quote.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'GST Included:', value: `Rs. ${Number(quote.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: 'Total Amount:', value: `Rs. ${Number(quote.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 },
+        ],
+        watermarkText: 'ESTIMATE'
+    };
 
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.text('To Supplier:', 14, startY);
-    doc.text('Reference Details:', 120, startY);
-    startY += 5;
+    return _generateConfigurablePDF(data, profile, templateConfig);
+};
 
-    doc.setFont('helvetica', 'normal');
-    doc.text(supplier?.name || 'Unknown Supplier', 14, startY);
-    doc.text(`Debit Note #: ${returnData.id}`, 120, startY);
-    startY += 5;
-
-    const suppAddr = doc.splitTextToSize(supplier?.location || '', 80);
-    doc.text(suppAddr, 14, startY);
-    doc.text(`Date: ${new Date(returnData.returnDate).toLocaleDateString()}`, 120, startY);
-    startY += 5;
-    doc.text(`Original Inv #: ${returnData.referenceId}`, 120, startY);
+export const generateDebitNotePDF = async (
+    returnData: Return, 
+    supplier: Supplier | undefined, 
+    profile: ProfileData | null,
+    templateConfig: InvoiceTemplateConfig
+): Promise<jsPDF> => {
     
-    startY += Math.max((suppAddr.length * 5), 10) + 5;
+    const data: GenericDocumentData = {
+        id: returnData.id,
+        date: returnData.returnDate,
+        recipient: {
+            label: 'To Supplier:',
+            name: supplier?.name || 'Unknown Supplier',
+            address: supplier?.location || ''
+        },
+        sender: {
+            label: 'Reference Details:',
+            idLabel: 'Debit Note #:'
+        },
+        items: returnData.items.map(item => ({
+            name: item.productName,
+            quantity: item.quantity,
+            rate: Number(item.price),
+            amount: Number(item.quantity) * Number(item.price)
+        })),
+        totals: [
+            { label: 'Total Debit Value:', value: `Rs. ${Number(returnData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, size: templateConfig.fonts.bodySize + 2 }
+        ],
+        watermarkText: 'DEBIT NOTE'
+    };
 
-    autoTable(doc, {
-        startY: startY,
-        head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
-        body: returnData.items.map((item, index) => [
-            index + 1,
-            item.productName,
-            item.quantity,
-            `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
-            `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
-        ]),
-        theme: 'grid',
-        headStyles: { fillColor: [0, 128, 128] },
-        columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
-    });
-
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.text(`Total Debit Value: Rs. ${Number(returnData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, finalY, { align: 'right' });
-
-    return doc;
+    return _generateConfigurablePDF(data, profile, templateConfig);
 };

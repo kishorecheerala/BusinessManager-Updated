@@ -181,8 +181,10 @@ export interface ProfileData {
 }
 
 // --- Invoice Template Configuration ---
+export type DocumentType = 'INVOICE' | 'ESTIMATE' | 'DEBIT_NOTE';
+
 export interface InvoiceTemplateConfig {
-  id: 'invoiceTemplateConfig';
+  id: string;
   colors: {
     primary: string;
     secondary: string;

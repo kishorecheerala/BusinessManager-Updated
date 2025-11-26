@@ -1,13 +1,14 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Save, RotateCcw, Type, Layout, Palette, FileText, Image as ImageIcon, RefreshCw, Eye, Edit3, ExternalLink } from 'lucide-react';
+import { Save, RotateCcw, Type, Layout, Palette, FileText, Image as ImageIcon, RefreshCw, Eye, Edit3, ExternalLink, ChevronDown } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { InvoiceTemplateConfig } from '../types';
+import { InvoiceTemplateConfig, DocumentType } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import ColorPickerModal from '../components/ColorPickerModal';
-import { generateA4InvoicePdf } from '../utils/pdfGenerator';
+import { generateA4InvoicePdf, generateEstimatePDF, generateDebitNotePDF } from '../utils/pdfGenerator';
 
+// --- Dummy Data for Previews ---
 const dummyCustomer = {
     id: 'CUST-001',
     name: 'John Doe Enterprises',
@@ -32,9 +33,39 @@ const dummySale = {
     payments: [{ id: 'PAY-1', amount: 5000, date: new Date().toISOString(), method: 'UPI' as const }]
 };
 
+const dummyQuote = {
+    ...dummySale,
+    id: 'EST-2023-005',
+    validUntil: new Date(Date.now() + 7 * 86400000).toISOString(),
+    status: 'PENDING' as const
+};
+
+const dummyReturn = {
+    id: 'DBN-2023-008',
+    type: 'SUPPLIER' as const,
+    referenceId: 'PUR-ABC-123',
+    partyId: 'SUPP-001',
+    items: [
+        { productId: 'P1', productName: 'Defective Fabric Roll', quantity: 1, price: 3200 }
+    ],
+    returnDate: new Date().toISOString(),
+    amount: 3200,
+    reason: 'Damaged goods'
+};
+
+const dummySupplier = {
+    id: 'SUPP-001',
+    name: 'Kanchi Weavers Co.',
+    phone: '8887776665',
+    location: 'Kanchipuram, Tamil Nadu',
+    gstNumber: '33ABCDE1234Z1'
+};
+
 const InvoiceDesigner: React.FC = () => {
     const { state, dispatch, showToast } = useAppContext();
     
+    const [selectedDocType, setSelectedDocType] = useState<DocumentType>('INVOICE');
+
     // Safe defaults
     const defaults: InvoiceTemplateConfig = {
         id: 'invoiceTemplateConfig',
@@ -44,41 +75,55 @@ const InvoiceDesigner: React.FC = () => {
         content: { titleText: 'TAX INVOICE', showTerms: true, showQr: true, termsText: '', footerText: 'Thank you for your business!' }
     };
 
-    // Deep merge to safely handle potential missing properties from saved state
-    const [config, setConfig] = useState<InvoiceTemplateConfig>(() => ({
-        ...defaults,
-        ...state.invoiceTemplate,
-        colors: { ...defaults.colors, ...state.invoiceTemplate?.colors },
-        fonts: { ...defaults.fonts, ...state.invoiceTemplate?.fonts },
-        layout: { ...defaults.layout, ...state.invoiceTemplate?.layout },
-        content: { ...defaults.content, ...state.invoiceTemplate?.content },
-    }));
-
+    const [config, setConfig] = useState<InvoiceTemplateConfig>(defaults);
     const [activeTab, setActiveTab] = useState<'layout' | 'colors' | 'fonts' | 'content'>('layout');
     const [mobileView, setMobileView] = useState<'editor' | 'preview'>('editor');
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [colorPickerTarget, setColorPickerTarget] = useState<keyof InvoiceTemplateConfig['colors'] | null>(null);
 
+    // Load correct template from state when doc type changes
+    useEffect(() => {
+        let sourceConfig = state.invoiceTemplate;
+        if (selectedDocType === 'ESTIMATE') sourceConfig = state.estimateTemplate;
+        if (selectedDocType === 'DEBIT_NOTE') sourceConfig = state.debitNoteTemplate;
+
+        // Deep merge with defaults to ensure safety
+        setConfig({
+            ...defaults,
+            ...sourceConfig,
+            id: sourceConfig?.id || defaults.id,
+            colors: { ...defaults.colors, ...sourceConfig?.colors },
+            fonts: { ...defaults.fonts, ...sourceConfig?.fonts },
+            layout: { ...defaults.layout, ...sourceConfig?.layout },
+            content: { ...defaults.content, ...sourceConfig?.content },
+        });
+    }, [selectedDocType, state.invoiceTemplate, state.estimateTemplate, state.debitNoteTemplate]);
+
     // Debounce PDF generation
     useEffect(() => {
         setIsGenerating(true);
         const timer = setTimeout(() => {
             generatePreview();
-        }, 800); // Increased debounce to prevent flickering on rapid changes
+        }, 800);
         return () => clearTimeout(timer);
-    }, [config]);
-
-    // Initial generation
-    useEffect(() => {
-        generatePreview();
-    }, []);
+    }, [config, selectedDocType]);
 
     const generatePreview = async () => {
         try {
-            const doc = await generateA4InvoicePdf(dummySale, dummyCustomer, state.profile, config);
-            const blobUrl = doc.output('bloburl');
-            setPdfUrl(blobUrl);
+            let doc;
+            if (selectedDocType === 'INVOICE') {
+                doc = await generateA4InvoicePdf(dummySale, dummyCustomer, state.profile, config);
+            } else if (selectedDocType === 'ESTIMATE') {
+                doc = await generateEstimatePDF(dummyQuote, dummyCustomer, state.profile, config);
+            } else if (selectedDocType === 'DEBIT_NOTE') {
+                doc = await generateDebitNotePDF(dummyReturn, dummySupplier, state.profile, config);
+            }
+            
+            if (doc) {
+                const blobUrl = doc.output('bloburl');
+                setPdfUrl(blobUrl);
+            }
         } catch (e) {
             console.error("Preview generation failed", e);
         } finally {
@@ -87,13 +132,14 @@ const InvoiceDesigner: React.FC = () => {
     };
 
     const handleSave = () => {
-        dispatch({ type: 'SET_INVOICE_TEMPLATE', payload: config });
-        showToast("Invoice template saved successfully!");
+        dispatch({ type: 'SET_DOCUMENT_TEMPLATE', payload: { type: selectedDocType, config } });
+        showToast(`${selectedDocType} template saved successfully!`);
     };
 
     const handleReset = () => {
         if (window.confirm("Reset to default settings?")) {
-            setConfig(defaults);
+            // We just reset local state to defaults, user must save to persist
+            setConfig({ ...defaults, id: config.id }); // Keep ID
         }
     };
 
@@ -114,7 +160,7 @@ const InvoiceDesigner: React.FC = () => {
     };
 
     return (
-        <div className="flex flex-col h-full w-full md:flex-row gap-4 overflow-hidden relative">
+        <div className="h-full w-full flex flex-col md:flex-row gap-4 overflow-hidden relative">
             
             {/* Mobile View Switcher - Fixed Top */}
             <div className="md:hidden flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg shrink-0 border dark:border-slate-700 mb-2">
@@ -134,15 +180,34 @@ const InvoiceDesigner: React.FC = () => {
 
             {/* Left Control Panel - Hidden on Mobile when in Preview mode */}
             <div className={`w-full md:w-1/3 lg:w-1/4 flex-col bg-white dark:bg-slate-800 rounded-xl shadow-lg border border-gray-200 dark:border-slate-700 overflow-hidden ${mobileView === 'editor' ? 'flex flex-grow' : 'hidden md:flex'}`}>
-                <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-900/50 shrink-0">
-                    <h2 className="font-bold text-lg text-primary">Invoice Designer</h2>
-                    <div className="flex gap-2">
-                        <button onClick={handleReset} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-500" title="Reset Default">
-                            <RotateCcw size={18} />
-                        </button>
-                        <Button onClick={handleSave} className="h-8 px-3 text-xs">
-                            <Save size={14} className="mr-1" /> Save
-                        </Button>
+                
+                {/* Document Type Selector */}
+                <div className="p-4 border-b dark:border-slate-700 bg-gray-50 dark:bg-slate-900/50 shrink-0">
+                    <div className="mb-3">
+                        <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Document Type</label>
+                        <div className="relative">
+                            <select 
+                                value={selectedDocType} 
+                                onChange={(e) => setSelectedDocType(e.target.value as DocumentType)}
+                                className="w-full p-2 pr-8 border rounded-lg appearance-none bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold focus:ring-2 focus:ring-primary outline-none"
+                            >
+                                <option value="INVOICE">Sales Invoice</option>
+                                <option value="ESTIMATE">Estimate / Quotation</option>
+                                <option value="DEBIT_NOTE">Debit Note (Returns)</option>
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+                        </div>
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <h2 className="font-bold text-lg text-primary">Designer</h2>
+                        <div className="flex gap-2">
+                            <button onClick={handleReset} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 text-gray-500" title="Reset Default">
+                                <RotateCcw size={18} />
+                            </button>
+                            <Button onClick={handleSave} className="h-8 px-3 text-xs">
+                                <Save size={14} className="mr-1" /> Save
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
@@ -334,7 +399,7 @@ const InvoiceDesigner: React.FC = () => {
             {/* Right Preview Panel */}
             <div className={`flex-grow bg-gray-200 dark:bg-slate-900 rounded-xl border border-gray-300 dark:border-slate-700 flex-col relative overflow-hidden ${mobileView === 'preview' ? 'flex' : 'hidden md:flex'}`}>
                 <div className="absolute top-0 left-0 right-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur p-2 flex justify-between items-center border-b border-gray-200 dark:border-slate-700 z-10">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Live Preview</span>
+                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Live Preview: {selectedDocType.replace('_', ' ')}</span>
                     {isGenerating ? (
                         <span className="text-xs text-primary flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Updating...</span>
                     ) : (
@@ -361,7 +426,7 @@ const InvoiceDesigner: React.FC = () => {
                             Inline PDF preview is not supported on mobile devices. Please open the file to view it.
                         </p>
                         <Button onClick={handleOpenPdf} className="w-full bg-indigo-600 hover:bg-indigo-700 shadow-md">
-                            <ExternalLink size={16} className="mr-2" /> Open Invoice PDF
+                            <ExternalLink size={16} className="mr-2" /> Open {selectedDocType.replace('_', ' ')} PDF
                         </Button>
                     </div>
 

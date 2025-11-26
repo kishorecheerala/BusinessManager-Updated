@@ -1,6 +1,6 @@
 
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useRef } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Payment, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, AppMetadataPin, Theme, GoogleUser, AuditLogEntry, SyncStatus, AppMetadataTheme, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Payment, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, AppMetadataPin, Theme, GoogleUser, AuditLogEntry, SyncStatus, AppMetadataTheme, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, DocumentType } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
@@ -25,6 +25,9 @@ export interface AppState {
   audit_logs: AuditLogEntry[];
   profile: ProfileData | null;
   invoiceTemplate: InvoiceTemplateConfig;
+  estimateTemplate: InvoiceTemplateConfig;
+  debitNoteTemplate: InvoiceTemplateConfig;
+  invoiceSettings?: AppMetadataInvoiceSettings;
   toast: ToastState;
   selection: { page: Page; id: string; action?: 'edit' | 'new'; data?: any } | null;
   installPromptEvent: BeforeInstallPromptEvent | null;
@@ -52,6 +55,8 @@ type Action =
   | { type: 'SET_REVENUE_GOAL'; payload: number }
   | { type: 'UPDATE_METADATA_TIMESTAMP'; payload: number }
   | { type: 'SET_INVOICE_TEMPLATE'; payload: InvoiceTemplateConfig }
+  | { type: 'SET_DOCUMENT_TEMPLATE'; payload: { type: DocumentType, config: InvoiceTemplateConfig } }
+  | { type: 'UPDATE_INVOICE_SETTINGS'; payload: { terms: string, footer: string, showQr: boolean } }
   | { type: 'ADD_CUSTOMER'; payload: Customer }
   | { type: 'UPDATE_CUSTOMER'; payload: Customer }
   | { type: 'ADD_SUPPLIER'; payload: Supplier }
@@ -174,6 +179,37 @@ const defaultInvoiceTemplate: InvoiceTemplateConfig = {
     }
 };
 
+const defaultEstimateTemplate: InvoiceTemplateConfig = {
+    ...defaultInvoiceTemplate,
+    id: 'estimateTemplateConfig',
+    colors: {
+        ...defaultInvoiceTemplate.colors,
+        primary: '#4f46e5', // Indigo for Estimates
+        tableHeaderBg: '#4f46e5'
+    },
+    content: {
+        ...defaultInvoiceTemplate.content,
+        titleText: 'ESTIMATE / QUOTATION',
+        footerText: 'Valid for 7 days.'
+    }
+};
+
+const defaultDebitNoteTemplate: InvoiceTemplateConfig = {
+    ...defaultInvoiceTemplate,
+    id: 'debitNoteTemplateConfig',
+    colors: {
+        ...defaultInvoiceTemplate.colors,
+        primary: '#000000', // Black for Debit Notes usually
+        tableHeaderBg: '#333333'
+    },
+    content: {
+        ...defaultInvoiceTemplate.content,
+        titleText: 'DEBIT NOTE',
+        showTerms: false,
+        footerText: ''
+    }
+};
+
 const initialState: AppState = {
   customers: [],
   suppliers: [],
@@ -188,6 +224,8 @@ const initialState: AppState = {
   audit_logs: [],
   profile: null,
   invoiceTemplate: defaultInvoiceTemplate,
+  estimateTemplate: defaultEstimateTemplate,
+  debitNoteTemplate: defaultDebitNoteTemplate,
   toast: { message: '', show: false, type: 'info' },
   selection: null,
   installPromptEvent: null,
@@ -263,16 +301,41 @@ const appReducer = (state: AppState, action: Action): AppState => {
         };
     }
     case 'SET_INVOICE_TEMPLATE': {
+        // Fallback legacy action
         const metaWithoutTemplate = state.app_metadata.filter(m => m.id !== 'invoiceTemplateConfig');
-        // Store as metadata so it syncs
-        // cast to any to store complex object in metadata array for IDB persistence, 
-        // though runtime state has strict type
         return {
             ...state,
             invoiceTemplate: action.payload,
             app_metadata: [...metaWithoutTemplate, action.payload as any],
             ...touch
         };
+    }
+    case 'SET_DOCUMENT_TEMPLATE': {
+        const { type, config } = action.payload;
+        const configId = config.id;
+        const metaWithoutThis = state.app_metadata.filter(m => m.id !== configId);
+        
+        let newState = { ...state };
+        if (type === 'INVOICE') newState.invoiceTemplate = config;
+        else if (type === 'ESTIMATE') newState.estimateTemplate = config;
+        else if (type === 'DEBIT_NOTE') newState.debitNoteTemplate = config;
+
+        return {
+            ...newState,
+            app_metadata: [...metaWithoutThis, config as any],
+            ...touch
+        };
+    }
+    case 'UPDATE_INVOICE_SETTINGS': {
+        const { terms, footer, showQr } = action.payload;
+        const newSettings: AppMetadataInvoiceSettings = { id: 'invoiceSettings', terms, footer, showQr };
+        const meta = state.app_metadata.filter(m => m.id !== 'invoiceSettings');
+        return {
+            ...state,
+            invoiceSettings: newSettings,
+            app_metadata: [...meta, newSettings],
+            ...touch
+        }
     }
     case 'UPDATE_METADATA_TIMESTAMP': {
         const timestamp = action.payload;
@@ -593,11 +656,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
               stateData.themeColor = themeMeta.color;
               stateData.themeGradient = themeMeta.gradient;
           }
-          // Apply Invoice Template
-          const templateMeta = meta.find((m: any) => m.id === 'invoiceTemplateConfig');
-          if (templateMeta) {
-              stateData.invoiceTemplate = templateMeta;
-          }
+          // Apply Document Templates
+          const invTemplate = meta.find((m: any) => m.id === 'invoiceTemplateConfig');
+          if (invTemplate) stateData.invoiceTemplate = invTemplate;
+          
+          const estTemplate = meta.find((m: any) => m.id === 'estimateTemplateConfig');
+          if (estTemplate) stateData.estimateTemplate = estTemplate;
+          
+          const debTemplate = meta.find((m: any) => m.id === 'debitNoteTemplateConfig');
+          if (debTemplate) stateData.debitNoteTemplate = debTemplate;
+
+          // Apply Invoice Settings
+          const invSettings = meta.find((m: any) => m.id === 'invoiceSettings');
+          if (invSettings) stateData.invoiceSettings = invSettings;
+
           return stateData;
       };
       
@@ -875,7 +947,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const validatedMetadata = Array.isArray(app_metadata) ? app_metadata : [];
         const pinData = validatedMetadata.find(m => m.id === 'securityPin') as AppMetadataPin | undefined;
         const themeData = validatedMetadata.find(m => m.id === 'themeSettings') as AppMetadataTheme | undefined;
+        
         const invoiceTemplateData = validatedMetadata.find(m => m.id === 'invoiceTemplateConfig') as InvoiceTemplateConfig | undefined;
+        const estimateTemplateData = validatedMetadata.find(m => m.id === 'estimateTemplateConfig') as InvoiceTemplateConfig | undefined;
+        const debitNoteTemplateData = validatedMetadata.find(m => m.id === 'debitNoteTemplateConfig') as InvoiceTemplateConfig | undefined;
+        const invoiceSettingsData = validatedMetadata.find(m => m.id === 'invoiceSettings') as AppMetadataInvoiceSettings | undefined;
 
         const validatedState: Partial<AppState> = {
             customers: Array.isArray(customers) ? customers : [],
@@ -891,7 +967,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             theme: themeData?.theme || getInitialTheme(),
             themeColor: themeData?.color || getInitialThemeColor(),
             themeGradient: themeData?.gradient || getInitialThemeGradient(),
+            
             invoiceTemplate: invoiceTemplateData || defaultInvoiceTemplate,
+            estimateTemplate: estimateTemplateData || defaultEstimateTemplate,
+            debitNoteTemplate: debitNoteTemplateData || defaultDebitNoteTemplate,
+            invoiceSettings: invoiceSettingsData
         };
         dispatch({ type: 'SET_STATE', payload: validatedState });
         if (pinData?.pin) {
