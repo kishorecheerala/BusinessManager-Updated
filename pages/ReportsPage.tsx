@@ -1,13 +1,12 @@
 
 import React, { useMemo, useState } from 'react';
-import { Download, XCircle, Users, Package, TrendingUp, BarChart } from 'lucide-react';
+import { Download, XCircle, Users, Package, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Customer, Sale, Supplier, Page } from '../types';
-import { logoBase64 } from '../utils/logo';
+import { Customer, Sale, Supplier, Page, Product } from '../types';
 import Dropdown from '../components/Dropdown';
 import DatePill from '../components/DatePill';
 
@@ -22,7 +21,7 @@ interface ReportsPageProps {
 
 const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const { state, dispatch } = useAppContext();
-    const [activeTab, setActiveTab] = useState<'customer' | 'supplier' | 'inventory'>('customer');
+    const [activeTab, setActiveTab] = useState<'customer' | 'supplier' | 'stock'>('customer');
 
     // --- Customer Filters ---
     const [areaFilter, setAreaFilter] = useState('all');
@@ -88,7 +87,6 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateDuesPDF = () => {
         if (customerDues.length === 0) return alert("No customer dues data to export.");
         const doc = new jsPDF();
-        // FIX: Removed logo from internal report.
         doc.text('Customer Dues Report', 14, 22);
         autoTable(doc, {
             startY: 40,
@@ -135,7 +133,6 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateCustomerSummaryPDF = () => {
         if (customerAccountSummary.length === 0) return alert("No customer account data to export.");
         const doc = new jsPDF();
-        // FIX: Removed logo from internal report.
         doc.text('Customer Account Summary Report', 14, 22);
         autoTable(doc, {
             startY: 40,
@@ -213,7 +210,6 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateSupplierDuesPDF = () => {
         if (supplierDues.length === 0) return alert("No supplier dues data to export.");
         const doc = new jsPDF();
-        // FIX: Removed logo from internal report.
         doc.text('Supplier Dues Report', 14, 22);
         autoTable(doc, {
             startY: 40,
@@ -244,7 +240,6 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateSupplierSummaryPDF = () => {
         if (supplierAccountSummary.length === 0) return alert("No supplier account data to export.");
         const doc = new jsPDF();
-        // FIX: Removed logo from internal report.
         doc.text('Supplier Account Summary Report', 14, 22);
         autoTable(doc, {
             startY: 40,
@@ -272,25 +267,40 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
         link.click();
     };
 
-    // --- Inventory Valuation Logic ---
-    const inventoryValuation = useMemo(() => {
-        const products = state.products;
-        let totalCostValue = 0;
-        let totalRetailValue = 0;
-        let totalItems = 0;
-
-        products.forEach(p => {
-            const qty = Math.max(0, p.quantity);
-            totalItems += qty;
-            totalCostValue += qty * p.purchasePrice;
-            totalRetailValue += qty * p.salePrice;
-        });
-
-        const potentialProfit = totalRetailValue - totalCostValue;
-        const margin = totalRetailValue > 0 ? (potentialProfit / totalRetailValue) * 100 : 0;
-
-        return { totalItems, totalCostValue, totalRetailValue, potentialProfit, margin };
+    // --- Low Stock Report Logic ---
+    const lowStockItems = useMemo(() => {
+        return state.products
+            .filter(p => p.quantity < 5)
+            .sort((a, b) => a.quantity - b.quantity);
     }, [state.products]);
+
+    const generateLowStockPDF = () => {
+        if (lowStockItems.length === 0) return alert("No low stock items found.");
+        const doc = new jsPDF();
+        
+        doc.setFontSize(20);
+        doc.setTextColor('#dc2626'); // Red title
+        doc.text('Low Stock Reorder Report', 14, 20);
+        
+        doc.setFontSize(10);
+        doc.setTextColor('#666666');
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+        
+        autoTable(doc, {
+            startY: 35,
+            head: [['Product Name', 'Current Stock', 'Last Cost']],
+            body: lowStockItems.map(p => [
+                p.name,
+                p.quantity,
+                `Rs. ${p.purchasePrice.toLocaleString('en-IN')}`
+            ]),
+            theme: 'striped',
+            headStyles: { fillColor: [220, 38, 38] }, // Red header
+            columnStyles: { 1: { halign: 'center', fontStyle: 'bold' }, 2: { halign: 'right' } }
+        });
+        
+        doc.save('low-stock-report.pdf');
+    };
 
     return (
         <div className="space-y-6">
@@ -316,10 +326,10 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                         <Package size={16} /> Supplier Reports
                     </button>
                     <button 
-                        onClick={() => setActiveTab('inventory')} 
-                        className={`py-2 px-1 border-b-2 font-semibold flex items-center gap-2 ${activeTab === 'inventory' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}`}
+                        onClick={() => setActiveTab('stock')} 
+                        className={`py-2 px-1 border-b-2 font-semibold flex items-center gap-2 ${activeTab === 'stock' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-gray-500'}`}
                     >
-                        <BarChart size={16} /> Inventory Valuation
+                        <AlertTriangle size={16} /> Inventory Reports
                     </button>
                 </nav>
             </div>
@@ -510,49 +520,34 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                 </div>
             )}
 
-            {activeTab === 'inventory' && (
+            {activeTab === 'stock' && (
                 <div className="animate-fade-in-fast space-y-6">
-                    <Card title="Inventory Valuation" className="border-l-4 border-indigo-500">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-900">
-                                <p className="text-sm text-indigo-600 dark:text-indigo-300 font-bold uppercase tracking-wider">Total Items</p>
-                                <p className="text-3xl font-extrabold text-indigo-900 dark:text-indigo-100 mt-1">{inventoryValuation.totalItems.toLocaleString()}</p>
-                                <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-1">Units in stock</p>
-                            </div>
-                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-900">
-                                <p className="text-sm text-blue-600 dark:text-blue-300 font-bold uppercase tracking-wider">Asset Value (Cost)</p>
-                                <p className="text-3xl font-extrabold text-blue-900 dark:text-blue-100 mt-1">₹{inventoryValuation.totalCostValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-                                <p className="text-xs text-blue-500 dark:text-blue-400 mt-1">Based on purchase price</p>
-                            </div>
-                            <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg border border-emerald-100 dark:border-emerald-900">
-                                <p className="text-sm text-emerald-600 dark:text-emerald-300 font-bold uppercase tracking-wider">Potential Revenue</p>
-                                <p className="text-3xl font-extrabold text-emerald-900 dark:text-emerald-100 mt-1">₹{inventoryValuation.totalRetailValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-                                <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-1">Based on sale price</p>
-                            </div>
-                            <div className="p-4 bg-amber-50 dark:bg-amber-900/20 rounded-lg border border-amber-100 dark:border-amber-900">
-                                <p className="text-sm text-amber-600 dark:text-amber-300 font-bold uppercase tracking-wider">Projected Profit</p>
-                                <p className="text-3xl font-extrabold text-amber-900 dark:text-amber-100 mt-1">₹{inventoryValuation.potentialProfit.toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-                                <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">~{inventoryValuation.margin.toFixed(1)}% Margin</p>
-                            </div>
+                    <Card title="Low Stock Reorder Report">
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                            This report lists all items with less than 5 units in stock. Use this to place orders with your suppliers.
+                        </p>
+                        <div className="flex gap-2 mb-4">
+                            <Button onClick={generateLowStockPDF} className="bg-red-600 hover:bg-red-700 focus:ring-red-600"><Download className="w-4 h-4 mr-2" /> Download Reorder PDF</Button>
                         </div>
-                        
-                        <div className="mt-6">
-                            <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-4 overflow-hidden flex">
-                                <div 
-                                    className="bg-blue-500 h-full" 
-                                    style={{ width: `${(inventoryValuation.totalCostValue / inventoryValuation.totalRetailValue) * 100}%` }} 
-                                    title="Cost Value"
-                                ></div>
-                                <div 
-                                    className="bg-amber-500 h-full" 
-                                    style={{ width: `${(inventoryValuation.potentialProfit / inventoryValuation.totalRetailValue) * 100}%` }} 
-                                    title="Profit Value"
-                                ></div>
-                            </div>
-                            <div className="flex justify-between text-xs mt-2 text-gray-600 dark:text-gray-400 font-medium">
-                                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-blue-500 rounded-full"></div> Cost: {((inventoryValuation.totalCostValue / inventoryValuation.totalRetailValue) * 100).toFixed(1)}%</span>
-                                <span className="flex items-center gap-1"><div className="w-3 h-3 bg-amber-500 rounded-full"></div> Profit: {((inventoryValuation.potentialProfit / inventoryValuation.totalRetailValue) * 100).toFixed(1)}%</span>
-                            </div>
+                        <div className="overflow-x-auto max-h-96">
+                            <table className="w-full text-sm">
+                                <thead className="text-left text-gray-600 bg-gray-50 dark:bg-slate-700 dark:text-gray-300 sticky top-0">
+                                    <tr>
+                                        <th className="p-2">Product Name</th>
+                                        <th className="p-2 text-center">Stock</th>
+                                        <th className="p-2 text-right">Last Cost</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="dark:text-slate-300">
+                                    {lowStockItems.length > 0 ? lowStockItems.map(p => (
+                                        <tr key={p.id} className="border-b dark:border-slate-700">
+                                            <td className="p-2 font-semibold">{p.name}</td>
+                                            <td className="p-2 text-center font-bold text-red-600">{p.quantity}</td>
+                                            <td className="p-2 text-right">₹{p.purchasePrice.toLocaleString('en-IN')}</td>
+                                        </tr>
+                                    )) : <tr><td colSpan={3} className="text-center p-4 text-gray-500 dark:text-gray-400">Inventory is healthy. No low stock items.</td></tr>}
+                                </tbody>
+                            </table>
                         </div>
                     </Card>
                 </div>

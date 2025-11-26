@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, XCircle, CheckCircle, Info, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, ArrowRight, Zap, BrainCircuit, TrendingDown, Wallet, CalendarClock, Tag, Undo2, Crown, Calendar, Receipt } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, XCircle, CheckCircle, Info, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, ArrowRight, Zap, BrainCircuit, TrendingDown, Wallet, CalendarClock, Tag, Undo2, Crown, Calendar, Receipt, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -63,7 +63,6 @@ const SmartAnalystCard: React.FC<{
     expenses: Expense[], 
     ownerName: string 
 }> = ({ sales, products, customers, purchases, returns, expenses, ownerName }) => {
-    
     const insights = useMemo(() => {
         const list: { icon: React.ElementType, text: string, color: string, type: string }[] = [];
         const now = new Date();
@@ -184,29 +183,7 @@ const SmartAnalystCard: React.FC<{
             });
         }
 
-        // 6. Category Trends
-        const categoryCounts: Record<string, number> = {};
-        thisMonthSales.forEach(s => {
-            s.items.forEach(i => {
-                // Infer category from ID (e.g., BM-KAN-001 -> KAN) or Name
-                const cat = i.productId.split('-')[1] || 'General';
-                categoryCounts[cat] = (categoryCounts[cat] || 0) + Number(i.quantity);
-            });
-        });
-        const topCategory = Object.keys(categoryCounts).sort((a, b) => categoryCounts[b] - categoryCounts[a])[0];
-        
-        if (topCategory) {
-             const catMap: Record<string, string> = { 'KAN': 'Kanchi', 'COT': 'Cotton', 'SILK': 'Mysore Silk', 'BAN': 'Banarasi', 'GAD': 'Gadwal', 'UPP': 'Uppada' };
-             const friendlyName = catMap[topCategory] || topCategory;
-             list.push({
-                icon: Tag,
-                type: 'Trending',
-                text: `${friendlyName} is the top category this month. Ensure you have enough variety.`,
-                color: 'text-pink-600 dark:text-pink-400'
-            });
-        }
-
-        // 7. Fast Moving Item (Velocity Risk)
+        // 6. Fast Moving Item (Velocity Risk)
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         const recentSales = sales.filter(s => new Date(s.date) >= sevenDaysAgo);
@@ -239,7 +216,7 @@ const SmartAnalystCard: React.FC<{
             });
         }
 
-        // 8. High Return Rate (Last 30 days)
+        // 7. High Return Rate
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const recentReturnsVal = returns
@@ -261,7 +238,7 @@ const SmartAnalystCard: React.FC<{
             }
         }
 
-        // 9. Top Customer of the Month
+        // 8. Top Customer
         const customerSpend: Record<string, number> = {};
         thisMonthSales.forEach(s => {
             customerSpend[s.customerId] = (customerSpend[s.customerId] || 0) + Number(s.totalAmount);
@@ -280,7 +257,6 @@ const SmartAnalystCard: React.FC<{
             }
         }
 
-        // Default if list is empty
         if (list.length === 0) {
             list.push({
                 icon: Sparkles,
@@ -381,6 +357,9 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null }> = ({ lastBa
 };
 
 const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNavigate: (customerId: string) => void; }> = ({ sales, customers, onNavigate }) => {
+    const { state } = useAppContext();
+    const businessName = state.profile?.name || 'Our Business';
+
     const overdueCustomersArray = useMemo(() => {
         const overdueCustomers: { [key: string]: { customer: Customer; totalOverdue: number; oldestOverdueDate: string } } = {};
         const thirtyDaysAgo = new Date();
@@ -419,6 +398,16 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
         return Object.values(overdueCustomers);
     }, [sales, customers]);
 
+    const sendWhatsAppReminder = (e: React.MouseEvent, customer: Customer, totalDue: number) => {
+        e.stopPropagation();
+        const message = `Dear ${customer.name}, your outstanding balance with ${businessName} is ₹${totalDue.toLocaleString('en-IN')}. Please clear it at the earliest. Thank you.`;
+        const encodedMessage = encodeURIComponent(message);
+        const cleanPhone = customer.phone.replace(/\D/g, '');
+        const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
+        
+        window.open(`https://wa.me/${finalPhone}?text=${encodedMessage}`, '_blank');
+    };
+
     if (overdueCustomersArray.length === 0) {
         return (
             <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
@@ -439,7 +428,7 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
                 <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 mr-3" />
                 <h2 className="text-lg font-bold text-rose-800 dark:text-rose-200">Overdue Dues Alert</h2>
             </div>
-            <p className="text-sm text-rose-700 dark:text-rose-300 mb-4">The following customers have dues from sales older than 30 days. Please follow up.</p>
+            <p className="text-sm text-rose-700 dark:text-rose-300 mb-4">The following customers have dues from sales older than 30 days.</p>
             <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {overdueCustomersArray.sort((a, b) => b.totalOverdue - a.totalOverdue).map(({ customer, totalOverdue, oldestOverdueDate }) => (
                     <div
@@ -448,7 +437,6 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
                         onClick={() => onNavigate(customer.id)}
                         role="button"
                         tabIndex={0}
-                        aria-label={`View details for ${customer.name}`}
                     >
                         <div className="flex items-center gap-3">
                             <User className="w-6 h-6 text-rose-700 dark:text-rose-400 flex-shrink-0" />
@@ -459,7 +447,16 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
                         </div>
                         <div className="text-right flex-shrink-0 ml-2">
                             <p className="font-bold text-lg text-red-600 dark:text-red-400">₹{totalOverdue.toLocaleString('en-IN')}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400">Oldest: {new Date(oldestOverdueDate).toLocaleDateString()}</p>
+                            <div className="flex items-center justify-end gap-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{Math.floor((new Date().getTime() - new Date(oldestOverdueDate).getTime()) / (1000 * 60 * 60 * 24))} days old</p>
+                                <button
+                                    onClick={(e) => sendWhatsAppReminder(e, customer, totalOverdue)}
+                                    className="bg-green-500 text-white p-1 rounded-full hover:scale-110 transition-transform"
+                                    title="Send Reminder"
+                                >
+                                    <MessageCircle size={12} />
+                                </button>
+                            </div>
                         </div>
                     </div>
                 ))}

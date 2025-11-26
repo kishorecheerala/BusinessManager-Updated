@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, AlertTriangle, Printer, QrCode } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -8,6 +8,7 @@ import Button from '../components/Button';
 import { BarcodeModal } from '../components/BarcodeModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import DatePill from '../components/DatePill';
+import { compressImage } from '../utils/imageUtils';
 
 interface ProductsPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -16,23 +17,29 @@ interface ProductsPageProps {
 const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const { state, dispatch, showToast } = useAppContext();
     const [searchTerm, setSearchTerm] = useState('');
+    
     const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
     const [isEditing, setIsEditing] = useState(false);
     const [editedProduct, setEditedProduct] = useState<Product | null>(null);
     const [newQuantity, setNewQuantity] = useState<string>('');
     const isDirtyRef = useRef(false);
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     // State for multi-select
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
     const [isBatchBarcodeModalOpen, setIsBatchBarcodeModalOpen] = useState(false);
     
+    // State for Showcase Mode
+    const [isShowcaseMode, setIsShowcaseMode] = useState(false);
+    
     useEffect(() => {
         if (state.selection && state.selection.page === 'PRODUCTS') {
             const productToSelect = state.products.find(p => p.id === state.selection.id);
             if (productToSelect) {
                 setSelectedProduct(productToSelect);
+                setIsShowcaseMode(false); // Ensure we are in admin mode to see details
             }
             dispatch({ type: 'CLEAR_SELECTION' });
         }
@@ -42,7 +49,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         let formIsDirty = false;
         if (selectedProduct) {
             const quantityChanged = newQuantity !== '' && parseInt(newQuantity, 10) !== selectedProduct.quantity;
-            formIsDirty = isEditing || quantityChanged;
+            const imageChanged = editedProduct?.image !== selectedProduct.image;
+            formIsDirty = isEditing || quantityChanged || imageChanged;
         } else if (isSelectMode) {
             formIsDirty = selectedProductIds.length > 0;
         }
@@ -113,11 +121,23 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             }
         }
     };
+    
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0] && editedProduct) {
+            try {
+                const base64 = await compressImage(e.target.files[0]);
+                setEditedProduct({ ...editedProduct, image: base64 });
+            } catch (error) {
+                alert("Error processing image.");
+            }
+        }
+    };
 
-    const filteredProducts = state.products.filter(p => 
-        p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-        p.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProducts = state.products.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                              p.id.toLowerCase().includes(searchTerm.toLowerCase());
+        return matchesSearch;
+    });
 
     const handleSelectAll = () => {
         if (selectedProductIds.length === filteredProducts.length) {
@@ -148,7 +168,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         };
 
         return (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fade-in-fast">
                 <BarcodeModal 
                     isOpen={isDownloadModalOpen} 
                     onClose={() => setIsDownloadModalOpen(false)} 
@@ -158,9 +178,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 <Button onClick={() => setSelectedProduct(null)}>&larr; Back to List</Button>
                 <Card>
                     <div className="flex justify-between items-start mb-4">
-                         <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-bold text-primary">Product Details</h2>
-                            <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded">{selectedProduct.id}</span>
+                         <div className="flex items-center gap-3">
+                            <div className="relative">
+                                {selectedProduct.image ? (
+                                    <img src={selectedProduct.image} alt={selectedProduct.name} className="w-16 h-16 object-cover rounded-lg border border-gray-200 dark:border-slate-600" />
+                                ) : (
+                                    <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-lg flex items-center justify-center border border-gray-200 dark:border-slate-600 text-gray-400">
+                                        <ImageIcon size={24} />
+                                    </div>
+                                )}
+                            </div>
+                            <div>
+                                <h2 className="text-lg font-bold text-primary">Product Details</h2>
+                                <span className="text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-slate-700 px-2 py-1 rounded">{selectedProduct.id}</span>
+                            </div>
                         </div>
                         <div className="flex gap-2 items-center">
                              {isEditing ? (
@@ -176,7 +207,32 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     
                      {isEditing ? (
                         <div className="space-y-3">
+                            <div>
+                                <label className="block text-sm font-medium mb-1">Product Image</label>
+                                <div className="flex gap-2 items-center">
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        ref={fileInputRef} 
+                                        className="hidden" 
+                                        onChange={handleImageUpload}
+                                    />
+                                    <Button onClick={() => fileInputRef.current?.click()} variant="secondary" className="w-full">
+                                        <Camera size={16} className="mr-2" /> 
+                                        {editedProduct.image ? 'Change Photo' : 'Add Photo'}
+                                    </Button>
+                                    {editedProduct.image && (
+                                        <button 
+                                            onClick={() => setEditedProduct({...editedProduct, image: undefined})}
+                                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200"
+                                        >
+                                            <Trash2 size={18} />
+                                        </button>
+                                    )}
+                                </div>
+                            </div>
                             <div><label className="text-sm font-medium">Name</label><input type="text" name="name" value={editedProduct.name} onChange={handleInputChange} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" /></div>
+                            
                             <div className="grid grid-cols-2 gap-4">
                                 <div><label className="text-sm font-medium">Purchase Price</label><input type="number" name="purchasePrice" value={editedProduct.purchasePrice} onChange={handleInputChange} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" /></div>
                                 <div><label className="text-sm font-medium">Sale Price</label><input type="number" name="salePrice" value={editedProduct.salePrice} onChange={handleInputChange} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" /></div>
@@ -234,25 +290,39 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
 
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-primary">Products Inventory</h1>
+                    <h1 className="text-2xl font-bold text-primary">Inventory</h1>
                     <DatePill />
                 </div>
+                
                 <div className="flex gap-2">
-                    {isSelectMode && (
-                         <Button 
-                            onClick={() => setIsBatchBarcodeModalOpen(true)} 
-                            disabled={selectedProductIds.length === 0}
-                            variant="secondary"
-                        >
-                            <Printer className="w-4 h-4 mr-2" /> Print Selected ({selectedProductIds.length})
-                        </Button>
+                    <button 
+                        onClick={() => setIsShowcaseMode(!isShowcaseMode)} 
+                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${isShowcaseMode ? 'bg-indigo-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border dark:border-slate-700'}`}
+                    >
+                        {isShowcaseMode ? <Grid size={16} /> : <List size={16} />}
+                        {isShowcaseMode ? 'Showcase Mode' : 'Admin View'}
+                    </button>
+                    
+                    {!isShowcaseMode && (
+                        <>
+                            {isSelectMode && (
+                                <Button 
+                                    onClick={() => setIsBatchBarcodeModalOpen(true)} 
+                                    disabled={selectedProductIds.length === 0}
+                                    variant="secondary"
+                                >
+                                    <Printer className="w-4 h-4 mr-2" /> Print ({selectedProductIds.length})
+                                </Button>
+                            )}
+                            <Button onClick={toggleSelectMode} variant={isSelectMode ? "secondary" : "primary"}>
+                                {isSelectMode ? 'Cancel' : 'Select'}
+                            </Button>
+                        </>
                     )}
-                    <Button onClick={toggleSelectMode} variant={isSelectMode ? "secondary" : "primary"}>
-                        {isSelectMode ? 'Cancel Selection' : 'Select Multiple'}
-                    </Button>
                 </div>
             </div>
             
+            {/* Search Bar */}
             <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
@@ -264,7 +334,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 />
             </div>
             
-            {isSelectMode && (
+            {/* Selection Tool (Admin Mode only) */}
+            {isSelectMode && !isShowcaseMode && (
                  <div className="flex items-center gap-2 mb-2">
                     <input 
                         type="checkbox" 
@@ -277,11 +348,44 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 gap-3">
+            {/* SHOWCASE MODE (GRID) */}
+            {isShowcaseMode ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in-up">
+                    {filteredProducts.map((product) => (
+                        <div key={product.id} className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-md border border-gray-100 dark:border-slate-700 hover:shadow-xl transition-shadow flex flex-col h-full">
+                            <div className="aspect-square w-full bg-gray-100 dark:bg-slate-700 relative overflow-hidden group">
+                                {product.image ? (
+                                    <img src={product.image} alt={product.name} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+                                        <ImageIcon size={48} />
+                                    </div>
+                                )}
+                                {product.quantity < 1 && (
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                        <span className="bg-red-600 text-white px-3 py-1 text-xs font-bold uppercase tracking-widest rounded-sm">Out of Stock</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="p-3 flex flex-col flex-grow">
+                                <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm line-clamp-2 mb-1 flex-grow">{product.name}</h3>
+                                <div className="flex justify-between items-end mt-2">
+                                    <span className="text-lg font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</span>
+                                    {product.quantity > 0 && (
+                                        <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">In Stock</span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+            /* ADMIN MODE (LIST) */
+            <div className="grid grid-cols-1 gap-3 animate-fade-in-up">
                 {filteredProducts.map((product, index) => (
                     <div 
                         key={product.id} 
-                        className={`bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border transition-all animate-slide-up-fade flex items-center gap-3 ${isSelectMode && selectedProductIds.includes(product.id) ? 'border-primary ring-1 ring-primary bg-primary/10 dark:bg-primary/20' : 'border-gray-100 dark:border-slate-700 hover:shadow-md cursor-pointer'}`}
+                        className={`bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border transition-all flex items-center gap-3 ${isSelectMode && selectedProductIds.includes(product.id) ? 'border-primary ring-1 ring-primary bg-primary/10 dark:bg-primary/20' : 'border-gray-100 dark:border-slate-700 hover:shadow-md cursor-pointer'}`}
                         style={{ animationDelay: `${index * 30}ms` }}
                         onClick={() => handleProductClick(product)}
                     >
@@ -290,26 +394,42 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 {selectedProductIds.includes(product.id) && <PackageCheck size={14} className="text-white" />}
                             </div>
                         )}
+                        
+                        <div className="w-12 h-12 rounded bg-gray-100 dark:bg-slate-700 overflow-hidden flex-shrink-0 border border-gray-200 dark:border-slate-600">
+                            {product.image ? (
+                                <img src={product.image} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-gray-400"><ImageIcon size={20} /></div>
+                            )}
+                        </div>
+
                         <div className="flex-grow min-w-0">
                             <div className="flex justify-between items-start">
                                 <div>
                                     <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{product.id}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                        <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{product.id}</span>
+                                    </div>
                                 </div>
                                 <div className="text-right flex-shrink-0">
                                     <p className="font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</p>
-                                    <p className={`text-xs font-medium ${product.quantity < 5 ? 'text-red-500' : 'text-green-600'}`}>
-                                        Stock: {product.quantity}
-                                    </p>
+                                    <div className="flex justify-end gap-2 text-xs">
+                                        <span className="text-gray-400 line-through">₹{product.purchasePrice}</span>
+                                        <span className={`font-medium ${product.quantity < 5 ? 'text-red-500' : 'text-green-600'}`}>
+                                            Stock: {product.quantity}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                 ))}
-                {filteredProducts.length === 0 && (
-                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">No products found.</p>
-                )}
             </div>
+            )}
+            
+            {filteredProducts.length === 0 && (
+                <p className="text-center text-gray-500 dark:text-gray-400 py-8">No products found.</p>
+            )}
         </div>
     );
 };

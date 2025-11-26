@@ -2,6 +2,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Sale, Customer, ProfileData, Purchase, Supplier, Return, Quote } from '../types';
+import { logoBase64 } from './logo'; // Fallback logo
 
 // --- Helper: Fetch QR Code ---
 export const getQrCodeBase64 = async (data: string): Promise<string> => {
@@ -24,7 +25,22 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
     const centerX = pageWidth / 2;
     let currentY = 10;
 
-    // 1. SACRED TEXT
+    // Add Logo if available
+    if (profile?.logo) {
+        try {
+            // Add logo at top left
+            doc.addImage(profile.logo, 'JPEG', 14, 10, 25, 25);
+        } catch (e) {
+            console.warn("Failed to add custom logo to PDF", e);
+        }
+    } else {
+        // Use fallback generic logo
+        try {
+             doc.addImage(logoBase64, 'PNG', 14, 10, 25, 25);
+        } catch(e) {}
+    }
+
+    // 1. SACRED TEXT (Centered)
     doc.setFont('times', 'italic');
     doc.setFontSize(10);
     doc.setTextColor('#000000');
@@ -63,6 +79,7 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
     }
     
     // Separator Line
+    currentY = Math.max(currentY, 40); // Ensure we clear the logo
     currentY += 2;
     doc.setDrawColor('#cccccc');
     doc.setLineWidth(0.5);

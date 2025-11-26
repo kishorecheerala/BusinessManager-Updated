@@ -53,10 +53,12 @@ export interface Supplier {
 export interface Product {
   id: string; // QR code or manual entry
   name: string;
+  category?: string; // New field for categorization
   quantity: number;
   purchasePrice: number;
   salePrice: number;
   gstPercent: number;
+  image?: string; // Base64 encoded image
 }
 
 export interface SaleItem {
@@ -175,6 +177,7 @@ export interface ProfileData {
   phone: string;
   address: string;
   gstNumber: string;
+  logo?: string; // Base64 encoded logo
 }
 
 // --- App Metadata Types ---

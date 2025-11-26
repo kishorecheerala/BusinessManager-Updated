@@ -4,7 +4,7 @@ import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, Prof
 import { AppState } from '../context/AppContext';
 
 const DB_NAME = 'business-manager-db';
-const DB_VERSION = 7; // Bumped for Quotes
+const DB_VERSION = 8; // Bumped for Audit Logs
 
 export type StoreName = 'customers' | 'suppliers' | 'products' | 'sales' | 'purchases' | 'returns' | 'app_metadata' | 'notifications' | 'profile' | 'audit_logs' | 'expenses' | 'quotes';
 const STORE_NAMES: StoreName[] = ['customers', 'suppliers', 'products', 'sales', 'purchases', 'returns', 'app_metadata', 'notifications', 'profile', 'audit_logs', 'expenses', 'quotes'];

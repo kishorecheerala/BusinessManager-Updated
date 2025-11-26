@@ -472,13 +472,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     dispatch(action);
     
     // Auto-log specific actions
-    if (['ADD_SALE', 'UPDATE_SALE', 'ADD_PURCHASE', 'UPDATE_PURCHASE', 'ADD_CUSTOMER', 'UPDATE_CUSTOMER', 'ADD_PAYMENT_TO_SALE', 'ADD_EXPENSE'].includes(action.type)) {
+    if (['ADD_SALE', 'UPDATE_SALE', 'ADD_PURCHASE', 'UPDATE_PURCHASE', 'ADD_CUSTOMER', 'UPDATE_CUSTOMER', 'ADD_PAYMENT_TO_SALE', 'ADD_EXPENSE', 'DELETE_SALE', 'DELETE_PURCHASE', 'DELETE_EXPENSE'].includes(action.type)) {
         const logEntry: AuditLogEntry = {
             id: `LOG-${Date.now()}`,
             timestamp: new Date().toISOString(),
             user: state.googleUser ? state.googleUser.email : 'Local User',
             action: action.type.replace(/_/g, ' '),
-            details: 'payload' in action ? JSON.stringify((action.payload as any).id || 'item') : 'N/A',
+            details: 'payload' in action && (action.payload as any).id ? (action.payload as any).id : 'Item Action',
         };
         dispatch({ type: 'ADD_AUDIT_LOG', payload: logEntry });
     }

@@ -20,6 +20,7 @@ interface InsightsPageProps {
     setCurrentPage: (page: Page) => void;
 }
 
+// ... (Keep Helper Functions and AI Components as is) ...
 // --- Helper Functions ---
 const calculateRisk = (customer: Customer, allSales: Sale[]) => {
     const custSales = allSales.filter(s => s.customerId === customer.id);
@@ -282,6 +283,7 @@ const RevenueTargetCard: React.FC<{
     customGoal?: number,
     onEditGoal: () => void
 }> = ({ currentRevenue, previousRevenue, customGoal, onEditGoal }) => {
+    // ... (Keep existing RevenueTargetCard code) ...
     const target = customGoal && customGoal > 0 ? customGoal : (previousRevenue > 0 ? previousRevenue * 1.10 : 50000);
     const percentage = Math.min(100, Math.max(0, (currentRevenue / target) * 100));
     const remaining = Math.max(0, target - currentRevenue);
@@ -291,7 +293,7 @@ const RevenueTargetCard: React.FC<{
     const strokeDashoffset = circumference - (percentage / 100) * circumference;
 
     return (
-        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-md border border-gray-100 dark:border-slate-700 relative overflow-hidden">
+        <div className="bg-white dark:bg-slate-800 rounded-xl p-6 shadow-md border border-gray-100 dark:border-slate-700 relative overflow-hidden h-full">
              <div className="flex justify-between items-center relative z-10 h-full">
                 <div className="flex-1 pr-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -362,6 +364,7 @@ const RevenueTargetCard: React.FC<{
 };
 
 const ChampionsCard: React.FC<{ sales: Sale[], customers: Customer[] }> = ({ sales, customers }) => {
+    // ... (Keep existing ChampionsCard code) ...
     const topCustomers = useMemo(() => {
         const customerSpend: Record<string, number> = {};
         sales.forEach(s => {
@@ -409,6 +412,7 @@ const ChampionsCard: React.FC<{ sales: Sale[], customers: Customer[] }> = ({ sal
 };
 
 const InventoryVelocityCard: React.FC<{ sales: Sale[], products: Product[] }> = ({ sales, products }) => {
+    // ... (Keep existing InventoryVelocityCard code) ...
     const velocityData = useMemo(() => {
         const productSoldQty: Record<string, number> = {};
         const cutoffDate = new Date();
@@ -434,12 +438,12 @@ const InventoryVelocityCard: React.FC<{ sales: Sale[], products: Product[] }> = 
     }, [sales, products]);
 
     return (
-        <Card title="Inventory Velocity (60 Days)">
+        <Card title="Inventory Velocity (60 Days)" className="h-full">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-emerald-50 dark:bg-emerald-900/20 p-3 rounded-lg border border-emerald-100 dark:border-emerald-900/50">
                     <div className="flex items-center gap-2 mb-2">
                         <Zap size={16} className="text-emerald-600" />
-                        <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-200">Fastest Movers</h4>
+                        <h4 className="text-sm font-bold text-emerald-800 dark:text-emerald-200">Fastest</h4>
                     </div>
                     {velocityData.fastMovers.length > 0 ? (
                         <ul className="space-y-2">
@@ -456,7 +460,7 @@ const InventoryVelocityCard: React.FC<{ sales: Sale[], products: Product[] }> = 
                 <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg border border-orange-100 dark:border-orange-900/50">
                     <div className="flex items-center gap-2 mb-2">
                         <Timer size={16} className="text-orange-600" />
-                        <h4 className="text-sm font-bold text-orange-800 dark:text-orange-200">Slow Movers</h4>
+                        <h4 className="text-sm font-bold text-orange-800 dark:text-orange-200">Slow</h4>
                     </div>
                     {velocityData.slowMovers.length > 0 ? (
                         <ul className="space-y-2">
@@ -467,9 +471,58 @@ const InventoryVelocityCard: React.FC<{ sales: Sale[], products: Product[] }> = 
                                 </li>
                             ))}
                         </ul>
-                    ) : <p className="text-xs text-gray-500">Inventory is moving well!</p>}
+                    ) : <p className="text-xs text-gray-500">Inventory moving well!</p>}
                 </div>
             </div>
+        </Card>
+    );
+};
+
+const InventoryValuationCard: React.FC<{ products: Product[] }> = ({ products }) => {
+    // ... (Keep existing InventoryValuationCard code) ...
+    const data = useMemo(() => {
+        let totalCostValue = 0;
+        let totalRetailValue = 0;
+        let totalItems = 0;
+
+        products.forEach(p => {
+            const qty = Math.max(0, p.quantity);
+            totalItems += qty;
+            totalCostValue += qty * p.purchasePrice;
+            totalRetailValue += qty * p.salePrice;
+        });
+
+        const potentialProfit = totalRetailValue - totalCostValue;
+        const margin = totalRetailValue > 0 ? (potentialProfit / totalRetailValue) * 100 : 0;
+
+        return { totalItems, totalCostValue, totalRetailValue, potentialProfit, margin };
+    }, [products]);
+    
+    return (
+        <Card title="Inventory Valuation" className="h-full">
+             <div className="grid grid-cols-2 gap-3 mb-4">
+                 <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-100 dark:border-blue-900">
+                    <p className="text-xs text-blue-600 dark:text-blue-300 font-bold">Asset Cost</p>
+                    <p className="text-lg font-bold text-blue-900 dark:text-blue-100">₹{data.totalCostValue.toLocaleString('en-IN', { notation: 'compact' })}</p>
+                 </div>
+                 <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded border border-emerald-100 dark:border-emerald-900">
+                    <p className="text-xs text-emerald-600 dark:text-emerald-300 font-bold">Potential Sales</p>
+                    <p className="text-lg font-bold text-emerald-900 dark:text-emerald-100">₹{data.totalRetailValue.toLocaleString('en-IN', { notation: 'compact' })}</p>
+                 </div>
+             </div>
+             <div className="mb-2">
+                <div className="flex justify-between text-xs mb-1">
+                    <span className="text-gray-500 dark:text-gray-400">Projected Profit</span>
+                    <span className="font-bold text-amber-600 dark:text-amber-400">₹{data.potentialProfit.toLocaleString('en-IN')}</span>
+                </div>
+                <div className="w-full bg-gray-200 dark:bg-slate-700 rounded-full h-2">
+                    <div className="bg-amber-500 h-2 rounded-full" style={{ width: `${data.margin}%` }}></div>
+                </div>
+                <p className="text-[10px] text-right text-gray-400 mt-1">{data.margin.toFixed(1)}% Margin</p>
+             </div>
+             <div className="mt-auto pt-2 border-t border-gray-100 dark:border-slate-700">
+                <p className="text-xs text-center text-gray-500 dark:text-gray-400">Total Stock: <strong>{data.totalItems.toLocaleString()}</strong> units</p>
+             </div>
         </Card>
     );
 };
@@ -477,6 +530,7 @@ const InventoryVelocityCard: React.FC<{ sales: Sale[], products: Product[] }> = 
 // --- Visual Chart Components ---
 
 const DayOfWeekChart: React.FC<{ filteredSales: Sale[] }> = ({ filteredSales }) => {
+    // ... (Keep existing DayOfWeekChart code) ...
     const dayData = useMemo(() => {
         if (!filteredSales || filteredSales.length === 0) {
              // Return empty placeholder if no data
@@ -527,6 +581,7 @@ const DayOfWeekChart: React.FC<{ filteredSales: Sale[] }> = ({ filteredSales }) 
 };
 
 const RetentionChart: React.FC<{ filteredSales: Sale[], allSales: Sale[] }> = ({ filteredSales, allSales }) => {
+    // ... (Keep existing RetentionChart code) ...
     const data = useMemo(() => {
         if (filteredSales.length === 0) return { new: 0, returning: 0, newPct: 0, retPct: 0 };
         
@@ -581,6 +636,7 @@ const RetentionChart: React.FC<{ filteredSales: Sale[], allSales: Sale[] }> = ({
 };
 
 const RiskAnalysisCard: React.FC<{ customers: Customer[], sales: Sale[], onNavigate: (id: string) => void }> = ({ customers, sales, onNavigate }) => {
+    // ... (Keep existing RiskAnalysisCard code) ...
     const riskData = useMemo(() => {
         const stats = { High: 0, Medium: 0, Low: 0, Safe: 0 };
         const highRiskList: { name: string, id: string, due: number }[] = [];
@@ -668,6 +724,7 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
     const { state, dispatch } = useAppContext();
     const { sales, products, customers, purchases, expenses, pin, app_metadata, profile } = state;
 
+    // ... (Keep existing state variables and handlers) ...
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
     const [selectedMonth, setSelectedMonth] = useState<string>('all');
     
@@ -719,8 +776,7 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
         return { revenue, cogs, grossProfit, operationalExpenses, netProfit };
     };
 
-    // --- Data Filtering & Aggregation ---
-
+    // ... (Keep existing Data Filtering & Aggregation logic) ...
     // 1. Yearly Data
     const filteredYearSales = useMemo(() => sales.filter(s => new Date(s.date).getFullYear().toString() === selectedYear), [sales, selectedYear]);
     const filteredYearExpenses = useMemo(() => expenses.filter(e => new Date(e.date).getFullYear().toString() === selectedYear), [expenses, selectedYear]);
@@ -833,21 +889,6 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
     }, [filteredSales, filteredExpenses, selectedMonth, selectedYear, products]);
 
     const maxChartValue = Math.max(...chartData.map(d => d.sales), 1);
-
-    // --- Category Data ---
-    const categoryData = useMemo(() => {
-        const cats: Record<string, number> = {};
-        filteredSales.forEach(s => {
-            s.items.forEach(i => {
-                const cat = i.productId.split('-')[1] || 'Other';
-                cats[cat] = (cats[cat] || 0) + (Number(i.price) * Number(i.quantity));
-            });
-        });
-        const total = Object.values(cats).reduce((a, b) => a + b, 0);
-        return Object.entries(cats)
-            .map(([name, value]) => ({ name, value, percent: total > 0 ? (value / total) * 100 : 0 }))
-            .sort((a, b) => b.value - a.value);
-    }, [filteredSales]);
 
     // --- Expense Category Data ---
     const expenseCategoryData = useMemo(() => {
@@ -1127,7 +1168,7 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
             <SmartInsightsSection sales={sales} products={products} customers={customers} />
 
             {/* Growth Tracking Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
                 <RevenueTargetCard 
                     currentRevenue={currentMetrics.revenue} 
                     previousRevenue={0} // Simplified for this view
@@ -1139,6 +1180,7 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                 />
                 <ChampionsCard sales={sales} customers={customers} />
                 <InventoryVelocityCard sales={sales} products={products} />
+                <InventoryValuationCard products={products} />
             </div>
 
             {/* Filtered KPI Cards */}
@@ -1247,27 +1289,6 @@ const InsightsPage: React.FC<InsightsPageProps> = ({ setCurrentPage }) => {
                                     <p className="text-sm font-medium truncate dark:text-gray-200">{p.name}</p>
                                 </div>
                                 <span className="text-sm font-bold text-gray-600 dark:text-gray-400 whitespace-nowrap">{p.quantity} sold</span>
-                            </div>
-                        ))}
-                    </div>
-                </Card>
-                
-                 <Card title="Category Sales">
-                    <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                         {categoryData.length === 0 ? (
-                            <p className="text-gray-500 text-sm">No category data available.</p>
-                         ) : categoryData.map((cat) => (
-                            <div key={cat.name}>
-                                <div className="flex justify-between text-xs mb-1">
-                                    <span className="font-medium dark:text-gray-300">{cat.name}</span>
-                                    <span className="text-gray-500">{cat.percent.toFixed(1)}%</span>
-                                </div>
-                                <div className="w-full bg-gray-100 dark:bg-slate-700 rounded-full h-2">
-                                    <div 
-                                        className="h-2 rounded-full bg-purple-500" 
-                                        style={{ width: `${cat.percent}%` }}
-                                    ></div>
-                                </div>
                             </div>
                         ))}
                     </div>
