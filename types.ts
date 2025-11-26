@@ -151,6 +151,12 @@ export interface Expense {
   receiptImage?: string; // Base64 encoded image
 }
 
+export interface CustomFont {
+  id: string;
+  name: string; // Display name
+  data: string; // Base64 encoded TTF data
+}
+
 export interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
   readonly userChoice: Promise<{
@@ -181,7 +187,23 @@ export interface ProfileData {
 }
 
 // --- Invoice Template Configuration ---
-export type DocumentType = 'INVOICE' | 'ESTIMATE' | 'DEBIT_NOTE';
+export type DocumentType = 'INVOICE' | 'ESTIMATE' | 'DEBIT_NOTE' | 'RECEIPT';
+
+export interface InvoiceLabels {
+    billedTo: string;
+    date: string;
+    invoiceNo: string; // or Estimate No, etc.
+    item: string;
+    qty: string;
+    rate: string;
+    amount: string;
+    subtotal: string;
+    discount: string;
+    gst: string;
+    grandTotal: string;
+    paid: string;
+    balance: string;
+}
 
 export interface InvoiceTemplateConfig {
   id: string;
@@ -195,7 +217,7 @@ export interface InvoiceTemplateConfig {
   fonts: {
     headerSize: number;
     bodySize: number;
-    titleFont: string; // 'helvetica', 'times', 'courier'
+    titleFont: string; // 'helvetica', 'times', 'courier', or custom font name
     bodyFont: string;
   };
   layout: {
@@ -211,6 +233,12 @@ export interface InvoiceTemplateConfig {
     showQr: boolean;
     termsText: string;
     footerText: string;
+    showBusinessDetails?: boolean;
+    showCustomerDetails?: boolean;
+    showSignature?: boolean;
+    signatureText?: string;
+    signatureImage?: string; // Base64 signature image
+    labels?: InvoiceLabels; // Custom labels for tables and fields
   };
 }
 

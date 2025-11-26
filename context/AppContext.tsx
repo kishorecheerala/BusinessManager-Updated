@@ -1,6 +1,6 @@
 
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useRef } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Payment, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, AppMetadataPin, Theme, GoogleUser, AuditLogEntry, SyncStatus, AppMetadataTheme, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, DocumentType } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Payment, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, AppMetadataPin, Theme, GoogleUser, AuditLogEntry, SyncStatus, AppMetadataTheme, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, DocumentType, CustomFont, InvoiceLabels } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
@@ -20,6 +20,7 @@ export interface AppState {
   returns: Return[];
   expenses: Expense[];
   quotes: Quote[];
+  customFonts: CustomFont[];
   app_metadata: AppMetadata[];
   notifications: Notification[];
   audit_logs: AuditLogEntry[];
@@ -27,6 +28,7 @@ export interface AppState {
   invoiceTemplate: InvoiceTemplateConfig;
   estimateTemplate: InvoiceTemplateConfig;
   debitNoteTemplate: InvoiceTemplateConfig;
+  receiptTemplate: InvoiceTemplateConfig;
   invoiceSettings?: AppMetadataInvoiceSettings;
   toast: ToastState;
   selection: { page: Page; id: string; action?: 'edit' | 'new'; data?: any } | null;
@@ -77,6 +79,8 @@ type Action =
   | { type: 'ADD_QUOTE'; payload: Quote }
   | { type: 'UPDATE_QUOTE'; payload: Quote }
   | { type: 'DELETE_QUOTE'; payload: string }
+  | { type: 'ADD_CUSTOM_FONT'; payload: CustomFont }
+  | { type: 'REMOVE_CUSTOM_FONT'; payload: string }
   | { type: 'ADD_PAYMENT_TO_SALE'; payload: { saleId: string; payment: Payment } }
   | { type: 'ADD_PAYMENT_TO_PURCHASE'; payload: { purchaseId: string; payment: Payment } }
   | { type: 'SHOW_TOAST'; payload: { message: string; type?: 'success' | 'info' | 'error' } }
@@ -148,6 +152,22 @@ const getInitialDevMode = (): boolean => {
     }
 }
 
+const defaultLabels: InvoiceLabels = {
+    billedTo: "Billed To",
+    date: "Date",
+    invoiceNo: "Invoice No",
+    item: "Item",
+    qty: "Qty",
+    rate: "Rate",
+    amount: "Amount",
+    subtotal: "Subtotal",
+    discount: "Discount",
+    gst: "GST",
+    grandTotal: "Grand Total",
+    paid: "Paid",
+    balance: "Balance"
+};
+
 const defaultInvoiceTemplate: InvoiceTemplateConfig = {
     id: 'invoiceTemplateConfig',
     colors: {
@@ -175,7 +195,12 @@ const defaultInvoiceTemplate: InvoiceTemplateConfig = {
         showTerms: true,
         showQr: true,
         termsText: '',
-        footerText: 'Thank you for your business!'
+        footerText: 'Thank you for your business!',
+        showBusinessDetails: true,
+        showCustomerDetails: true,
+        showSignature: true,
+        signatureText: 'Authorized Signatory',
+        labels: defaultLabels
     }
 };
 
@@ -190,7 +215,8 @@ const defaultEstimateTemplate: InvoiceTemplateConfig = {
     content: {
         ...defaultInvoiceTemplate.content,
         titleText: 'ESTIMATE / QUOTATION',
-        footerText: 'Valid for 7 days.'
+        footerText: 'Valid for 7 days.',
+        labels: { ...defaultLabels, invoiceNo: "Estimate No", balance: "Total Due" }
     }
 };
 
@@ -206,7 +232,45 @@ const defaultDebitNoteTemplate: InvoiceTemplateConfig = {
         ...defaultInvoiceTemplate.content,
         titleText: 'DEBIT NOTE',
         showTerms: false,
-        footerText: ''
+        footerText: '',
+        labels: { ...defaultLabels, invoiceNo: "Debit Note No", billedTo: "To Supplier" }
+    }
+};
+
+const defaultReceiptTemplate: InvoiceTemplateConfig = {
+    ...defaultInvoiceTemplate,
+    id: 'receiptTemplateConfig',
+    colors: {
+        ...defaultInvoiceTemplate.colors,
+        primary: '#000000', // Typically black for thermal
+        secondary: '#000000',
+        tableHeaderBg: '#ffffff', // No background typically
+        tableHeaderText: '#000000'
+    },
+    fonts: {
+        headerSize: 12,
+        bodySize: 8,
+        titleFont: 'helvetica',
+        bodyFont: 'helvetica'
+    },
+    layout: {
+        margin: 2, // Small margin for 80mm paper
+        logoSize: 15,
+        logoPosition: 'center',
+        headerAlignment: 'center',
+        showWatermark: false
+    },
+    content: {
+        titleText: 'TAX INVOICE',
+        showTerms: true,
+        showQr: true,
+        termsText: '',
+        footerText: 'Thank You! Visit Again.',
+        showBusinessDetails: true,
+        showCustomerDetails: true,
+        showSignature: false,
+        signatureText: '',
+        labels: defaultLabels
     }
 };
 
@@ -219,6 +283,7 @@ const initialState: AppState = {
   returns: [],
   expenses: [],
   quotes: [],
+  customFonts: [],
   app_metadata: [],
   notifications: [],
   audit_logs: [],
@@ -226,6 +291,7 @@ const initialState: AppState = {
   invoiceTemplate: defaultInvoiceTemplate,
   estimateTemplate: defaultEstimateTemplate,
   debitNoteTemplate: defaultDebitNoteTemplate,
+  receiptTemplate: defaultReceiptTemplate,
   toast: { message: '', show: false, type: 'info' },
   selection: null,
   installPromptEvent: null,
@@ -319,6 +385,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
         if (type === 'INVOICE') newState.invoiceTemplate = config;
         else if (type === 'ESTIMATE') newState.estimateTemplate = config;
         else if (type === 'DEBIT_NOTE') newState.debitNoteTemplate = config;
+        else if (type === 'RECEIPT') newState.receiptTemplate = config;
 
         return {
             ...newState,
@@ -511,6 +578,10 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return { ...state, quotes: state.quotes.map(q => q.id === action.payload.id ? action.payload : q), ...touch };
     case 'DELETE_QUOTE':
         return { ...state, quotes: state.quotes.filter(q => q.id !== action.payload), ...touch };
+    case 'ADD_CUSTOM_FONT':
+        return { ...state, customFonts: [...state.customFonts, action.payload], ...touch };
+    case 'REMOVE_CUSTOM_FONT':
+        return { ...state, customFonts: state.customFonts.filter(f => f.id !== action.payload), ...touch };
     case 'ADD_PAYMENT_TO_SALE':
       return { ...state, sales: state.sales.map(sale => sale.id === action.payload.saleId ? { ...sale, payments: [...(sale.payments || []), action.payload.payment] } : sale), ...touch };
     case 'ADD_PAYMENT_TO_PURCHASE':
@@ -666,9 +737,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           const debTemplate = meta.find((m: any) => m.id === 'debitNoteTemplateConfig');
           if (debTemplate) stateData.debitNoteTemplate = debTemplate;
 
+          const recTemplate = meta.find((m: any) => m.id === 'receiptTemplateConfig');
+          if (recTemplate) stateData.receiptTemplate = recTemplate;
+
           // Apply Invoice Settings
           const invSettings = meta.find((m: any) => m.id === 'invoiceSettings');
           if (invSettings) stateData.invoiceSettings = invSettings;
+
+          // Apply Custom Fonts if present in backup (but they are separate store)
+          if (d.custom_fonts) {
+              stateData.customFonts = d.custom_fonts;
+          }
 
           return stateData;
       };
@@ -929,7 +1008,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [customers, suppliers, products, sales, purchases, returns, expenses, quotes, app_metadata, notifications, profile, audit_logs] = await Promise.all([
+        const [customers, suppliers, products, sales, purchases, returns, expenses, quotes, app_metadata, notifications, profile, audit_logs, custom_fonts] = await Promise.all([
           db.getAll('customers'),
           db.getAll('suppliers'),
           db.getAll('products'),
@@ -942,6 +1021,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           db.getAll('notifications'),
           db.getAll('profile'),
           db.getAll('audit_logs'),
+          db.getAll('custom_fonts'),
         ]);
 
         const validatedMetadata = Array.isArray(app_metadata) ? app_metadata : [];
@@ -951,6 +1031,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         const invoiceTemplateData = validatedMetadata.find(m => m.id === 'invoiceTemplateConfig') as InvoiceTemplateConfig | undefined;
         const estimateTemplateData = validatedMetadata.find(m => m.id === 'estimateTemplateConfig') as InvoiceTemplateConfig | undefined;
         const debitNoteTemplateData = validatedMetadata.find(m => m.id === 'debitNoteTemplateConfig') as InvoiceTemplateConfig | undefined;
+        const receiptTemplateData = validatedMetadata.find(m => m.id === 'receiptTemplateConfig') as InvoiceTemplateConfig | undefined;
         const invoiceSettingsData = validatedMetadata.find(m => m.id === 'invoiceSettings') as AppMetadataInvoiceSettings | undefined;
 
         const validatedState: Partial<AppState> = {
@@ -962,6 +1043,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             returns: Array.isArray(returns) ? returns : [],
             expenses: Array.isArray(expenses) ? expenses : [],
             quotes: Array.isArray(quotes) ? quotes : [],
+            customFonts: Array.isArray(custom_fonts) ? custom_fonts : [],
             app_metadata: validatedMetadata,
             audit_logs: Array.isArray(audit_logs) ? audit_logs : [],
             theme: themeData?.theme || getInitialTheme(),
@@ -971,6 +1053,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             invoiceTemplate: invoiceTemplateData || defaultInvoiceTemplate,
             estimateTemplate: estimateTemplateData || defaultEstimateTemplate,
             debitNoteTemplate: debitNoteTemplateData || defaultDebitNoteTemplate,
+            receiptTemplate: receiptTemplateData || defaultReceiptTemplate,
             invoiceSettings: invoiceSettingsData
         };
         dispatch({ type: 'SET_STATE', payload: validatedState });
@@ -996,6 +1079,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
   useEffect(() => { if (isDbLoaded) db.saveCollection('returns', state.returns); }, [state.returns, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('expenses', state.expenses); }, [state.expenses, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('quotes', state.quotes); }, [state.quotes, isDbLoaded]);
+  useEffect(() => { if (isDbLoaded) db.saveCollection('custom_fonts', state.customFonts); }, [state.customFonts, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('app_metadata', state.app_metadata); }, [state.app_metadata, isDbLoaded]);
   useEffect(() => { if (isDbLoaded) db.saveCollection('notifications', state.notifications); }, [state.notifications, isDbLoaded]);
   useEffect(() => { if (isDbLoaded && state.profile) db.saveCollection('profile', [state.profile]); }, [state.profile, isDbLoaded]);

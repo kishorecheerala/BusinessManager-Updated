@@ -191,7 +191,7 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
 
         if (returnType === 'SUPPLIER') {
             const supplier = state.suppliers.find(s => s.id === partyId);
-            const doc = await generateDebitNotePDF(returnData, supplier, state.profile);
+            const doc = await generateDebitNotePDF(returnData, supplier, state.profile, state.debitNoteTemplate);
             const dateStr = new Date(returnDate).toLocaleDateString('en-IN').replace(/\//g, '-');
             doc.save(`DebitNote_${returnId}_${dateStr}.pdf`);
         }

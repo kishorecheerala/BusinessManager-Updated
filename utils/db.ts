@@ -1,13 +1,13 @@
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, AppMetadata, AuditLogEntry, Expense, Quote } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, AppMetadata, AuditLogEntry, Expense, Quote, CustomFont } from '../types';
 import { AppState } from '../context/AppContext';
 
 const DB_NAME = 'business-manager-db';
-const DB_VERSION = 8; // Bumped for Audit Logs
+const DB_VERSION = 9; // Bumped for Custom Fonts
 
-export type StoreName = 'customers' | 'suppliers' | 'products' | 'sales' | 'purchases' | 'returns' | 'app_metadata' | 'notifications' | 'profile' | 'audit_logs' | 'expenses' | 'quotes';
-const STORE_NAMES: StoreName[] = ['customers', 'suppliers', 'products', 'sales', 'purchases', 'returns', 'app_metadata', 'notifications', 'profile', 'audit_logs', 'expenses', 'quotes'];
+export type StoreName = 'customers' | 'suppliers' | 'products' | 'sales' | 'purchases' | 'returns' | 'app_metadata' | 'notifications' | 'profile' | 'audit_logs' | 'expenses' | 'quotes' | 'custom_fonts';
+const STORE_NAMES: StoreName[] = ['customers', 'suppliers', 'products', 'sales', 'purchases', 'returns', 'app_metadata', 'notifications', 'profile', 'audit_logs', 'expenses', 'quotes', 'custom_fonts'];
 
 interface BusinessManagerDB extends DBSchema {
   customers: { key: string; value: Customer; };
@@ -22,6 +22,7 @@ interface BusinessManagerDB extends DBSchema {
   audit_logs: { key: string; value: AuditLogEntry; };
   expenses: { key: string; value: Expense; };
   quotes: { key: string; value: Quote; };
+  custom_fonts: { key: string; value: CustomFont; };
 }
 
 let dbPromise: Promise<IDBPDatabase<BusinessManagerDB>>;

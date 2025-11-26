@@ -1,7 +1,7 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Sale, Customer, ProfileData, Purchase, Supplier, Return, Quote, InvoiceTemplateConfig } from '../types';
+import { Sale, Customer, ProfileData, Purchase, Supplier, Return, Quote, InvoiceTemplateConfig, CustomFont, InvoiceLabels } from '../types';
 import { logoBase64 } from './logo'; // Fallback logo
 
 // --- Helper: Fetch QR Code ---
@@ -27,6 +27,51 @@ const getImageType = (dataUrl: string): string => {
     if (dataUrl.startsWith('data:image/jpeg')) return 'JPEG';
     if (dataUrl.startsWith('data:image/jpg')) return 'JPEG';
     return 'PNG'; // default fallback
+};
+
+// --- Helper: Register Custom Fonts ---
+const registerCustomFonts = (doc: jsPDF, fonts: CustomFont[]) => {
+    if (!fonts || fonts.length === 0) return;
+    
+    fonts.forEach(font => {
+        try {
+            let cleanData = font.data;
+            // Remove data URI prefix if present
+            if (cleanData.includes(',')) {
+                cleanData = cleanData.split(',')[1];
+            }
+            
+            const filename = `${font.name}.ttf`;
+            // Add file to VFS
+            doc.addFileToVFS(filename, cleanData);
+            
+            // Register font for normal, bold, italic styles mapping all to the same file for simplicity
+            // (unless separate bold/italic files are supported later)
+            doc.addFont(filename, font.name, 'normal');
+            doc.addFont(filename, font.name, 'bold');
+            doc.addFont(filename, font.name, 'italic');
+            doc.addFont(filename, font.name, 'bolditalic');
+        } catch (e) {
+            console.error(`Failed to register font ${font.name}`, e);
+        }
+    });
+};
+
+// --- Default Labels Fallback ---
+const defaultLabels: InvoiceLabels = {
+    billedTo: "Billed To",
+    invoiceNo: "Invoice No",
+    date: "Date",
+    item: "Item",
+    qty: "Qty",
+    rate: "Rate",
+    amount: "Amount",
+    subtotal: "Subtotal",
+    discount: "Discount",
+    gst: "GST",
+    grandTotal: "Grand Total",
+    paid: "Paid",
+    balance: "Balance"
 };
 
 // --- Helper: Add Header (Legacy support for other docs, updated to be flexible) ---
@@ -102,60 +147,118 @@ interface InvoiceSettings {
 }
 
 // --- Thermal Receipt Generator ---
-export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, settings?: InvoiceSettings): Promise<jsPDF> => {
-    const terms = settings?.terms || '';
-    const footer = settings?.footer || 'Thank You! Visit Again.';
-    const showQr = settings?.showQr ?? true;
+export const generateThermalInvoicePDF = async (
+    sale: Sale, 
+    customer: Customer, 
+    profile: ProfileData | null, 
+    templateConfig?: InvoiceTemplateConfig,
+    customFonts?: CustomFont[]
+): Promise<jsPDF> => {
+    
+    const terms = templateConfig?.content.termsText || '';
+    const footer = templateConfig?.content.footerText || 'Thank You! Visit Again.';
+    const showQr = templateConfig?.content.showQr ?? true;
+    const showTerms = templateConfig?.content.showTerms ?? false;
+    const showBusiness = templateConfig?.content.showBusinessDetails ?? true;
+    const showCustomer = templateConfig?.content.showCustomerDetails ?? true;
+    
+    const labels = { ...defaultLabels, ...templateConfig?.content.labels };
 
-    const estimatedHeight = 200 + (sale.items.length * 15) + (terms.length > 0 ? 30 : 0);
+    const margin = templateConfig?.layout.margin || 3;
+    const logoSize = templateConfig?.layout.logoSize || 15;
+    const logoPos = templateConfig?.layout.logoPosition || 'center';
+    const titleText = templateConfig?.content.titleText || 'TAX INVOICE';
+    
+    // Colors
+    const textColor = templateConfig?.colors.text || '#000000';
+    const primaryColor = templateConfig?.colors.primary || '#000000';
+
+    // Fonts
+    const headerFontSize = templateConfig?.fonts.headerSize || 12;
+    const bodyFontSize = templateConfig?.fonts.bodySize || 9;
+    const titleFont = templateConfig?.fonts.titleFont || 'helvetica';
+    const bodyFont = templateConfig?.fonts.bodyFont || 'helvetica';
+
+    const estimatedHeight = 250 + (sale.items.length * 10) + (terms.length > 0 ? 30 : 0);
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: [80, estimatedHeight]
     });
 
+    // Register custom fonts
+    if (customFonts) {
+        registerCustomFonts(doc, customFonts);
+    }
+
     const pageWidth = 80;
-    const margin = 3;
     const centerX = pageWidth / 2;
     let y = 8;
 
-    const logoToUse = profile?.logo || logoBase64;
-    if (logoToUse) {
-        try {
-            const format = getImageType(logoToUse);
-            doc.addImage(logoToUse, format, centerX - 7.5, y, 15, 15);
-            y += 18;
-        } catch (e) {}
+    if (showBusiness) {
+        // --- Logo ---
+        const logoToUse = profile?.logo || logoBase64;
+        if (logoToUse && logoSize > 5) {
+            try {
+                const format = getImageType(logoToUse);
+                let logoX = margin;
+                if (logoPos === 'center') logoX = (pageWidth - logoSize) / 2;
+                else if (logoPos === 'right') logoX = pageWidth - margin - logoSize;
+                
+                doc.addImage(logoToUse, format, logoX, y, logoSize, logoSize);
+                y += logoSize + 3;
+            } catch (e) {}
+        }
+
+        // --- Business Header ---
+        // Always center business details on thermal for readability
+        doc.setFont(titleFont, 'bold');
+        doc.setFontSize(headerFontSize);
+        doc.setTextColor(primaryColor); 
+        const busName = doc.splitTextToSize(profile?.name || 'Business Name', pageWidth - (margin * 2));
+        doc.text(busName, centerX, y, { align: 'center' });
+        y += (busName.length * (headerFontSize * 0.35)) + 2;
+
+        // Address
+        doc.setTextColor(textColor);
+        doc.setFont(bodyFont, 'normal');
+        doc.setFontSize(bodyFontSize - 1);
+        if (profile?.address) {
+            const addr = doc.splitTextToSize(profile.address, pageWidth - (margin * 2));
+            doc.text(addr, centerX, y, { align: 'center' });
+            y += (addr.length * 3) + 1;
+        }
+        if (profile?.phone) {
+            doc.text(`Ph: ${profile.phone}`, centerX, y, { align: 'center' });
+            y += 4;
+        }
+        if (profile?.gstNumber) {
+            doc.text(`GSTIN: ${profile.gstNumber}`, centerX, y, { align: 'center' });
+            y += 4;
+        }
     }
 
-    doc.setFont('times', 'italic');
-    doc.setFontSize(9);
-    doc.setTextColor('#000000');
-    doc.text('Om Namo Venkatesaya', centerX, y, { align: 'center' });
+    // --- Title ---
+    y += 2;
+    doc.setFont(titleFont, 'bold');
+    doc.setFontSize(bodyFontSize + 2);
+    doc.text(titleText, centerX, y, { align: 'center' });
     y += 5;
 
-    doc.setFont('times', 'bold');
-    doc.setFontSize(14);
-    doc.setTextColor(0, 128, 128); 
-    const busName = doc.splitTextToSize(profile?.name || 'Business Name', pageWidth - 10);
-    doc.text(busName, centerX, y, { align: 'center' });
-    y += (busName.length * 5) + 2;
-
-    doc.setTextColor('#000000');
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
+    // --- Invoice Meta ---
+    doc.setFont(bodyFont, 'normal');
+    doc.setFontSize(bodyFontSize);
 
     const qrSize = 20;
     const qrX = pageWidth - margin - qrSize;
     const startHeaderY = y;
 
-    doc.setFontSize(8);
-    doc.text(`Inv: ${sale.id}`, margin, y);
+    doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y);
     y += 4;
     
     const d = new Date(sale.date);
     const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}, ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-    doc.text(`${dateStr}`, margin, y);
+    doc.text(`${labels.date}: ${dateStr}`, margin, y);
     y += 4;
 
     if (showQr) {
@@ -167,17 +270,26 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         } catch (e) {}
     }
 
-    y = Math.max(y + 2, startHeaderY + (showQr ? qrSize : 0) + 2);
+    // Adjust Y if QR overlapped
+    if (showQr && y < startHeaderY + qrSize) {
+        // If text is short, jump below QR
+        y = startHeaderY + qrSize + 2;
+    } else {
+        y += 2;
+    }
 
-    doc.setFont('helvetica', 'bold');
-    doc.text('To:', margin, y);
-    doc.setFont('helvetica', 'normal');
-    doc.text(customer.name, margin + 7, y);
-    y += 4;
-    
-    if (customer.phone) {
-        doc.text(`Ph: ${customer.phone}`, margin, y);
+    // --- Customer ---
+    if (showCustomer) {
+        doc.setFont(bodyFont, 'bold');
+        doc.text('To:', margin, y);
+        doc.setFont(bodyFont, 'normal');
+        doc.text(customer.name, margin + 8, y);
         y += 4;
+        
+        if (customer.phone) {
+            doc.text(`Ph: ${customer.phone}`, margin, y);
+            y += 4;
+        }
     }
 
     doc.setDrawColor(0);
@@ -185,24 +297,26 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     doc.line(margin, y, pageWidth - margin, y);
     y += 4;
     
-    doc.setFont('helvetica', 'bold');
-    doc.text('Item', margin, y);
-    doc.text('Amt', pageWidth - margin, y, { align: 'right' });
+    // --- Items Header ---
+    doc.setFont(bodyFont, 'bold');
+    doc.text(labels.item, margin, y);
+    doc.text(labels.amount, pageWidth - margin, y, { align: 'right' });
     y += 2;
     doc.line(margin, y, pageWidth - margin, y);
     y += 4;
 
-    doc.setFont('helvetica', 'normal');
+    // --- Items List ---
+    doc.setFont(bodyFont, 'normal');
     sale.items.forEach(item => {
         const itemTotal = Number(item.price) * Number(item.quantity);
-        doc.setTextColor('#000000');
-        doc.setFontSize(9);
+        doc.setTextColor(textColor);
+        doc.setFontSize(bodyFontSize);
         const nameLines = doc.splitTextToSize(item.productName, 55); 
         doc.text(nameLines, margin, y);
         doc.text(`${itemTotal.toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
         y += (nameLines.length * 4);
         doc.setTextColor('#555555');
-        doc.setFontSize(8);
+        doc.setFontSize(bodyFontSize - 1);
         doc.text(`${item.quantity} x ${Number(item.price).toLocaleString('en-IN')}`, margin, y);
         y += 4;
     });
@@ -212,53 +326,58 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     doc.line(margin, y, pageWidth - margin, y);
     y += 4;
 
+    // --- Totals ---
     const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
     const paidAmount = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
     const dueAmount = Number(sale.totalAmount) - paidAmount;
 
-    const addTotalRow = (label: string, value: string, isBold = false, fontSize = 9) => {
-        doc.setFont('helvetica', isBold ? 'bold' : 'normal');
+    const addTotalRow = (label: string, value: string, isBold = false, fontSize = bodyFontSize) => {
+        doc.setFont(bodyFont, isBold ? 'bold' : 'normal');
         doc.setFontSize(fontSize);
-        doc.setTextColor('#000000');
+        doc.setTextColor(textColor);
         doc.text(label, pageWidth - 30, y, { align: 'right' });
         doc.text(value, pageWidth - margin, y, { align: 'right' });
         y += 4;
     };
 
-    addTotalRow('Subtotal', `${subTotal.toLocaleString('en-IN')}`);
-    if (sale.discount > 0) addTotalRow('Discount', `-${Number(sale.discount).toLocaleString('en-IN')}`);
+    addTotalRow(labels.subtotal, `${subTotal.toLocaleString('en-IN')}`);
+    if (sale.discount > 0) addTotalRow(labels.discount, `-${Number(sale.discount).toLocaleString('en-IN')}`);
     
     y += 1;
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.text('Total', pageWidth - 30, y, { align: 'right' });
+    doc.setFontSize(bodyFontSize + 2);
+    doc.setFont(bodyFont, 'bold');
+    doc.setTextColor(primaryColor);
+    doc.text(labels.grandTotal, pageWidth - 30, y, { align: 'right' });
     doc.text(`Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
     y += 6;
     
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(9);
-    addTotalRow('Paid', `${paidAmount.toLocaleString('en-IN')}`);
+    doc.setFont(bodyFont, 'normal');
+    doc.setFontSize(bodyFontSize);
+    doc.setTextColor(textColor);
+    addTotalRow(labels.paid, `${paidAmount.toLocaleString('en-IN')}`);
     
     if (dueAmount > 0) {
-        doc.setFont('helvetica', 'bold');
-        addTotalRow('Balance', `${dueAmount.toLocaleString('en-IN')}`);
+        doc.setFont(bodyFont, 'bold');
+        addTotalRow(labels.balance, `${dueAmount.toLocaleString('en-IN')}`);
     }
 
-    if (terms) {
+    // --- Terms ---
+    if (showTerms && terms) {
         y += 4;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(8);
+        doc.setFont(bodyFont, 'bold');
+        doc.setFontSize(bodyFontSize - 1);
         doc.text("Terms & Conditions:", margin, y);
         y += 4;
-        doc.setFont('helvetica', 'normal');
+        doc.setFont(bodyFont, 'normal');
         const termsLines = doc.splitTextToSize(terms, pageWidth - (margin*2));
         doc.text(termsLines, margin, y);
         y += (termsLines.length * 4);
     }
 
+    // --- Footer ---
     y += 5;
-    doc.setFontSize(8);
-    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(bodyFontSize - 1);
+    doc.setFont(bodyFont, 'italic');
     doc.setTextColor('#555555');
     doc.text(footer, centerX, y, { align: 'center' });
 
@@ -298,11 +417,19 @@ interface GenericDocumentData {
 const _generateConfigurablePDF = async (
     data: GenericDocumentData,
     profile: ProfileData | null,
-    templateConfig: InvoiceTemplateConfig
+    templateConfig: InvoiceTemplateConfig,
+    customFonts?: CustomFont[]
 ): Promise<jsPDF> => {
     
     const doc = new jsPDF();
+    
+    // Register custom fonts
+    if (customFonts) {
+        registerCustomFonts(doc, customFonts);
+    }
+
     const { colors, fonts, layout, content } = templateConfig;
+    const labels = { ...defaultLabels, ...content.labels };
 
     // Conversions
     const pageWidth = doc.internal.pageSize.getWidth();
@@ -311,65 +438,73 @@ const _generateConfigurablePDF = async (
     const centerX = pageWidth / 2;
     let currentY = margin;
 
+    const showBusiness = content.showBusinessDetails ?? true;
+    const showCustomer = content.showCustomerDetails ?? true;
+
     // --- 1. HEADER & LOGO ---
-    const logoToUse = profile?.logo || logoBase64;
-    
-    if (logoToUse) {
-        try {
-            const format = getImageType(logoToUse);
-            let logoX = margin;
+    if (showBusiness) {
+        const logoToUse = profile?.logo || logoBase64;
+        
+        if (logoToUse) {
+            try {
+                const format = getImageType(logoToUse);
+                let logoX = margin;
+                
+                if (layout.logoPosition === 'center') {
+                    logoX = (pageWidth - layout.logoSize) / 2;
+                } else if (layout.logoPosition === 'right') {
+                    logoX = pageWidth - margin - layout.logoSize;
+                }
+
+                doc.addImage(logoToUse, format, logoX, currentY, layout.logoSize, layout.logoSize);
+                
+                if (layout.logoPosition === 'center') {
+                    currentY += layout.logoSize + 5;
+                }
+            } catch (e) {}
+        }
+
+        // Business Details
+        const headerAlign = layout.headerAlignment;
+        const headerX = headerAlign === 'center' ? centerX : (headerAlign === 'right' ? pageWidth - margin : margin);
+        let textY = layout.logoPosition === 'center' ? currentY : margin;
+        let textXOffset = (layout.logoPosition === 'left' && headerAlign === 'left') ? (layout.logoSize + 5) : 0;
+        
+        if (profile) {
+            doc.setFont(fonts.titleFont, 'bold');
+            doc.setFontSize(fonts.headerSize);
+            doc.setTextColor(colors.primary);
+            doc.text(profile.name, headerX + textXOffset, textY, { align: headerAlign });
             
-            if (layout.logoPosition === 'center') {
-                logoX = (pageWidth - layout.logoSize) / 2;
-            } else if (layout.logoPosition === 'right') {
-                logoX = pageWidth - margin - layout.logoSize;
-            }
-
-            doc.addImage(logoToUse, format, logoX, currentY, layout.logoSize, layout.logoSize);
+            textY += (fonts.headerSize * 0.4) + 2;
             
-            if (layout.logoPosition === 'center') {
-                currentY += layout.logoSize + 5;
-            }
-        } catch (e) {}
+            doc.setFont(fonts.bodyFont, 'normal');
+            doc.setFontSize(fonts.bodySize);
+            doc.setTextColor(colors.secondary);
+            
+            const addressLines = doc.splitTextToSize(profile.address, (pageWidth / 2));
+            doc.text(addressLines, headerX + textXOffset, textY, { align: headerAlign });
+            textY += (addressLines.length * 4);
+            
+            const contactLine = [
+                profile.phone ? `Ph: ${profile.phone}` : '',
+                profile.gstNumber ? `GSTIN: ${profile.gstNumber}` : ''
+            ].filter(Boolean).join(' | ');
+            
+            doc.text(contactLine, headerX + textXOffset, textY, { align: headerAlign });
+            textY += 6;
+        }
+
+        currentY = Math.max(currentY, textY, layout.logoPosition !== 'center' ? margin + layout.logoSize + 5 : 0);
+
+        doc.setDrawColor(colors.secondary);
+        doc.setLineWidth(0.5);
+        doc.line(margin, currentY, pageWidth - margin, currentY);
+        currentY += 10;
+    } else {
+        // Even if hidden, add some top margin
+        currentY += 10;
     }
-
-    // Business Details
-    const headerAlign = layout.headerAlignment;
-    const headerX = headerAlign === 'center' ? centerX : (headerAlign === 'right' ? pageWidth - margin : margin);
-    let textY = layout.logoPosition === 'center' ? currentY : margin;
-    let textXOffset = (layout.logoPosition === 'left' && headerAlign === 'left') ? (layout.logoSize + 5) : 0;
-    
-    if (profile) {
-        doc.setFont(fonts.titleFont, 'bold');
-        doc.setFontSize(fonts.headerSize);
-        doc.setTextColor(colors.primary);
-        doc.text(profile.name, headerX + textXOffset, textY, { align: headerAlign });
-        
-        textY += (fonts.headerSize * 0.4) + 2;
-        
-        doc.setFont(fonts.bodyFont, 'normal');
-        doc.setFontSize(fonts.bodySize);
-        doc.setTextColor(colors.secondary);
-        
-        const addressLines = doc.splitTextToSize(profile.address, (pageWidth / 2));
-        doc.text(addressLines, headerX + textXOffset, textY, { align: headerAlign });
-        textY += (addressLines.length * 4);
-        
-        const contactLine = [
-            profile.phone ? `Ph: ${profile.phone}` : '',
-            profile.gstNumber ? `GSTIN: ${profile.gstNumber}` : ''
-        ].filter(Boolean).join(' | ');
-        
-        doc.text(contactLine, headerX + textXOffset, textY, { align: headerAlign });
-        textY += 6;
-    }
-
-    currentY = Math.max(currentY, textY, layout.logoPosition !== 'center' ? margin + layout.logoSize + 5 : 0);
-
-    doc.setDrawColor(colors.secondary);
-    doc.setLineWidth(0.5);
-    doc.line(margin, currentY, pageWidth - margin, currentY);
-    currentY += 10;
 
     // --- 2. TITLE & METADATA ---
     doc.setFont(fonts.titleFont, 'bold');
@@ -379,20 +514,24 @@ const _generateConfigurablePDF = async (
     currentY += 10;
 
     const colWidth = (pageWidth - (margin * 2)) / 2;
-    
+    let recipientY = currentY + 5;
+    let recipientAddrLines: string[] = [];
+
     // Left Col (Recipient)
-    doc.setFontSize(11);
-    doc.setFont(fonts.bodyFont, 'bold');
-    doc.setTextColor(colors.primary);
-    doc.text(data.recipient.label, margin, currentY);
-    
-    doc.setFont(fonts.bodyFont, 'normal');
-    doc.setFontSize(fonts.bodySize);
-    doc.setTextColor(colors.text);
-    const recipientY = currentY + 5;
-    doc.text(data.recipient.name, margin, recipientY);
-    const recipientAddrLines = doc.splitTextToSize(data.recipient.address || '', colWidth - 5);
-    doc.text(recipientAddrLines, margin, recipientY + 5);
+    if (showCustomer) {
+        doc.setFontSize(11);
+        doc.setFont(fonts.bodyFont, 'bold');
+        doc.setTextColor(colors.primary);
+        doc.text(data.recipient.label, margin, currentY);
+        
+        doc.setFont(fonts.bodyFont, 'normal');
+        doc.setFontSize(fonts.bodySize);
+        doc.setTextColor(colors.text);
+        
+        doc.text(data.recipient.name, margin, recipientY);
+        recipientAddrLines = doc.splitTextToSize(data.recipient.address || '', colWidth - 5);
+        doc.text(recipientAddrLines, margin, recipientY + 5);
+    }
     
     // Right Col (Doc Details)
     const rightColX = pageWidth - margin;
@@ -405,7 +544,7 @@ const _generateConfigurablePDF = async (
     doc.setFontSize(fonts.bodySize);
     doc.setTextColor(colors.text);
     doc.text(`${data.sender.idLabel} ${data.id}`, rightColX, recipientY, { align: 'right' });
-    doc.text(`Date: ${new Date(data.date).toLocaleDateString()}`, rightColX, recipientY + 5, { align: 'right' });
+    doc.text(`${labels.date}: ${new Date(data.date).toLocaleDateString()}`, rightColX, recipientY + 5, { align: 'right' });
 
     if (content.showQr) {
         try {
@@ -422,7 +561,7 @@ const _generateConfigurablePDF = async (
     autoTable(doc, {
         startY: currentY,
         margin: { left: margin, right: margin },
-        head: [['#', 'Item Description', 'Qty', 'Rate', 'Amount']],
+        head: [['#', labels.item, labels.qty, labels.rate, labels.amount]],
         body: data.items.map((item, index) => [
             index + 1,
             item.name,
@@ -471,25 +610,62 @@ const _generateConfigurablePDF = async (
         finalY += (row.size && row.size > fonts.bodySize ? 8 : 6);
     });
 
-    // --- 5. TERMS & FOOTER ---
-    if (pageHeight - finalY < 40) {
+    // --- 5. SIGNATURE, TERMS & FOOTER ---
+    // Check space for signature + terms (approx 50mm needed)
+    if (pageHeight - finalY < 50) {
         doc.addPage();
         finalY = margin;
     } else {
         finalY += 10;
     }
 
+    // Signature Section
+    if (content.showSignature) {
+        const sigY = finalY + 10; // Give some breathing room
+        const sigX = pageWidth - margin - 40;
+        
+        if (content.signatureImage) {
+            try {
+                const format = getImageType(content.signatureImage);
+                // Render signature image (approx 40x20mm)
+                doc.addImage(content.signatureImage, format, sigX - 20, sigY - 15, 40, 20);
+            } catch(e) {}
+        } else {
+            // Text signature line
+            doc.setFont(fonts.bodyFont, 'normal');
+            doc.setFontSize(fonts.bodySize);
+            doc.setTextColor(colors.text);
+            doc.text("______________________", sigX, sigY + 15, { align: 'center' });
+        }
+        
+        if (content.signatureText) {
+            doc.setFont(fonts.bodyFont, 'normal');
+            doc.setFontSize(fonts.bodySize);
+            doc.setTextColor(colors.text);
+            doc.text(content.signatureText, sigX, sigY + 20, { align: 'center' });
+        }
+        
+        // Update finalY to ensure terms/footer don't overlap signature area if they are placed below
+        // However, terms usually go on left side. 
+        // If signature is on right, terms can start at same Y on left.
+    }
+
     if (content.showTerms && content.termsText) {
+        // Start Terms at same Y as signature block start
+        let termsY = finalY;
+        
         doc.setFontSize(fonts.bodySize);
         doc.setFont(fonts.bodyFont, 'bold');
         doc.setTextColor(colors.text);
-        doc.text("Terms & Conditions:", margin, finalY);
-        finalY += 5;
+        doc.text("Terms & Conditions:", margin, termsY);
+        termsY += 5;
         
         doc.setFont(fonts.bodyFont, 'normal');
         doc.setTextColor(colors.secondary);
-        const termsLines = doc.splitTextToSize(content.termsText, pageWidth - (margin * 2));
-        doc.text(termsLines, margin, finalY);
+        // Wrap width: exclude signature area approx 60mm from right
+        const termsWidth = pageWidth - margin - 70; 
+        const termsLines = doc.splitTextToSize(content.termsText, termsWidth);
+        doc.text(termsLines, margin, termsY);
     }
 
     if (layout.showWatermark) {
@@ -515,8 +691,10 @@ export const generateA4InvoicePdf = async (
     sale: Sale, 
     customer: Customer, 
     profile: ProfileData | null, 
-    templateConfig: InvoiceTemplateConfig
+    templateConfig: InvoiceTemplateConfig,
+    customFonts?: CustomFont[]
 ): Promise<jsPDF> => {
+    const labels = { ...defaultLabels, ...templateConfig.content.labels };
     const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
     const paidAmount = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
     const dueAmount = Number(sale.totalAmount) - paidAmount;
@@ -526,13 +704,13 @@ export const generateA4InvoicePdf = async (
         id: sale.id,
         date: sale.date,
         recipient: {
-            label: 'Billed To:',
+            label: labels.billedTo,
             name: customer.name,
             address: customer.address
         },
         sender: {
             label: 'Invoice Details:',
-            idLabel: 'Invoice No:'
+            idLabel: labels.invoiceNo
         },
         items: sale.items.map(item => ({
             name: item.productName,
@@ -541,24 +719,26 @@ export const generateA4InvoicePdf = async (
             amount: Number(item.quantity) * Number(item.price)
         })),
         totals: [
-            { label: 'Subtotal:', value: `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-            { label: 'Discount:', value: `- Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-            { label: 'GST Included:', value: `Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-            { label: 'Grand Total:', value: `Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 },
-            { label: 'Paid:', value: `Rs. ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-            { label: 'Amount Due:', value: `Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: dueColor, size: templateConfig.fonts.bodySize + 2 }
+            { label: labels.subtotal, value: `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: labels.discount, value: `- Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: labels.gst, value: `Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: labels.grandTotal, value: `Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 },
+            { label: labels.paid, value: `Rs. ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: labels.balance, value: `Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: dueColor, size: templateConfig.fonts.bodySize + 2 }
         ]
     };
 
-    return _generateConfigurablePDF(data, profile, templateConfig);
+    return _generateConfigurablePDF(data, profile, templateConfig, customFonts);
 };
 
 export const generateEstimatePDF = async (
     quote: Quote, 
     customer: Customer, 
     profile: ProfileData | null,
-    templateConfig: InvoiceTemplateConfig
+    templateConfig: InvoiceTemplateConfig,
+    customFonts?: CustomFont[]
 ): Promise<jsPDF> => {
+    const labels = { ...defaultLabels, ...templateConfig.content.labels };
     const subTotal = quote.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
 
     const data: GenericDocumentData = {
@@ -571,7 +751,7 @@ export const generateEstimatePDF = async (
         },
         sender: {
             label: 'Estimate Details:',
-            idLabel: 'Estimate No:'
+            idLabel: labels.invoiceNo
         },
         items: quote.items.map(item => ({
             name: item.productName,
@@ -580,35 +760,37 @@ export const generateEstimatePDF = async (
             amount: Number(item.quantity) * Number(item.price)
         })),
         totals: [
-            { label: 'Subtotal:', value: `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-            { label: 'Discount:', value: `- Rs. ${Number(quote.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-            { label: 'GST Included:', value: `Rs. ${Number(quote.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-            { label: 'Total Amount:', value: `Rs. ${Number(quote.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 },
+            { label: labels.subtotal, value: `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: labels.discount, value: `- Rs. ${Number(quote.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: labels.gst, value: `Rs. ${Number(quote.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+            { label: labels.grandTotal, value: `Rs. ${Number(quote.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 },
         ],
         watermarkText: 'ESTIMATE'
     };
 
-    return _generateConfigurablePDF(data, profile, templateConfig);
+    return _generateConfigurablePDF(data, profile, templateConfig, customFonts);
 };
 
 export const generateDebitNotePDF = async (
     returnData: Return, 
     supplier: Supplier | undefined, 
     profile: ProfileData | null,
-    templateConfig: InvoiceTemplateConfig
+    templateConfig: InvoiceTemplateConfig,
+    customFonts?: CustomFont[]
 ): Promise<jsPDF> => {
+    const labels = { ...defaultLabels, ...templateConfig.content.labels };
     
     const data: GenericDocumentData = {
         id: returnData.id,
         date: returnData.returnDate,
         recipient: {
-            label: 'To Supplier:',
+            label: labels.billedTo,
             name: supplier?.name || 'Unknown Supplier',
             address: supplier?.location || ''
         },
         sender: {
             label: 'Reference Details:',
-            idLabel: 'Debit Note #:'
+            idLabel: labels.invoiceNo
         },
         items: returnData.items.map(item => ({
             name: item.productName,
@@ -622,5 +804,5 @@ export const generateDebitNotePDF = async (
         watermarkText: 'DEBIT NOTE'
     };
 
-    return _generateConfigurablePDF(data, profile, templateConfig);
+    return _generateConfigurablePDF(data, profile, templateConfig, customFonts);
 };

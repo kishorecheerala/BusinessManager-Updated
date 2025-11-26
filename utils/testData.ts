@@ -111,6 +111,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   quotes: [],
   app_metadata: [],
   audit_logs: [],
+  customFonts: [],
   theme: 'light',
   themeColor: '#0d9488',
   themeGradient: '',
@@ -146,5 +147,26 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
         termsText: '',
         footerText: 'Thank you for your business!'
     }
+  },
+  estimateTemplate: {
+    id: 'estimateTemplateConfig',
+    colors: { primary: '#4f46e5', secondary: '#333333', text: '#000000', tableHeaderBg: '#4f46e5', tableHeaderText: '#ffffff' },
+    fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
+    layout: { margin: 10, logoSize: 25, logoPosition: 'center', headerAlignment: 'center', showWatermark: false },
+    content: { titleText: 'ESTIMATE', showTerms: true, showQr: false, termsText: '', footerText: 'Valid for 7 days.' }
+  },
+  debitNoteTemplate: {
+    id: 'debitNoteTemplateConfig',
+    colors: { primary: '#000000', secondary: '#333333', text: '#000000', tableHeaderBg: '#333333', tableHeaderText: '#ffffff' },
+    fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
+    layout: { margin: 10, logoSize: 25, logoPosition: 'center', headerAlignment: 'center', showWatermark: false },
+    content: { titleText: 'DEBIT NOTE', showTerms: false, showQr: false, termsText: '', footerText: '' }
+  },
+  receiptTemplate: {
+    id: 'receiptTemplateConfig',
+    colors: { primary: '#000000', secondary: '#000000', text: '#000000', tableHeaderBg: '#ffffff', tableHeaderText: '#000000' },
+    fonts: { headerSize: 12, bodySize: 8, titleFont: 'helvetica', bodyFont: 'helvetica' },
+    layout: { margin: 2, logoSize: 15, logoPosition: 'center', headerAlignment: 'center', showWatermark: false },
+    content: { titleText: 'RECEIPT', showTerms: true, showQr: true, termsText: '', footerText: 'Thank You!' }
   },
 };
