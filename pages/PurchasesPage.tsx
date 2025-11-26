@@ -1,13 +1,12 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { Supplier, Purchase, Payment, Return, Page } from '../types';
+import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import ConfirmationModal from '../components/ConfirmationModal';
 import DeleteButton from '../components/DeleteButton';
-import { PurchaseForm } from '../components/AddPurchaseView';
 import AddSupplierModal from '../components/AddSupplierModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
@@ -15,6 +14,8 @@ import PaymentModal from '../components/PaymentModal';
 import { generateDebitNotePDF } from '../utils/pdfGenerator';
 import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
+import { Html5Qrcode } from 'html5-qrcode';
+import { PurchaseForm } from '../components/AddPurchaseView';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -30,7 +31,6 @@ interface PurchasesPageProps {
 
 const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPage }) => {
     const { state, dispatch, showToast } = useAppContext();
-    // ... (state setup remains same)
     const [view, setView] = useState<'list' | 'add_purchase' | 'edit_purchase' | 'add_supplier' | 'edit_supplier'>('list');
     const [selectedSupplier, setSelectedSupplier] = useState<Supplier | null>(null);
     const [searchTerm, setSearchTerm] = useState('');
@@ -47,7 +47,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
 
     const isDirtyRef = useRef(false);
 
-    // ... (all useEffects and handlers up to handleDownloadDebitNote) ...
     useEffect(() => {
         if (state.selection && state.selection.page === 'PURCHASES') {
             if (state.selection.id === 'new') {
@@ -66,7 +65,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
     
     useEffect(() => {
         const detailViewDirty = !!(selectedSupplier && (editingScheduleId));
-        // add_supplier and edit_supplier are now inline views
         const currentlyDirty = detailViewDirty || view === 'add_supplier' || view === 'edit_supplier';
         if (currentlyDirty !== isDirtyRef.current) {
             isDirtyRef.current = currentlyDirty;
@@ -190,7 +188,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             return;
         }
         try {
-            // Pass custom fonts
             const doc = await generateDebitNotePDF(newReturn, supplier, state.profile, state.debitNoteTemplate, state.customFonts);
             const dateStr = new Date(newReturn.returnDate).toLocaleDateString('en-IN').replace(/\//g, '-');
             doc.save(`DebitNote_${newReturn.id}_${dateStr}.pdf`);
@@ -200,7 +197,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         }
     };
 
-    // ... (renderContent remains same) ...
     const renderContent = () => {
         if (view === 'add_purchase' || view === 'edit_purchase') {
             return (
@@ -218,7 +214,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             );
         }
 
-        // New Inline Add Supplier View
         if (view === 'add_supplier') {
             return (
                 <div className="space-y-4 animate-fade-in-fast">
@@ -234,7 +229,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             );
         }
 
-        // New Inline Edit Supplier View
         if (view === 'edit_supplier' && selectedSupplier) {
             return (
                 <div className="space-y-4 animate-fade-in-fast">
@@ -244,7 +238,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                         onClose={() => setView('list')}
                         onSave={(updated) => {
                             handleUpdateSupplier(updated);
-                            setView('list'); // Explicitly go back to list/details after save
+                            setView('list');
                         }} 
                         existingSuppliers={state.suppliers}
                         initialData={selectedSupplier}
@@ -340,13 +334,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                     const isPaid = dueAmount <= 0.01;
                                     const isEditingThisSchedule = editingScheduleId === purchase.id;
 
-                                    const totalGst = purchase.items.reduce((sum, item) => {
-                                        const itemTotal = Number(item.price) * Number(item.quantity);
-                                        const itemGst = itemTotal - (itemTotal / (1 + (Number(item.gstPercent) / 100)));
-                                        return sum + itemGst;
-                                    }, 0);
-                                    const subTotal = Number(purchase.totalAmount) - totalGst;
-
                                     return (
                                     <div key={purchase.id} className="bg-white dark:bg-slate-800 rounded-lg border dark:border-slate-700 overflow-hidden mb-4 shadow-sm">
                                         <div className="w-full text-left p-3 flex justify-between items-center bg-gray-50 dark:bg-slate-700 border-b dark:border-slate-600">
@@ -357,8 +344,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                             </div>
                                             <div className="text-right mx-2">
                                                 <p className="font-bold text-lg text-primary">₹{Number(purchase.totalAmount).toLocaleString('en-IN')}</p>
-                                                <p className={`text-sm font-semibold text-red-600 dark:text-red-400`}>
-                                                    Due: ₹{dueAmount.toLocaleString('en-IN')}
+                                                <p className={`text-sm font-semibold ${isPaid ? 'text-green-600' : 'text-red-600'}`}>
+                                                    {isPaid ? 'Paid' : `Due: ₹${dueAmount.toLocaleString('en-IN')}`}
                                                 </p>
                                             </div>
                                         </div>
@@ -397,4 +384,216 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                     </ul>
                                                 </div>
 
-                                                <div className
+                                                <div className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-md text-sm border dark:border-slate-600">
+                                                    <div className="flex justify-between"><span>Total Amount:</span> <span>₹{Number(purchase.totalAmount).toLocaleString('en-IN')}</span></div>
+                                                    <div className="flex justify-between text-green-600"><span>Paid:</span> <span>₹{amountPaid.toLocaleString('en-IN')}</span></div>
+                                                    <div className="flex justify-between font-bold border-t dark:border-slate-600 pt-1 mt-1"><span>Due:</span> <span className={dueAmount > 0 ? 'text-red-600' : 'text-green-600'}>₹{dueAmount.toLocaleString('en-IN')}</span></div>
+                                                </div>
+
+                                                {/* Payment Schedule Section */}
+                                                {dueAmount > 0 && (
+                                                    <div className="mt-2">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300">Payment Schedule:</h4>
+                                                            {!isEditingThisSchedule && (
+                                                                <button onClick={() => handleEditScheduleClick(purchase)} className="text-xs text-blue-600 hover:underline">Edit Schedule</button>
+                                                            )}
+                                                        </div>
+                                                        
+                                                        {isEditingThisSchedule ? (
+                                                            <div className="space-y-2 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
+                                                                {tempDueDates.map((date, idx) => (
+                                                                    <div key={idx} className="flex items-center gap-2">
+                                                                        <DateInput 
+                                                                            value={date} 
+                                                                            onChange={(e) => handleTempDateChange(idx, e.target.value)}
+                                                                            className="text-xs py-1"
+                                                                        />
+                                                                        <button onClick={() => removeTempDate(idx)} className="text-red-500"><X size={14}/></button>
+                                                                    </div>
+                                                                ))}
+                                                                <div className="flex gap-2 mt-2">
+                                                                    <button onClick={addTempDate} className="text-xs text-blue-600 flex items-center gap-1"><Plus size={12}/> Add Date</button>
+                                                                    <div className="flex-grow"></div>
+                                                                    <button onClick={() => setEditingScheduleId(null)} className="text-xs text-gray-500 mr-2">Cancel</button>
+                                                                    <button onClick={() => handleSaveSchedule(purchase)} className="text-xs bg-blue-600 text-white px-2 py-1 rounded">Save</button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                                {purchase.paymentDueDates && purchase.paymentDueDates.length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {purchase.paymentDueDates.map((date, idx) => (
+                                                                            <span key={idx} className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 px-2 py-0.5 rounded text-xs border border-yellow-200 dark:border-yellow-700">
+                                                                                {new Date(date).toLocaleDateString()}
+                                                                            </span>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : (
+                                                                    <span className="text-xs italic text-gray-400">No scheduled dates</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <div>
+                                                    <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-1">Payments History:</h4>
+                                                    {purchase.payments.length > 0 ? (
+                                                        <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 space-y-1">
+                                                            {purchase.payments.map(payment => (
+                                                                <li key={payment.id}>
+                                                                    ₹{Number(payment.amount).toLocaleString('en-IN')} via {payment.method} on {new Date(payment.date).toLocaleDateString()}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    ) : <p className="text-sm text-gray-500 dark:text-gray-400 italic">No payments recorded.</p>}
+                                                </div>
+
+                                                {!isPaid && (
+                                                    <div className="pt-2">
+                                                        <Button onClick={() => setPaymentModalState({ isOpen: true, purchaseId: purchase.id })} className="w-full text-sm h-8">
+                                                            <Plus size={14} className="mr-1"/> Record Payment
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )})}
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 dark:text-gray-400 text-center py-4">No purchase history for this supplier.</p>
+                        )}
+                    </Card>
+                    <Card title="Returns to Supplier">
+                        {supplierReturns.length > 0 ? (
+                            <div className="space-y-3">
+                                {supplierReturns.slice().reverse().map(ret => (
+                                    <div key={ret.id} className="p-3 bg-white dark:bg-slate-800 rounded-lg border dark:border-slate-700 shadow-sm">
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <p className="font-semibold text-gray-800 dark:text-gray-200">Return on {new Date(ret.returnDate).toLocaleDateString()}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">Ref: {ret.referenceId}</p>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-bold text-primary">₹{Number(ret.amount).toLocaleString('en-IN')}</p>
+                                                <div className="flex gap-1">
+                                                    <Button onClick={() => handleDownloadDebitNote(ret)} variant="secondary" className="p-1.5 h-auto text-xs" title="Download Debit Note">
+                                                        <Download size={14} />
+                                                    </Button>
+                                                    <Button onClick={() => handleEditReturn(ret.id)} variant="secondary" className="p-1.5 h-auto text-xs" title="Edit Return">
+                                                        <Edit size={14} />
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-2 pt-2 border-t dark:border-slate-600">
+                                            <ul className="text-sm list-disc list-inside text-gray-600 dark:text-gray-400">
+                                                {ret.items.map((item, idx) => (
+                                                    <li key={idx}>{item.productName} (x{item.quantity})</li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-gray-500 dark:text-gray-400 text-center py-4">No returns recorded.</p>
+                        )}
+                    </Card>
+                </div>
+            );
+        }
+
+        // Default List View
+        const filteredSuppliers = state.suppliers.filter(s => 
+            s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+            s.location.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+
+        return (
+            <div className="space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="flex items-center gap-3">
+                        <h1 className="text-2xl font-bold text-primary">Purchases</h1>
+                        <DatePill />
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <Button onClick={() => setView('add_supplier')} variant="secondary" className="flex-1 sm:flex-none">
+                            <Plus size={16} className="mr-2"/> Supplier
+                        </Button>
+                        <Button onClick={() => setView('add_purchase')} className="flex-1 sm:flex-none">
+                            <Plus size={16} className="mr-2"/> Purchase
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                    <input
+                        type="text"
+                        placeholder="Search suppliers by name or location..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full p-2 pl-10 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-primary outline-none"
+                    />
+                </div>
+
+                <div className="space-y-3">
+                    {filteredSuppliers.map((supplier, index) => {
+                        const supplierPurchases = state.purchases.filter(p => p.supplierId === supplier.id);
+                        const totalPurchased = supplierPurchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
+                        const totalPaid = supplierPurchases.reduce((sum, p) => sum + (p.payments || []).reduce((pSum, pay) => pSum + Number(pay.amount), 0), 0);
+                        const totalDue = totalPurchased - totalPaid;
+
+                        return (
+                            <Card 
+                                key={supplier.id} 
+                                className="cursor-pointer transition-shadow animate-slide-up-fade hover:shadow-md" 
+                                style={{ animationDelay: `${index * 50}ms` }}
+                                onClick={() => setSelectedSupplier(supplier)}
+                            >
+                                <div className="flex justify-between items-start">
+                                    <div>
+                                        <p className="font-bold text-lg text-primary">{supplier.name}</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">{supplier.location}</p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">{supplier.phone}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xs text-gray-500 dark:text-gray-400">Total Due</p>
+                                        <p className={`font-bold text-lg ${totalDue > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                            ₹{totalDue.toLocaleString('en-IN')}
+                                        </p>
+                                    </div>
+                                </div>
+                            </Card>
+                        );
+                    })}
+                    {filteredSuppliers.length === 0 && (
+                        <div className="text-center py-10 text-gray-500 dark:text-gray-400">
+                            <p>No suppliers found. Add a supplier to get started.</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    return (
+        <div className="animate-fade-in-fast">
+            {lastPurchase && (
+                <BatchBarcodeModal 
+                    isOpen={isBatchBarcodeModalOpen}
+                    onClose={() => setIsBatchBarcodeModalOpen(false)}
+                    purchaseItems={lastPurchase.items.map(item => ({ ...item, quantity: Number(item.quantity) }))}
+                    businessName={state.profile?.name || 'Business Manager'}
+                    title="Print Barcodes for New Stock"
+                />
+            )}
+            {renderContent()}
+        </div>
+    );
+};
+
+export default PurchasesPage;
