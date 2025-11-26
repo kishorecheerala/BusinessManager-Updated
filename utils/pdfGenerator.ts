@@ -29,8 +29,8 @@ const getImageType = (dataUrl: string): string => {
     return 'PNG'; // default fallback
 };
 
-// --- Helper: Add Header (Common for A4/Debit Note) ---
-const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
+// --- Helper: Add Header (Common for A4/Debit Note/Reports) ---
+export const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null, title?: string) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
     let currentY = 10;
@@ -84,6 +84,16 @@ const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null) => {
         currentY += 8;
     }
     
+    // Optional Title (Used for Reports)
+    if (title) {
+        currentY += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(16);
+        doc.setTextColor('#000000');
+        doc.text(title.toUpperCase(), centerX, currentY, { align: 'center' });
+        currentY += 2;
+    }
+    
     // Separator Line
     currentY = Math.max(currentY, 40); // Ensure we clear the logo
     currentY += 2;
@@ -109,19 +119,34 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     const centerX = pageWidth / 2;
     let y = 8;
 
+    // 0. LOGO (Small centered logo for thermal)
+    const logoToUse = profile?.logo || logoBase64;
+    if (logoToUse) {
+        try {
+            const format = getImageType(logoToUse);
+            // 15mm size logo centered
+            doc.addImage(logoToUse, format, centerX - 7.5, y, 15, 15);
+            y += 18;
+        } catch (e) {
+            // Ignore logo error
+        }
+    }
+
     // 1. Sacred Text
     doc.setFont('times', 'italic');
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor('#000000');
     doc.text('Om Namo Venkatesaya', centerX, y, { align: 'center' });
-    y += 6;
+    y += 5;
 
     // 2. Business Name (Teal, Times Bold)
     doc.setFont('times', 'bold');
-    doc.setFontSize(18);
+    doc.setFontSize(14);
     doc.setTextColor(0, 128, 128); // Teal color #008080
-    doc.text(profile?.name || 'Business Name', centerX, y, { align: 'center' });
-    y += 7;
+    // Split long business names
+    const busName = doc.splitTextToSize(profile?.name || 'Business Name', pageWidth - 10);
+    doc.text(busName, centerX, y, { align: 'center' });
+    y += (busName.length * 5) + 2;
 
     doc.setTextColor('#000000');
     doc.setFont('helvetica', 'normal');
@@ -134,13 +159,13 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
 
     // Left side: Invoice No & Date
     doc.setFontSize(8);
-    doc.text(`Invoice: ${sale.id}`, margin, y);
+    doc.text(`Inv: ${sale.id}`, margin, y);
     y += 4;
     
-    // Format date as DD/MM/YYYY, HH:mm:ss
+    // Format date as DD/MM/YYYY, HH:mm
     const d = new Date(sale.date);
-    const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}, ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
-    doc.text(`Date: ${dateStr}`, margin, y);
+    const dateStr = `${d.getDate().toString().padStart(2, '0')}/${(d.getMonth()+1).toString().padStart(2, '0')}/${d.getFullYear()}, ${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
+    doc.text(`${dateStr}`, margin, y);
     y += 4;
 
     // Right side: QR Code
@@ -158,32 +183,29 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
 
     // 4. Billed To
     doc.setFont('helvetica', 'bold');
-    doc.text('Billed To:', margin, y);
-    y += 4;
+    doc.text('To:', margin, y);
     doc.setFont('helvetica', 'normal');
-    doc.text(customer.name, margin, y);
+    doc.text(customer.name, margin + 7, y);
     y += 4;
-    const addressLines = doc.splitTextToSize(customer.address, pageWidth - (margin * 2));
-    doc.text(addressLines, margin, y);
-    y += (addressLines.length * 4) + 2;
+    
+    if (customer.phone) {
+        doc.text(`Ph: ${customer.phone}`, margin, y);
+        y += 4;
+    }
 
     // 5. Purchase Details Header
     doc.setDrawColor(0);
     doc.setLineWidth(0.2);
     doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
-    doc.setFont('helvetica', 'bold');
-    doc.text('Purchase Details', centerX, y, { align: 'center' });
-    y += 3;
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
-
+    y += 4;
+    
     // 6. Table Headers
+    doc.setFont('helvetica', 'bold');
     doc.text('Item', margin, y);
-    doc.text('Total', pageWidth - margin, y, { align: 'right' });
+    doc.text('Amt', pageWidth - margin, y, { align: 'right' });
     y += 2;
     doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
+    y += 4;
 
     // 7. Items
     doc.setFont('helvetica', 'normal');
@@ -193,26 +215,26 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         // Item Name
         doc.setTextColor('#000000');
         doc.setFontSize(9);
-        const nameLines = doc.splitTextToSize(item.productName, 50); 
+        const nameLines = doc.splitTextToSize(item.productName, 55); 
         doc.text(nameLines, margin, y);
         
         // Total (aligned with first line of name)
-        doc.text(`Rs. ${itemTotal.toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
+        doc.text(`${itemTotal.toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
         
         y += (nameLines.length * 4);
         
         // Qty @ Rate
         doc.setTextColor('#555555');
         doc.setFontSize(8);
-        doc.text(`(x${item.quantity} @ Rs. ${Number(item.price).toLocaleString('en-IN')})`, margin, y);
-        y += 5;
+        doc.text(`${item.quantity} x ${Number(item.price).toLocaleString('en-IN')}`, margin, y);
+        y += 4;
     });
 
     // 8. Separator
-    y += 2;
+    y += 1;
     doc.setDrawColor(200); // Light grey
     doc.line(margin, y, pageWidth - margin, y);
-    y += 5;
+    y += 4;
 
     // 9. Totals
     const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
@@ -223,29 +245,36 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         doc.setFont('helvetica', isBold ? 'bold' : 'normal');
         doc.setFontSize(fontSize);
         doc.setTextColor('#000000');
-        doc.text(label, pageWidth - 35, y, { align: 'right' });
+        doc.text(label, pageWidth - 30, y, { align: 'right' });
         doc.text(value, pageWidth - margin, y, { align: 'right' });
-        y += 5;
+        y += 4;
     };
 
-    addTotalRow('Subtotal', `Rs. ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-    addTotalRow('GST', `Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
-    addTotalRow('Discount', `Rs. ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    addTotalRow('Subtotal', `${subTotal.toLocaleString('en-IN')}`);
+    if (sale.discount > 0) addTotalRow('Discount', `-${Number(sale.discount).toLocaleString('en-IN')}`);
     
     y += 1;
     // Grand Total in Bold
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
-    doc.text('Total', pageWidth - 35, y, { align: 'right' });
-    doc.text(`Rs. ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, pageWidth - margin, y, { align: 'right' });
+    doc.text('Total', pageWidth - 30, y, { align: 'right' });
+    doc.text(`Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
     y += 6;
     
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
-    addTotalRow('Paid', `Rs. ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    addTotalRow('Paid', `${paidAmount.toLocaleString('en-IN')}`);
     
-    doc.setFont('helvetica', 'bold');
-    addTotalRow('Due', `Rs. ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    if (dueAmount > 0) {
+        doc.setFont('helvetica', 'bold');
+        addTotalRow('Balance', `${dueAmount.toLocaleString('en-IN')}`);
+    }
+
+    y += 5;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    doc.setTextColor('#555555');
+    doc.text("Thank You! Visit Again.", centerX, y, { align: 'center' });
 
     return doc;
 };

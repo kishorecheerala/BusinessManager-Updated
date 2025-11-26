@@ -9,6 +9,7 @@ import autoTable from 'jspdf-autotable';
 import { Customer, Sale, Supplier, Page, Product } from '../types';
 import Dropdown from '../components/Dropdown';
 import DatePill from '../components/DatePill';
+import { addBusinessHeader } from '../utils/pdfGenerator';
 
 interface CustomerWithDue extends Customer {
   dueAmount: number;
@@ -87,16 +88,28 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateDuesPDF = () => {
         if (customerDues.length === 0) return alert("No customer dues data to export.");
         const doc = new jsPDF();
-        doc.text('Customer Dues Report', 14, 22);
+        
+        // Add Header
+        let currentY = addBusinessHeader(doc, state.profile, "Customer Dues Report");
+        
+        // Filters Info
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        const filterText = `Filter: Area=${areaFilter}, Age=${duesAgeFilter === 'custom' ? customDuesAge + ' days' : duesAgeFilter}`;
+        doc.text(filterText, 14, currentY);
+        currentY += 6;
+
         autoTable(doc, {
-            startY: 40,
+            startY: currentY,
             head: [['Customer Name', 'Area', 'Last Paid Date', 'Due Amount (Rs.)']],
             body: customerDues.map(c => [ c.name, c.area, c.lastPaidDate || 'N/A', c.dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 }) ]),
             theme: 'grid', headStyles: { fillColor: [13, 148, 136] }, columnStyles: { 3: { halign: 'right' } }
         });
         const finalY = (doc as any).lastAutoTable.finalY + 10;
         doc.text(`Total Due: Rs. ${totalDuesFiltered.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, finalY, { align: 'right' });
-        doc.save('customer-dues-report.pdf');
+        
+        const dateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        doc.save(`Report_CustomerDues_${dateStr}.pdf`);
     };
 
     const generateDuesCSV = () => {
@@ -133,9 +146,11 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateCustomerSummaryPDF = () => {
         if (customerAccountSummary.length === 0) return alert("No customer account data to export.");
         const doc = new jsPDF();
-        doc.text('Customer Account Summary Report', 14, 22);
+        
+        const currentY = addBusinessHeader(doc, state.profile, "Customer Account Summary");
+
         autoTable(doc, {
-            startY: 40,
+            startY: currentY,
             head: [['Customer Name', 'Last Purchase Date', 'Total Purchased', 'Total Paid', 'Outstanding Due']],
             body: customerAccountSummary.map(s => [
                 s.customer.name,
@@ -147,7 +162,9 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
             theme: 'grid', headStyles: { fillColor: [13, 148, 136] },
             columnStyles: { 2: { halign: 'right' }, 3: { halign: 'right' }, 4: { halign: 'right' } }
         });
-        doc.save('customer-account-summary.pdf');
+        
+        const dateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        doc.save(`Report_CustomerSummary_${dateStr}.pdf`);
     };
 
     const generateCustomerSummaryCSV = () => {
@@ -210,9 +227,10 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateSupplierDuesPDF = () => {
         if (supplierDues.length === 0) return alert("No supplier dues data to export.");
         const doc = new jsPDF();
-        doc.text('Supplier Dues Report', 14, 22);
+        const currentY = addBusinessHeader(doc, state.profile, "Supplier Dues Report");
+
         autoTable(doc, {
-            startY: 40,
+            startY: currentY,
             head: [['Supplier', 'Purchase ID', 'Next Due Date', 'Due Amount']],
             body: supplierDues.map(p => [
                 p.supplierName,
@@ -223,7 +241,9 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
             theme: 'grid', headStyles: { fillColor: [13, 148, 136] },
             columnStyles: { 3: { halign: 'right' } }
         });
-        doc.save('supplier-dues-report.pdf');
+        
+        const dateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        doc.save(`Report_SupplierDues_${dateStr}.pdf`);
     };
 
     const generateSupplierDuesCSV = () => {
@@ -240,9 +260,10 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const generateSupplierSummaryPDF = () => {
         if (supplierAccountSummary.length === 0) return alert("No supplier account data to export.");
         const doc = new jsPDF();
-        doc.text('Supplier Account Summary Report', 14, 22);
+        const currentY = addBusinessHeader(doc, state.profile, "Supplier Account Summary");
+
         autoTable(doc, {
-            startY: 40,
+            startY: currentY,
             head: [['Supplier Name', 'Total Purchased', 'Total Paid', 'Outstanding Due']],
             body: supplierAccountSummary.map(s => [
                 s.supplier.name,
@@ -253,7 +274,9 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
             theme: 'grid', headStyles: { fillColor: [13, 148, 136] },
             columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' }, 3: { halign: 'right' } }
         });
-        doc.save('supplier-account-summary.pdf');
+        
+        const dateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        doc.save(`Report_SupplierSummary_${dateStr}.pdf`);
     };
 
     const generateSupplierSummaryCSV = () => {
@@ -278,16 +301,14 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
         if (lowStockItems.length === 0) return alert("No low stock items found.");
         const doc = new jsPDF();
         
-        doc.setFontSize(20);
-        doc.setTextColor('#dc2626'); // Red title
-        doc.text('Low Stock Reorder Report', 14, 20);
+        const currentY = addBusinessHeader(doc, state.profile, "Low Stock Reorder Report");
         
         doc.setFontSize(10);
         doc.setTextColor('#666666');
-        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, currentY + 5);
         
         autoTable(doc, {
-            startY: 35,
+            startY: currentY + 10,
             head: [['Product Name', 'Current Stock', 'Last Cost']],
             body: lowStockItems.map(p => [
                 p.name,
@@ -299,7 +320,8 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
             columnStyles: { 1: { halign: 'center', fontStyle: 'bold' }, 2: { halign: 'right' } }
         });
         
-        doc.save('low-stock-report.pdf');
+        const dateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        doc.save(`Report_LowStock_${dateStr}.pdf`);
     };
 
     return (

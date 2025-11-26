@@ -149,6 +149,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         reference: '',
     });
 
+    const [isSelectingProduct, setIsSelectingProduct] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
@@ -398,7 +399,10 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const doc = await generateA4InvoicePdf(sale, customer, state.profile);
         
         const pdfBlob = doc.output('blob');
-        const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
+        const cleanName = customer.name.replace(/[^a-z0-9]/gi, '_');
+        const dateStr = new Date(sale.date).toLocaleDateString('en-IN').replace(/\//g, '-');
+        const filename = `Invoice_${cleanName}_${dateStr}.pdf`;
+        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
         const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
@@ -421,7 +425,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             files: [pdfFile],
           });
         } else {
-          doc.save(`Invoice-${sale.id}.pdf`);
+          doc.save(filename);
         }
       } catch (error) {
         console.error("PDF generation or sharing failed:", error);

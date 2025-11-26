@@ -10,7 +10,7 @@ import DeleteButton from '../components/DeleteButton';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
-import { generateA4InvoicePdf } from '../utils/pdfGenerator';
+import { generateA4InvoicePdf, generateThermalInvoicePDF, addBusinessHeader } from '../utils/pdfGenerator';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -272,141 +272,15 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     const handleDownloadThermalReceipt = async (sale: Sale) => {
         if (!selectedCustomer) return;
-
-        let qrCodeBase64: string | null = null;
         try {
-            const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(sale.id)}&size=50x50&margin=0`;
-            qrCodeBase64 = await fetchImageAsBase64(qrCodeUrl);
-        } catch (error) {
-            console.error("Failed to fetch QR code", error);
+            const doc = await generateThermalInvoicePDF(sale, selectedCustomer, state.profile);
+            const cleanName = selectedCustomer.name.replace(/[^a-z0-9]/gi, '_');
+            const dateStr = new Date(sale.date).toLocaleDateString('en-IN').replace(/\//g, '-');
+            doc.save(`Receipt_${cleanName}_${dateStr}.pdf`);
+        } catch (e) {
+            console.error("PDF Error", e);
+            showToast("Failed to generate receipt", 'info');
         }
-
-        const renderContentOnDoc = (doc: jsPDF) => {
-            const customer = selectedCustomer;
-            const subTotal = Number(sale.totalAmount) + Number(sale.discount);
-            const paidAmountOnSale = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
-            const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
-
-            const pageWidth = doc.internal.pageSize.getWidth();
-            const centerX = pageWidth / 2;
-            const margin = 5;
-            const maxLineWidth = pageWidth - margin * 2;
-            let y = 5;
-
-            y = 10;
-            doc.setFont('times', 'italic');
-            doc.setFontSize(12);
-            doc.setTextColor('#000000');
-            doc.text('Om Namo Venkatesaya', centerX, y, { align: 'center' });
-            y += 7;
-            
-            doc.setFont('times', 'bold');
-            doc.setFontSize(16);
-            doc.setTextColor('#0d9488'); // Primary Color
-            doc.text(state.profile?.name || 'Business Manager', centerX, y, { align: 'center' });
-            y += 7;
-
-            doc.setDrawColor('#cccccc');
-            doc.line(margin, y, pageWidth - margin, y);
-            y += 6;
-
-            doc.setFont('Helvetica', 'normal');
-            doc.setFontSize(8);
-            doc.setTextColor('#000000');
-            
-            const invoiceTextTopY = y - 3; // Approximate top of the text line
-            doc.text(`Invoice: ${sale.id}`, margin, y);
-            y += 4;
-            doc.text(`Date: ${new Date(sale.date).toLocaleString()}`, margin, y);
-            
-            if (qrCodeBase64) {
-                const qrSize = 15; // 15mm
-                doc.addImage(qrCodeBase64, 'PNG', pageWidth - margin - qrSize, invoiceTextTopY, qrSize, qrSize);
-                
-                // Ensure y position is below the QR code for subsequent content
-                const qrBottom = invoiceTextTopY + qrSize;
-                if (qrBottom > y) {
-                    y = qrBottom;
-                }
-            }
-            y += 5;
-            
-            doc.setFont('Helvetica', 'bold');
-            doc.text('Billed To:', margin, y);
-            y += 4;
-            doc.setFont('Helvetica', 'normal');
-            doc.text(customer.name, margin, y);
-            y += 4;
-            const addressLines = doc.splitTextToSize(customer.address, maxLineWidth);
-            doc.text(addressLines, margin, y);
-            y += (addressLines.length * 4);
-            y += 2;
-
-            doc.setDrawColor('#000000');
-            doc.line(margin, y, pageWidth - margin, y); 
-            y += 5;
-            doc.setFont('Helvetica', 'bold');
-            doc.text('Purchase Details', centerX, y, { align: 'center' });
-            y += 5;
-            doc.line(margin, y, pageWidth - margin, y); 
-            y += 5;
-
-            doc.setFont('Helvetica', 'bold');
-            doc.text('Item', margin, y);
-            doc.text('Total', pageWidth - margin, y, { align: 'right' });
-            y += 2;
-            doc.setDrawColor('#cccccc');
-            doc.line(margin, y, pageWidth - margin, y);
-            y += 5;
-            
-            doc.setFont('Helvetica', 'normal');
-            sale.items.forEach(item => {
-                const itemTotal = Number(item.price) * Number(item.quantity);
-                doc.setFontSize(9);
-                const splitName = doc.splitTextToSize(item.productName, maxLineWidth - 20);
-                doc.text(splitName, margin, y);
-                doc.text(`Rs. ${itemTotal.toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
-                y += (splitName.length * 4);
-                doc.setFontSize(7);
-                doc.setTextColor('#666666');
-                doc.text(`(x${item.quantity} @ Rs. ${Number(item.price).toLocaleString('en-IN')})`, margin, y);
-                y += 6;
-                doc.setTextColor('#000000');
-            });
-            
-            y -= 2;
-            doc.setDrawColor('#cccccc');
-            doc.line(margin, y, pageWidth - margin, y); 
-            y += 5;
-
-            const totals = [
-                { label: 'Subtotal', value: subTotal },
-                { label: 'GST', value: Number(sale.gstAmount) },
-                { label: 'Discount', value: -Number(sale.discount) },
-                { label: 'Total', value: Number(sale.totalAmount), bold: true },
-                { label: 'Paid', value: paidAmountOnSale },
-                { label: 'Due', value: dueAmountOnSale, bold: true },
-            ];
-            
-            const totalsX = pageWidth - margin;
-            totals.forEach(({label, value, bold = false}) => {
-                doc.setFont('Helvetica', bold ? 'bold' : 'normal');
-                doc.setFontSize(bold ? 10 : 8);
-                doc.text(label, totalsX - 25, y, { align: 'right' });
-                doc.text(`Rs. ${value.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, totalsX, y, { align: 'right' });
-                y += (bold ? 5 : 4);
-            });
-          
-            return y;
-        };
-        
-        const dummyDoc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, 500] });
-        const finalY = renderContentOnDoc(dummyDoc);
-
-        const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, finalY + 5] });
-        renderContentOnDoc(doc);
-        
-        doc.save(`${sale.id}.pdf`);
     };
 
     const handlePrintA4Invoice = async (sale: Sale) => {
@@ -419,18 +293,28 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     const handleShareInvoice = async (sale: Sale) => {
         if (!selectedCustomer) return;
-        const doc = await generateA4InvoicePdf(sale, selectedCustomer, state.profile);
-        const pdfBlob = doc.output('blob');
-        const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
-        const businessName = state.profile?.name || 'Invoice';
+        try {
+            const doc = await generateA4InvoicePdf(sale, selectedCustomer, state.profile);
+            const pdfBlob = doc.output('blob');
+            
+            const cleanName = selectedCustomer.name.replace(/[^a-z0-9]/gi, '_');
+            const dateStr = new Date(sale.date).toLocaleDateString('en-IN').replace(/\//g, '-');
+            const filename = `Invoice_${cleanName}_${dateStr}.pdf`;
+            
+            const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
+            const businessName = state.profile?.name || 'Invoice';
 
-        if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
-            await navigator.share({
-                title: `${businessName} - Invoice ${sale.id}`,
-                files: [pdfFile],
-            });
-        } else {
-            doc.save(`Invoice-${sale.id}.pdf`);
+            if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
+                await navigator.share({
+                    title: `${businessName} - Invoice ${sale.id}`,
+                    files: [pdfFile],
+                });
+            } else {
+                doc.save(filename);
+            }
+        } catch (e) {
+            console.error("PDF Share Error", e);
+            showToast("Failed to generate or share invoice", 'info');
         }
     };
 
@@ -455,30 +339,18 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         
         const doc = new jsPDF();
         const profile = state.profile;
-        let currentY = 15;
+        
+        // Use centralized header logic with Logo
+        let currentY = addBusinessHeader(doc, profile, "Customer Dues Summary");
 
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(20);
-        doc.setTextColor('#0d9488'); // Primary color
-        doc.text('Customer Dues Summary', 105, currentY, { align: 'center' });
-        currentY += 8;
-        
-        if (profile) {
-            doc.setFontSize(12);
-            doc.setTextColor('#333333');
-            doc.text(profile.name, 105, currentY, { align: 'center' });
-            currentY += 5;
-        }
-        
-        currentY += 5;
         doc.setFontSize(12);
         doc.setFont('helvetica', 'bold');
         doc.setTextColor('#000000');
-        doc.text(`Billed To: ${selectedCustomer.name}`, 14, currentY);
+        doc.text(`Statement For: ${selectedCustomer.name}`, 14, currentY);
         currentY += 6;
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(10);
-        doc.text(`Date: ${new Date().toLocaleDateString()}`, 14, currentY);
+        doc.text(`Date Generated: ${new Date().toLocaleDateString()}`, 14, currentY);
         currentY += 10;
 
         autoTable(doc, {
@@ -510,7 +382,11 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         );
 
         const pdfBlob = doc.output('blob');
-        const pdfFile = new File([pdfBlob], `Dues-Summary-${selectedCustomer.id}.pdf`, { type: 'application/pdf' });
+        const cleanName = selectedCustomer.name.replace(/[^a-z0-9]/gi, '_');
+        const dateStr = new Date().toLocaleDateString('en-IN').replace(/\//g, '-');
+        const filename = `Dues_${cleanName}_${dateStr}.pdf`;
+        
+        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Dues Summary';
 
         if (navigator.share && navigator.canShare({ files: [pdfFile] })) {
@@ -519,7 +395,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
             files: [pdfFile],
           });
         } else {
-          doc.save(`Dues-Summary-${selectedCustomer.id}.pdf`);
+          doc.save(filename);
         }
     };
 

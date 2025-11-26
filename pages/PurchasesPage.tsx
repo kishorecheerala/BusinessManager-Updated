@@ -185,7 +185,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         }
         try {
             const doc = await generateDebitNotePDF(newReturn, supplier, state.profile);
-            doc.save(`DebitNote-${newReturn.id}.pdf`);
+            const dateStr = new Date(newReturn.returnDate).toLocaleDateString('en-IN').replace(/\//g, '-');
+            doc.save(`DebitNote_${newReturn.id}_${dateStr}.pdf`);
         } catch (e) {
             console.error("PDF Error", e);
             showToast("Failed to generate PDF", 'info');

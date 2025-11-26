@@ -181,7 +181,9 @@ const QuotationsPage: React.FC = () => {
         const customer = state.customers.find(c => c.id === customerId);
         if (customer) {
             const doc = await generateEstimatePDF(newQuote, customer, state.profile);
-            doc.save(`Quote-${newQuote.id}.pdf`);
+            const cleanName = customer.name.replace(/[^a-z0-9]/gi, '_');
+            const dateStr = new Date(quoteDate).toLocaleDateString('en-IN').replace(/\//g, '-');
+            doc.save(`Estimate_${cleanName}_${dateStr}.pdf`);
         }
     };
 
@@ -384,7 +386,9 @@ const QuotationsPage: React.FC = () => {
                                             onClick={async () => {
                                                 if(customer) {
                                                     const doc = await generateEstimatePDF(quote, customer, state.profile);
-                                                    doc.save(`Quote-${quote.id}.pdf`);
+                                                    const cleanName = customer.name.replace(/[^a-z0-9]/gi, '_');
+                                                    const dateStr = new Date(quote.date).toLocaleDateString('en-IN').replace(/\//g, '-');
+                                                    doc.save(`Estimate_${cleanName}_${dateStr}.pdf`);
                                                 }
                                             }}
                                         >

@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Undo2, Users, Package, Plus, Trash2, Share2, Edit, Download } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -9,6 +10,7 @@ import autoTable from 'jspdf-autotable';
 import Dropdown from '../components/Dropdown';
 import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
+import { generateDebitNotePDF } from '../utils/pdfGenerator';
 
 type ReturnType = 'CUSTOMER' | 'SUPPLIER';
 
@@ -148,98 +150,6 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
         }, 0);
     }, [returnedItems, selectedInvoice]);
 
-    const generateDebitNotePDF = async (newReturn: Return) => {
-        const profile = state.profile;
-        const supplier = state.suppliers.find(s => s.id === newReturn.partyId);
-
-        if (!profile || !supplier) {
-            alert("Could not generate PDF. Missing profile or supplier information.");
-            return;
-        }
-
-        const doc = new jsPDF();
-        
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(20);
-        doc.text('DEBIT NOTE', 105, 15, { align: 'center' });
-        
-        doc.setFontSize(12);
-        doc.text(profile.name, 14, 25);
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        const addressLines = doc.splitTextToSize(profile.address, 80);
-        doc.text(addressLines, 14, 30);
-        let currentY = 30 + (addressLines.length * 5);
-        if (profile.phone) doc.text(`Phone: ${profile.phone}`, 14, currentY);
-        if (profile.gstNumber) { currentY += 5; doc.text(`GSTIN: ${profile.gstNumber}`, 14, currentY); }
-        
-        doc.setFont('helvetica', 'bold');
-        doc.text('To:', 120, 25);
-        doc.setFont('helvetica', 'normal');
-        doc.text(supplier.name, 120, 30);
-        const supplierAddressLines = doc.splitTextToSize(supplier.location, 80);
-        doc.text(supplierAddressLines, 120, 35);
-
-        currentY += 15;
-        doc.setDrawColor(100);
-        doc.line(14, currentY, 196, currentY);
-        currentY += 8;
-
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Debit Note No:`, 14, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(newReturn.id, 55, currentY);
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Date:`, 120, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(new Date(newReturn.returnDate).toLocaleDateString(), 135, currentY);
-        currentY += 6;
-        doc.setFont('helvetica', 'bold');
-        doc.text(`Original Inv. No:`, 14, currentY);
-        doc.setFont('helvetica', 'normal');
-        doc.text(newReturn.referenceId, 55, currentY);
-        currentY += 10;
-        
-        autoTable(doc, {
-            startY: currentY,
-            head: [['#', 'Description', 'Qty', 'Rate', 'Amount']],
-            body: newReturn.items.map((item, index) => [
-                index + 1,
-                item.productName,
-                item.quantity,
-                `Rs. ${Number(item.price).toLocaleString('en-IN')}`,
-                `Rs. ${(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}`
-            ]),
-            theme: 'grid',
-            headStyles: { fillColor: [13, 148, 136] },
-            columnStyles: { 3: { halign: 'right' }, 4: { halign: 'right' } }
-        });
-
-        currentY = (doc as any).lastAutoTable.finalY + 10;
-        doc.setFontSize(12);
-        doc.setFont('helvetica', 'bold');
-        doc.text('Total Return Value:', 140, currentY, { align: 'right' });
-        doc.text(`Rs. ${Number(newReturn.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 196, currentY, { align: 'right' });
-        
-        if (newReturn.notes) {
-            currentY += 15;
-            doc.setFontSize(10);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Notes:', 14, currentY);
-            doc.setFont('helvetica', 'normal');
-            currentY += 5;
-            const notesLines = doc.splitTextToSize(newReturn.notes, 182);
-            doc.text(notesLines, 14, currentY);
-        }
-        
-        currentY = doc.internal.pageSize.height - 30;
-        doc.line(130, currentY, 196, currentY);
-        currentY += 5;
-        doc.text('Authorised Signatory', 163, currentY, { align: 'center' });
-
-        doc.save(`DebitNote-${newReturn.id}.pdf`);
-    };
-
     const handleProcessReturn = async () => {
         const amount = parseFloat(returnAmount);
         if (!partyId || !referenceId || Object.keys(returnedItems).length === 0 || isNaN(amount) || amount <= 0) {
@@ -280,7 +190,10 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
         }
 
         if (returnType === 'SUPPLIER') {
-            await generateDebitNotePDF(returnData);
+            const supplier = state.suppliers.find(s => s.id === partyId);
+            const doc = await generateDebitNotePDF(returnData, supplier, state.profile);
+            const dateStr = new Date(returnDate).toLocaleDateString('en-IN').replace(/\//g, '-');
+            doc.save(`DebitNote_${returnId}_${dateStr}.pdf`);
         }
 
         resetForm();
