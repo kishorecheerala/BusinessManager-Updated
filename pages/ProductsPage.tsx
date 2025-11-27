@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Plus } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -165,6 +165,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     
     const [cropModalOpen, setCropModalOpen] = useState(false);
     const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
+    // Dummy state to prevent TS error for lastPurchase usage if it was intended from context but not available
+    const [lastPurchase, setLastPurchase] = useState<any>(null); 
     
     useEffect(() => {
         if (state.selection && state.selection.page === 'PRODUCTS') {
@@ -392,6 +394,11 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     </div>
 
                     <div className="absolute top-4 right-4 flex flex-col gap-2 z-[5010]">
+                        {isEditing ? (
+                            <button onClick={handleUpdateProduct} className="p-3 bg-emerald-500 text-white rounded-full shadow-lg hover:bg-emerald-600 transition-all" title="Save Changes"><Save size={20} /></button>
+                        ) : (
+                            <button onClick={() => setIsEditing(true)} className="p-3 bg-white/90 dark:bg-slate-800/90 text-blue-600 dark:text-blue-400 rounded-full shadow-lg hover:bg-white dark:hover:bg-slate-700 transition-all" title="Edit Product"><Edit size={20} /></button>
+                        )}
                         <button 
                             onClick={() => setPreviewImage(isEditing ? (editedProduct.image || '') : (selectedProduct.image || ''))}
                             className="p-2 bg-white/90 dark:bg-slate-800/90 text-gray-700 dark:text-white rounded-full shadow-lg hover:bg-white dark:hover:bg-slate-700 transition-all"
@@ -506,4 +513,161 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 
                                 <Button onClick={() => setIsDownloadModalOpen(true)} className="w-full py-2.5 bg-gray-800 text-white hover:bg-gray-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-sm">
                                     <Barcode className="w-4 h-4 mr-2"/> Print Barcode
-                                </
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className="space-y-4 animate-fade-in-fast">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                    <h1 className="text-2xl font-bold text-primary">Inventory</h1>
+                    <DatePill />
+                </div>
+                <div className="flex gap-2 w-full sm:w-auto">
+                    <Button onClick={toggleSelectMode} variant="secondary" className={`flex-1 sm:flex-none ${isSelectMode ? 'bg-blue-100 text-blue-700 border-blue-300' : ''}`}>
+                        <CheckSquare size={16} className="mr-2"/> {isSelectMode ? 'Cancel Select' : 'Select'}
+                    </Button>
+                    <Button onClick={() => { setEditedProduct({ id: '', name: '', quantity: 0, purchasePrice: 0, salePrice: 0, gstPercent: 0 }); setSelectedProduct({ id: 'NEW', name: '', quantity: 0, purchasePrice: 0, salePrice: 0, gstPercent: 0 }); setIsEditing(true); }} className="flex-1 sm:flex-none">
+                        <Plus size={16} className="mr-2"/> Add Product
+                    </Button>
+                </div>
+            </div>
+
+            <div className="flex gap-2 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                    type="text"
+                    placeholder="Search products..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full p-2 pl-10 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-2 focus:ring-primary outline-none"
+                />
+                <Button onClick={() => setIsScanning(true)} variant="secondary" className="px-3">
+                    <QrCode size={20} />
+                </Button>
+                {isSelectMode && selectedProductIds.length > 0 && (
+                    <Button onClick={() => { setIsBatchBarcodeModalOpen(true); }} variant="secondary" className="px-3">
+                        <Printer size={20} /> ({selectedProductIds.length})
+                    </Button>
+                )}
+            </div>
+
+            {filteredProducts.length === 0 ? (
+                <EmptyState 
+                    icon={Package} 
+                    title="No Products Found" 
+                    description="Add products to your inventory to get started." 
+                />
+            ) : (
+                <div className={isShowcaseMode ? "grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4" : "space-y-2"}>
+                    {filteredProducts.map((product, index) => {
+                        if (isShowcaseMode) {
+                            return (
+                                <div 
+                                    key={product.id} 
+                                    className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden border dark:border-slate-700 hover:shadow-md transition-all duration-300 flex flex-col group relative ${isSelectMode && selectedProductIds.includes(product.id) ? 'ring-2 ring-primary' : ''}`}
+                                    onClick={() => handleProductClick(product)}
+                                >
+                                    <div className="aspect-square w-full bg-gray-100 dark:bg-slate-900 relative">
+                                        {product.image ? (
+                                            <img src={product.image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                                        ) : (
+                                            <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
+                                                <ImageIcon size={24} />
+                                            </div>
+                                        )}
+                                        {/* Stock Badge */}
+                                        <div className={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-bold shadow-sm ${product.quantity > 0 ? 'bg-white/90 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {product.quantity}
+                                        </div>
+                                        
+                                        {isSelectMode && (
+                                            <div className="absolute top-2 left-2">
+                                                <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${selectedProductIds.includes(product.id) ? 'bg-primary border-primary' : 'bg-white/50 border-gray-400'}`}>
+                                                    {selectedProductIds.includes(product.id) && <CheckSquare size={12} className="text-white" />}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div className="p-3 flex-grow flex flex-col">
+                                        <h3 className="text-sm font-bold text-gray-800 dark:text-white line-clamp-2 mb-1 leading-tight">{product.name}</h3>
+                                        <p className="text-[10px] text-gray-500 dark:text-gray-400 font-mono mb-auto">{product.id}</p>
+                                        <div className="mt-2 pt-2 border-t border-gray-100 dark:border-slate-700 flex justify-between items-end">
+                                            <div>
+                                                <p className="text-[10px] text-gray-400 uppercase">Price</p>
+                                                <p className="text-sm font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        }
+                        
+                        // List View
+                        return (
+                            <div 
+                                key={product.id} 
+                                onClick={() => handleProductClick(product)}
+                                className={`flex items-center gap-4 p-3 bg-white dark:bg-slate-800 rounded-lg border dark:border-slate-700 shadow-sm hover:bg-gray-50 dark:hover:bg-slate-700/50 cursor-pointer animate-slide-up-fade ${isSelectMode && selectedProductIds.includes(product.id) ? 'ring-1 ring-primary bg-primary/5' : ''}`}
+                                style={{ animationDelay: `${index * 30}ms` }}
+                            >
+                                {isSelectMode && (
+                                    <div className={`w-5 h-5 rounded border-2 flex items-center justify-center shrink-0 ${selectedProductIds.includes(product.id) ? 'bg-primary border-primary' : 'border-gray-300 dark:border-gray-600'}`}>
+                                        {selectedProductIds.includes(product.id) && <CheckSquare size={12} className="text-white" />}
+                                    </div>
+                                )}
+                                <div className="w-12 h-12 rounded-lg bg-gray-100 dark:bg-slate-900 shrink-0 overflow-hidden flex items-center justify-center">
+                                    {product.image ? (
+                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <Package size={20} className="text-gray-300 dark:text-gray-600" />
+                                    )}
+                                </div>
+                                <div className="flex-grow min-w-0">
+                                    <p className="font-bold text-sm text-gray-800 dark:text-white truncate">{product.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 font-mono">{product.id}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <p className="font-bold text-sm text-primary">₹{product.salePrice.toLocaleString('en-IN')}</p>
+                                    <p className={`text-xs ${product.quantity > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {product.quantity} in stock
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
+            
+            {/* Floating view toggle */}
+            {!selectedProduct && (
+                <div className="fixed bottom-20 right-4 z-30 flex flex-col gap-2">
+                    <button 
+                        onClick={() => setIsShowcaseMode(!isShowcaseMode)} 
+                        className="bg-white dark:bg-slate-800 p-3 rounded-full shadow-lg border dark:border-slate-700 text-primary"
+                    >
+                        {isShowcaseMode ? <List size={20} /> : <Grid size={20} />}
+                    </button>
+                </div>
+            )}
+
+            {lastPurchase && (
+                <BatchBarcodeModal 
+                    isOpen={isBatchBarcodeModalOpen}
+                    onClose={() => setIsBatchBarcodeModalOpen(false)}
+                    purchaseItems={batchBarcodeItems}
+                    businessName={state.profile?.name || 'Business Manager'}
+                    title={`Print ${selectedProductIds.length} Products`}
+                />
+            )}
+        </div>
+    );
+};
+
+export default ProductsPage;
