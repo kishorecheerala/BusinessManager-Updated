@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Plus } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -327,6 +328,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             setEditedProduct({ ...editedProduct, [name]: name === 'name' ? value : parseFloat(value) || 0 });
         };
 
+        const activeImage = isEditing ? editedProduct.image : selectedProduct.image;
+
         return (
             <div className="fixed inset-0 w-full h-full z-[5000] bg-white dark:bg-slate-900 flex flex-col md:flex-row overflow-hidden animate-fade-in-fast">
                 {/* Modals inside Details View with extreme Z-Index to top everything */}
@@ -379,17 +382,24 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 </button>
                 
                 {/* LEFT: IMAGE SECTION */}
-                <div className="h-[62%] w-full md:h-full md:w-1/2 bg-gray-100 dark:bg-slate-900 relative group flex-shrink-0">
-                    <div className="absolute inset-0 flex items-center justify-center">
-                        <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-slate-900">
-                            <ProductImage 
-                                src={isEditing ? editedProduct.image : selectedProduct.image} 
-                                alt={selectedProduct.name} 
-                                className="w-full h-full object-contain p-4 md:p-8"
-                                onPreview={() => setPreviewImage(isEditing ? (editedProduct.image || '') : (selectedProduct.image || ''))}
-                                enableInteract={!isEditing}
-                            />
-                        </div>
+                <div className="h-[62%] w-full md:h-full md:w-1/2 bg-gray-100 dark:bg-slate-900 relative group flex-shrink-0 overflow-hidden">
+                    {/* Ambient Background Layer */}
+                    {activeImage && (
+                        <div 
+                            className="absolute inset-0 bg-cover bg-center blur-3xl scale-150 opacity-60 dark:opacity-40"
+                            style={{ backgroundImage: `url(${activeImage})` }}
+                        />
+                    )}
+                    
+                    {/* Main Image Layer */}
+                    <div className="absolute inset-0 flex items-center justify-center z-10 p-2">
+                        <ProductImage 
+                            src={activeImage} 
+                            alt={selectedProduct.name} 
+                            className="w-full h-full object-contain drop-shadow-2xl" 
+                            onPreview={() => setPreviewImage(activeImage || '')}
+                            enableInteract={!isEditing}
+                        />
                     </div>
 
                     <div className="absolute top-4 right-4 flex flex-col gap-2 z-[5010]">
@@ -399,7 +409,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             <button onClick={() => setIsEditing(true)} className="p-3 bg-white/90 dark:bg-slate-800/90 text-blue-600 dark:text-blue-400 rounded-full shadow-lg hover:bg-white dark:hover:bg-slate-700 transition-all" title="Edit Product"><Edit size={20} /></button>
                         )}
                         <button 
-                            onClick={() => setPreviewImage(isEditing ? (editedProduct.image || '') : (selectedProduct.image || ''))}
+                            onClick={() => setPreviewImage(activeImage || '')}
                             className="p-2 bg-white/90 dark:bg-slate-800/90 text-gray-700 dark:text-white rounded-full shadow-lg hover:bg-white dark:hover:bg-slate-700 transition-all"
                             title="Open Full Screen Viewer"
                         >
@@ -573,27 +583,16 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                     className={`bg-white dark:bg-slate-800 rounded-xl shadow-sm overflow-hidden border dark:border-slate-700 hover:shadow-md transition-all duration-300 flex flex-col group relative ${isSelectMode && selectedProductIds.includes(product.id) ? 'ring-2 ring-primary' : ''}`}
                                     onClick={() => handleProductClick(product)}
                                 >
-                                    <div className="aspect-square w-full relative overflow-hidden bg-gray-50 dark:bg-slate-900">
+                                    <div className="aspect-square w-full relative overflow-hidden bg-gray-100 dark:bg-slate-800">
                                         {product.image ? (
-                                            <>
-                                                {/* Ambient Blurred Background */}
-                                                <div 
-                                                    className="absolute inset-0 bg-cover bg-center blur-xl scale-150 opacity-50 dark:opacity-40"
-                                                    style={{ backgroundImage: `url(${product.image})` }}
-                                                />
-                                                {/* Main Image */}
-                                                <div className="absolute inset-0 flex items-center justify-center p-4">
-                                                    <img 
-                                                        src={product.image} 
-                                                        alt={product.name} 
-                                                        className="w-full h-full object-contain drop-shadow-xl transition-transform duration-500 group-hover:scale-105" 
-                                                        loading="lazy" 
-                                                    />
-                                                </div>
-                                            </>
+                                            <img 
+                                                src={product.image} 
+                                                alt={product.name} 
+                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" 
+                                                loading="lazy" 
+                                            />
                                         ) : (
-                                            /* Empty State with Pattern */
-                                            <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600 bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:16px_16px]">
+                                            <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600 bg-gray-50 dark:bg-slate-800">
                                                 <ImageIcon size={32} className="opacity-50" />
                                             </div>
                                         )}
