@@ -104,6 +104,15 @@ const convertNumberToWords = (amount: number): string => {
     return str.trim() + " Rupees Only";
 };
 
+// --- Helper: Safe Currency Formatting ---
+// Checks if standard font is used and replaces ₹ with Rs. to prevent garbled text
+const formatCurrency = (amount: number, symbol: string, fontName: string): string => {
+    const isStandardFont = ['helvetica', 'times', 'courier'].includes(fontName.toLowerCase());
+    // If using standard font and symbol is Rupee, fallback to Rs.
+    const safeSymbol = (isStandardFont && symbol === '₹') ? 'Rs.' : symbol;
+    return `${safeSymbol} ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+};
+
 // --- Default Labels Fallback ---
 const defaultLabels: InvoiceLabels = {
     billedTo: "Billed To",
@@ -121,13 +130,13 @@ const defaultLabels: InvoiceLabels = {
     balance: "Balance"
 };
 
-// --- Helper: Add Header (Legacy support for other docs, updated to be flexible) ---
+// --- Helper: Add Header (Legacy support for Reports) ---
 export const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null, title?: string) => {
     const pageWidth = doc.internal.pageSize.getWidth();
     const centerX = pageWidth / 2;
     let currentY = 10;
 
-    // Default Layout for legacy docs (reports, returns)
+    // Add Logo if available
     const logoToUse = profile?.logo || logoBase64;
     if (logoToUse) {
         try {
@@ -138,35 +147,35 @@ export const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null, title
         }
     }
 
-    doc.setFont('times', 'italic');
-    doc.setFontSize(10);
-    doc.setTextColor('#000000');
-    doc.text('Om Namo Venkatesaya', centerX, currentY, { align: 'center' });
-    currentY += 6;
-
     if (profile) {
         doc.setFont('times', 'bold');
-        doc.setFontSize(22);
+        doc.setFontSize(20);
         doc.setTextColor(0, 128, 128); 
-        doc.text(profile.name, centerX, currentY, { align: 'center' });
-        currentY += 8;
+        doc.text(profile.name, centerX, currentY + 5, { align: 'center' });
         
         doc.setFontSize(10);
         doc.setTextColor('#333333');
         doc.setFont('helvetica', 'normal');
         
+        let addressY = currentY + 12;
         const address = profile.address || '';
         const addressLines = doc.splitTextToSize(address, 120);
-        doc.text(addressLines, centerX, currentY, { align: 'center' });
-        currentY += (addressLines.length * 5);
+        doc.text(addressLines, centerX, addressY, { align: 'center' });
+        
+        addressY += (addressLines.length * 4) + 1;
         
         const details = [];
-        if (profile.phone) details.push(`Phone: ${profile.phone}`);
+        if (profile.phone) details.push(`Ph: ${profile.phone}`);
         if (profile.gstNumber) details.push(`GSTIN: ${profile.gstNumber}`);
         
         if (details.length > 0) {
-            doc.text(details.join(' | '), centerX, currentY, { align: 'center' });
+            doc.text(details.join(' | '), centerX, addressY, { align: 'center' });
+            currentY = addressY + 6;
+        } else {
+            currentY = addressY + 2;
         }
+    } else {
+        currentY += 15;
     }
     
     if (title) {
@@ -184,14 +193,8 @@ export const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null, title
     doc.setLineWidth(0.5);
     doc.line(14, currentY, pageWidth - 14, currentY);
     
-    return currentY + 5; 
+    return currentY + 8; 
 };
-
-interface InvoiceSettings {
-    terms?: string;
-    footer?: string;
-    showQr?: boolean;
-}
 
 // --- Thermal Receipt Generator ---
 export const generateThermalInvoicePDF = async (
@@ -205,295 +208,154 @@ export const generateThermalInvoicePDF = async (
     const terms = templateConfig?.content.termsText || '';
     const footer = templateConfig?.content.footerText || 'Thank You! Visit Again.';
     const showQr = templateConfig?.content.showQr ?? true;
-    const showTerms = templateConfig?.content.showTerms ?? false;
-    const showBusiness = templateConfig?.content.showBusinessDetails ?? true;
-    const showCustomer = templateConfig?.content.showCustomerDetails ?? true;
-    const currency = templateConfig?.currencySymbol || 'Rs.';
+    const currencySymbol = templateConfig?.currencySymbol || 'Rs.';
     const dateFormat = templateConfig?.dateFormat || 'DD/MM/YYYY';
-    const showGst = templateConfig?.content.showGst !== false; // Default true if undefined
-    
     const labels = { ...defaultLabels, ...templateConfig?.content.labels };
 
-    const margin = templateConfig?.layout.margin || 3;
-    const logoSize = templateConfig?.layout.logoSize || 15;
-    const logoPos = templateConfig?.layout.logoPosition || 'center';
-    const logoOffsetX = templateConfig?.layout.logoOffsetX || 0;
-    const logoOffsetY = templateConfig?.layout.logoOffsetY || 0;
-    const titleText = templateConfig?.content.titleText || 'TAX INVOICE';
+    // Force 'Rs.' for thermal if no custom font, standard thermal printers often fail with special chars
+    const currency = customFonts?.length ? currencySymbol : 'Rs.';
+
+    const margin = 2;
+    const pageWidth = 72; // 80mm paper usually has ~72mm printable width
     
-    // Colors
-    const textColor = templateConfig?.colors.text || '#000000';
-    const primaryColor = templateConfig?.colors.primary || '#000000';
-
-    // Fonts
-    const headerFontSize = templateConfig?.fonts.headerSize || 12;
-    const bodyFontSize = templateConfig?.fonts.bodySize || 9;
-    const titleFont = templateConfig?.fonts.titleFont || 'helvetica';
-    const bodyFont = templateConfig?.fonts.bodyFont || 'helvetica';
-
-    const estimatedHeight = 250 + (sale.items.length * 10) + (terms.length > 0 ? 30 : 0);
+    // Calculate estimated height to initialize doc
+    const estimatedHeight = 200 + (sale.items.length * 10);
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
-        format: [80, estimatedHeight]
+        format: [80, estimatedHeight] 
     });
 
-    // Register custom fonts
-    if (customFonts) {
-        registerCustomFonts(doc, customFonts);
-    }
+    if (customFonts) registerCustomFonts(doc, customFonts);
 
-    const pageWidth = 80;
-    const centerX = pageWidth / 2;
-    let y = 8;
+    let y = 5;
+    const centerX = 40; // Center of 80mm
 
-    if (showBusiness) {
-        // --- Logo ---
-        const logoToUse = profile?.logo || logoBase64;
-        if (logoToUse && logoSize > 5) {
-            try {
-                const format = getImageType(logoToUse);
-                let logoX = margin;
-                if (logoPos === 'center') logoX = (pageWidth - logoSize) / 2;
-                else if (logoPos === 'right') logoX = pageWidth - margin - logoSize;
-                
-                doc.addImage(logoToUse, format, logoX + logoOffsetX, y + logoOffsetY, logoSize, logoSize);
-                y += logoSize + 3;
-            } catch (e) {}
-        }
-
-        // --- Business Header ---
-        // Always center business details on thermal for readability
-        doc.setFont(titleFont, 'bold');
-        doc.setFontSize(headerFontSize);
-        doc.setTextColor(primaryColor); 
-        const busName = doc.splitTextToSize(profile?.name || 'Business Name', pageWidth - (margin * 2));
-        doc.text(busName, centerX, y, { align: 'center' });
-        y += (busName.length * (headerFontSize * 0.35)) + 2;
-
-        // Address
-        doc.setTextColor(textColor);
-        doc.setFont(bodyFont, 'normal');
-        doc.setFontSize(bodyFontSize - 1);
-        if (profile?.address) {
-            const addr = doc.splitTextToSize(profile.address, pageWidth - (margin * 2));
-            doc.text(addr, centerX, y, { align: 'center' });
-            y += (addr.length * 3) + 1;
-        }
-        if (profile?.phone) {
-            doc.text(`Ph: ${profile.phone}`, centerX, y, { align: 'center' });
-            y += 4;
-        }
-        if (profile?.gstNumber) {
-            doc.text(`GSTIN: ${profile.gstNumber}`, centerX, y, { align: 'center' });
-            y += 4;
-        }
-    }
-
-    // --- Title ---
-    y += 2;
-    doc.setFont(titleFont, 'bold');
-    doc.setFontSize(bodyFontSize + 2);
-    doc.text(titleText, centerX, y, { align: 'center' });
-    y += 5;
-
-    // --- Invoice Meta ---
-    doc.setFont(bodyFont, 'normal');
-    doc.setFontSize(bodyFontSize);
-
-    const qrSize = 20;
-    const qrX = pageWidth - margin - qrSize;
-    const startHeaderY = y;
-
-    doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y);
-    y += 4;
-    
-    const dateStr = formatDate(sale.date, dateFormat);
-    doc.text(`${labels.date}: ${dateStr}`, margin, y);
-    y += 4;
-
-    if (showQr) {
+    // Logo
+    if (profile?.logo) {
         try {
-            let qrData = sale.id;
-            // Support UPI QR on Thermal if configured
-            if (templateConfig?.content.qrType === 'UPI_PAYMENT' && templateConfig?.content.upiId) {
-                const pa = templateConfig.content.upiId;
-                const pn = templateConfig.content.payeeName || 'Merchant';
-                const am = sale.totalAmount.toFixed(2);
-                const tr = sale.id;
-                const tn = `Invoice ${sale.id}`;
-                qrData = `upi://pay?pa=${pa}&pn=${encodeURIComponent(pn)}&am=${am}&tr=${tr}&tn=${encodeURIComponent(tn)}&cu=INR`;
-            }
-
-            const qrBase64 = await getQrCodeBase64(qrData);
-            if (qrBase64) {
-                doc.addImage(qrBase64, 'PNG', qrX, startHeaderY, qrSize, qrSize);
-            }
-        } catch (e) {}
+            const logoSize = 18;
+            doc.addImage(profile.logo, getImageType(profile.logo), centerX - (logoSize/2), y, logoSize, logoSize);
+            y += logoSize + 3;
+        } catch(e) {}
     }
 
-    // Adjust Y if QR overlapped
-    if (showQr && y < startHeaderY + qrSize) {
-        // If text is short, jump below QR
-        y = startHeaderY + qrSize + 2;
-    } else {
-        y += 2;
-    }
+    // Business Info
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor('#000000');
+    const busName = doc.splitTextToSize(profile?.name || 'Business Name', pageWidth);
+    doc.text(busName, centerX, y, { align: 'center' });
+    y += (busName.length * 4) + 1;
 
-    // --- Customer ---
-    if (showCustomer) {
-        doc.setFont(bodyFont, 'bold');
-        doc.text('To:', margin, y);
-        doc.setFont(bodyFont, 'normal');
-        doc.text(customer.name, margin + 8, y);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    if (profile?.address) {
+        const addr = doc.splitTextToSize(profile.address, pageWidth);
+        doc.text(addr, centerX, y, { align: 'center' });
+        y += (addr.length * 3.5) + 1;
+    }
+    if (profile?.phone) {
+        doc.text(`Ph: ${profile.phone}`, centerX, y, { align: 'center' });
         y += 4;
-        
-        if (customer.phone) {
-            doc.text(`Ph: ${customer.phone}`, margin, y);
-            y += 4;
-        }
     }
 
+    // Divider
     doc.setDrawColor(0);
     doc.setLineWidth(0.2);
-    doc.line(margin, y, pageWidth - margin, y);
-    y += 4;
-    
-    // --- Items Header ---
-    doc.setFont(bodyFont, 'bold');
-    doc.text(labels.item, margin, y);
-    doc.text(labels.amount, pageWidth - margin, y, { align: 'right' });
-    y += 2;
-    doc.line(margin, y, pageWidth - margin, y);
+    doc.line(margin, y, 80 - margin, y);
     y += 4;
 
-    // --- Items List ---
-    doc.setFont(bodyFont, 'normal');
+    // Invoice Meta
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.text(templateConfig?.content.titleText || 'TAX INVOICE', centerX, y, { align: 'center' });
+    y += 5;
+
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y);
+    y += 4;
+    doc.text(`${labels.date}: ${formatDate(sale.date, dateFormat)}`, margin, y);
+    y += 4;
+    doc.text(`${labels.billedTo}: ${customer.name}`, margin, y);
+    y += 5;
+
+    // Items Header
+    doc.line(margin, y, 80 - margin, y);
+    y += 4;
+    doc.setFont('helvetica', 'bold');
+    doc.text(labels.item, margin, y);
+    doc.text(labels.amount, 80 - margin, y, { align: 'right' });
+    y += 2;
+    doc.line(margin, y, 80 - margin, y);
+    y += 4;
+
+    // Items
+    doc.setFont('helvetica', 'normal');
     sale.items.forEach(item => {
         const itemTotal = Number(item.price) * Number(item.quantity);
-        doc.setTextColor(textColor);
-        doc.setFontSize(bodyFontSize);
-        const nameLines = doc.splitTextToSize(item.productName, 55); 
-        doc.text(nameLines, margin, y);
-        doc.text(`${itemTotal.toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
-        y += (nameLines.length * 4);
+        const name = doc.splitTextToSize(item.productName, 50);
+        doc.text(name, margin, y);
+        doc.text(itemTotal.toLocaleString('en-IN'), 80 - margin, y, { align: 'right' });
+        y += (name.length * 3.5);
+        
+        // Sub-detail
+        doc.setFontSize(7);
         doc.setTextColor('#555555');
-        doc.setFontSize(bodyFontSize - 1);
-        
-        // Only show Qty x Rate if configured, but on thermal space is tight so we usually show it
-        // We respect hideQty/hideRate if passed, but fallback to showing if critical
-        const showDetails = !(templateConfig?.layout.tableOptions?.hideQty && templateConfig?.layout.tableOptions?.hideRate);
-        
-        if (showDetails) {
-             const qtyStr = templateConfig?.layout.tableOptions?.hideQty ? '' : `${item.quantity} x `;
-             const rateStr = templateConfig?.layout.tableOptions?.hideRate ? '' : `${currency} ${Number(item.price).toLocaleString('en-IN')}`;
-             doc.text(`${qtyStr}${rateStr}`, margin, y);
-             y += 4;
-        }
+        doc.text(`${item.quantity} x ${Number(item.price).toLocaleString('en-IN')}`, margin, y);
+        doc.setFontSize(8);
+        doc.setTextColor('#000000');
+        y += 4;
     });
 
-    y += 1;
-    doc.setDrawColor(200); 
-    doc.line(margin, y, pageWidth - margin, y);
+    doc.line(margin, y, 80 - margin, y);
     y += 4;
 
-    // --- Totals ---
+    // Totals
     const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
-    const paidAmount = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
-    const dueAmount = Number(sale.totalAmount) - paidAmount;
-
-    const addTotalRow = (label: string, value: string, isBold = false, fontSize = bodyFontSize) => {
-        doc.setFont(bodyFont, isBold ? 'bold' : 'normal');
-        doc.setFontSize(fontSize);
-        doc.setTextColor(textColor);
-        doc.text(label, pageWidth - 30, y, { align: 'right' });
-        doc.text(value, pageWidth - margin, y, { align: 'right' });
-        y += 4;
-    };
-
-    addTotalRow(labels.subtotal, `${subTotal.toLocaleString('en-IN')}`);
-    if (sale.discount > 0) addTotalRow(labels.discount, `-${Number(sale.discount).toLocaleString('en-IN')}`);
+    const paid = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
     
-    // Conditionally add GST line for thermal
-    if (showGst) {
-        addTotalRow(labels.gst, `${currency} ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`);
+    const addRow = (label: string, value: string, bold = false) => {
+        doc.setFont('helvetica', bold ? 'bold' : 'normal');
+        doc.text(label, 45, y, { align: 'right' });
+        doc.text(value, 80 - margin, y, { align: 'right' });
+        y += 4;
     }
 
-    y += 1;
-    doc.setFontSize(bodyFontSize + 2);
-    doc.setFont(bodyFont, 'bold');
-    doc.setTextColor(primaryColor);
-    doc.text(labels.grandTotal, pageWidth - 30, y, { align: 'right' });
-    doc.text(`${currency} ${Number(sale.totalAmount).toLocaleString('en-IN')}`, pageWidth - margin, y, { align: 'right' });
-    y += 6;
+    addRow(labels.subtotal, subTotal.toLocaleString('en-IN'));
+    if (sale.discount > 0) addRow(labels.discount, `-${Number(sale.discount).toLocaleString('en-IN')}`);
+    addRow(labels.grandTotal, `${currency} ${Number(sale.totalAmount).toLocaleString('en-IN')}`, true);
     
-    doc.setFont(bodyFont, 'normal');
-    doc.setFontSize(bodyFontSize);
-    doc.setTextColor(textColor);
-    addTotalRow(labels.paid, `${paidAmount.toLocaleString('en-IN')}`);
-    
-    if (dueAmount > 0) {
-        doc.setFont(bodyFont, 'bold');
-        addTotalRow(labels.balance, `${dueAmount.toLocaleString('en-IN')}`);
+    if (paid < Number(sale.totalAmount)) {
+        addRow(labels.balance, `${currency} ${(Number(sale.totalAmount) - paid).toLocaleString('en-IN')}`, true);
     }
 
-    // --- Terms ---
-    if (showTerms && terms) {
-        y += 4;
-        doc.setFont(bodyFont, 'bold');
-        doc.setFontSize(bodyFontSize - 1);
-        doc.text("Terms & Conditions:", margin, y);
-        y += 4;
-        doc.setFont(bodyFont, 'normal');
-        const termsLines = doc.splitTextToSize(terms, pageWidth - (margin*2));
-        doc.text(termsLines, margin, y);
-        y += (termsLines.length * 4);
-    }
-
-    // --- Footer ---
+    // Footer
     y += 5;
-    doc.setFontSize(bodyFontSize - 1);
-    doc.setFont(bodyFont, 'italic');
-    doc.setTextColor('#555555');
-    doc.text(footer, centerX, y, { align: 'center' });
-
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'italic');
+    const footerLines = doc.splitTextToSize(footer, pageWidth);
+    doc.text(footerLines, centerX, y, { align: 'center' });
+    
     return doc;
 };
 
 export interface GenericDocumentData {
     id: string;
     date: string;
-    recipient: {
-        label: string; // e.g. "Billed To:"
-        name: string;
-        address: string;
-        contact?: string;
-    };
-    sender: {
-        label: string; // e.g. "Invoice Details:"
-        idLabel: string; // e.g. "Invoice No:"
-    };
-    items: {
-        name: string;
-        quantity: number;
-        rate: number;
-        amount: number;
-    }[];
-    totals: {
-        label: string;
-        value: string; // Formatted value
-        isBold?: boolean;
-        color?: string;
-        size?: number;
-    }[];
+    recipient: { label: string; name: string; address: string; contact?: string; };
+    sender: { label: string; idLabel: string; };
+    items: { name: string; quantity: number; rate: number; amount: number; }[];
+    totals: { label: string; value: string; isBold?: boolean; color?: string; size?: number; }[];
     watermarkText?: string;
-    qrString?: string; // Optional override for QR data (e.g. UPI string)
-    grandTotalNumeric?: number; // For Amount in Words
-    balanceDue?: number; // For Status Stamp
-    taxBreakdown?: { rate: number, taxable: number, tax: number }[]; // Optional Tax Breakdown
+    qrString?: string;
+    grandTotalNumeric?: number;
+    balanceDue?: number;
+    taxBreakdown?: { rate: number, taxable: number, tax: number }[];
 }
 
-// --- Core Configurable PDF Engine ---
+// --- Configurable PDF Engine (A4) ---
 const _generateConfigurablePDF = async (
     data: GenericDocumentData,
     profile: ProfileData | null,
@@ -502,406 +364,250 @@ const _generateConfigurablePDF = async (
 ): Promise<jsPDF> => {
     
     const doc = new jsPDF();
-    
-    // Register custom fonts
-    if (customFonts) {
-        registerCustomFonts(doc, customFonts);
-    }
+    if (customFonts) registerCustomFonts(doc, customFonts);
 
-    const { colors, fonts, layout, content, currencySymbol, dateFormat } = templateConfig;
+    const { colors, fonts, layout, content, currencySymbol } = templateConfig;
     const labels = { ...defaultLabels, ...content.labels };
-    const tableOpts = layout.tableOptions || { hideQty: false, hideRate: false, stripedRows: false };
-
-    // Conversions
-    const pageWidth = doc.internal.pageSize.getWidth();
+    
+    const pageWidth = doc.internal.pageSize.getWidth(); // 210mm
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = layout.margin;
-    const centerX = pageWidth / 2;
     let currentY = margin;
 
-    const showBusiness = content.showBusinessDetails ?? true;
-    const showCustomer = content.showCustomerDetails ?? true;
-    
-    // Header styles
-    const isBannerHeader = layout.headerStyle === 'banner';
-    const isMinimalHeader = layout.headerStyle === 'minimal';
-    
-    // --- 1. HEADER BACKGROUND (Banner Mode) ---
-    if (isBannerHeader) {
+    // --- HEADER ---
+    const isBanner = layout.headerStyle === 'banner';
+    if (isBanner) {
         doc.setFillColor(colors.bannerBg || colors.primary);
-        // Height is dynamic but lets allocate ~40-50mm based on content
-        const bannerHeight = Math.max(40, layout.logoSize + 20);
-        doc.rect(0, 0, pageWidth, bannerHeight, 'F');
-        // Reset Y to provide padding inside banner
-        currentY = margin + 5;
-    } else {
-        // Standard/Minimal: Add some top margin
-        currentY = margin + 5;
+        doc.rect(0, 0, pageWidth, 40 + (layout.logoSize/2), 'F');
+        currentY += 5;
     }
 
-    // --- 2. LOGO & BUSINESS DETAILS ---
-    if (showBusiness) {
-        const logoToUse = profile?.logo || logoBase64;
-        const logoOffsetX = layout.logoOffsetX || 0;
-        const logoOffsetY = layout.logoOffsetY || 0;
-        
-        if (logoToUse) {
-            try {
-                const format = getImageType(logoToUse);
-                let logoX = margin;
-                
-                if (layout.logoPosition === 'center') {
-                    logoX = (pageWidth - layout.logoSize) / 2;
-                } else if (layout.logoPosition === 'right') {
-                    logoX = pageWidth - margin - layout.logoSize;
-                }
+    // Logo & Text Positioning
+    const logoUrl = profile?.logo || logoBase64;
+    const hasLogo = !!logoUrl && layout.logoSize > 5;
+    
+    let logoX = margin;
+    let logoY = currentY + (layout.logoOffsetY || 0);
+    let textX = margin;
+    let textY = currentY;
+    let textAlign: 'left' | 'center' | 'right' = 'left';
 
-                doc.addImage(logoToUse, format, logoX + logoOffsetX, currentY + logoOffsetY, layout.logoSize, layout.logoSize);
-                
-                if (layout.logoPosition === 'center') {
-                    currentY += layout.logoSize + 5;
-                }
-            } catch (e) {}
+    // Robust layout logic
+    if (layout.logoPosition === 'center') {
+        logoX = (pageWidth - layout.logoSize) / 2;
+        if (hasLogo) {
+            doc.addImage(logoUrl, getImageType(logoUrl), logoX + (layout.logoOffsetX || 0), logoY, layout.logoSize, layout.logoSize);
+            textY = logoY + layout.logoSize + 5;
         }
+        textAlign = 'center';
+        textX = pageWidth / 2;
+    } else if (layout.logoPosition === 'right') {
+        logoX = pageWidth - margin - layout.logoSize;
+        if (hasLogo) {
+            doc.addImage(logoUrl, getImageType(logoUrl), logoX + (layout.logoOffsetX || 0), logoY, layout.logoSize, layout.logoSize);
+        }
+        // Text stays left
+        textAlign = 'left';
+        textX = margin;
+        textY += 5; 
+    } else { // Left Logo
+        logoX = margin;
+        if (hasLogo) {
+            doc.addImage(logoUrl, getImageType(logoUrl), logoX + (layout.logoOffsetX || 0), logoY, layout.logoSize, layout.logoSize);
+        }
+        // Text goes right for classic look, or left-below if preferred. 
+        // Let's stick to Right text for "Left Logo" configuration as it balances the header.
+        textAlign = 'right';
+        textX = pageWidth - margin;
+        textY += 5;
+    }
 
-        // Business Details
-        const headerAlign = layout.headerAlignment;
-        const headerX = headerAlign === 'center' ? centerX : (headerAlign === 'right' ? pageWidth - margin : margin);
+    // Draw Business Text
+    if (profile) {
+        doc.setFont(fonts.titleFont, 'bold');
+        doc.setFontSize(fonts.headerSize);
+        doc.setTextColor(isBanner ? (colors.bannerText || '#fff') : colors.primary);
+        doc.text(profile.name, textX, textY, { align: textAlign });
         
-        // Calculate vertical centering for text if banner is active
-        let textY = layout.logoPosition === 'center' ? currentY : currentY;
+        textY += fonts.headerSize * 0.4 + 2;
+        doc.setFont(fonts.bodyFont, 'normal');
+        doc.setFontSize(fonts.bodySize);
+        doc.setTextColor(isBanner ? (colors.bannerText || '#fff') : colors.secondary);
         
-        // If logo is Left/Right, align text vertically with logo roughly
-        if (layout.logoPosition !== 'center' && isBannerHeader) {
-             textY += 5; // Slight padding
-        }
+        const addr = doc.splitTextToSize(profile.address, 90);
+        doc.text(addr, textX, textY, { align: textAlign });
+        textY += (addr.length * 4) + 1;
         
-        let textXOffset = (layout.logoPosition === 'left' && headerAlign === 'left') ? (layout.logoSize + 5) : 0;
+        const contact = [profile.phone && `Ph: ${profile.phone}`, profile.gstNumber && `GST: ${profile.gstNumber}`].filter(Boolean).join(' | ');
+        doc.text(contact, textX, textY, { align: textAlign });
         
-        if (profile) {
-            doc.setFont(fonts.titleFont, 'bold');
-            doc.setFontSize(fonts.headerSize);
-            // If banner, use bannerText color, else primary
-            doc.setTextColor(isBannerHeader ? (colors.bannerText || '#ffffff') : colors.primary);
-            
-            doc.text(profile.name, headerX + textXOffset, textY, { align: headerAlign });
-            
-            textY += (fonts.headerSize * 0.4) + 2;
-            
-            doc.setFont(fonts.bodyFont, 'normal');
-            doc.setFontSize(fonts.bodySize);
-            // Secondary color for address
-            doc.setTextColor(isBannerHeader ? (colors.bannerText || '#ffffff') : colors.secondary);
-            
-            const addressLines = doc.splitTextToSize(profile.address, (pageWidth / 2));
-            doc.text(addressLines, headerX + textXOffset, textY, { align: headerAlign });
-            textY += (addressLines.length * 4);
-            
-            const contactLine = [
-                profile.phone ? `Ph: ${profile.phone}` : '',
-                profile.gstNumber ? `GSTIN: ${profile.gstNumber}` : ''
-            ].filter(Boolean).join(' | ');
-            
-            doc.text(contactLine, headerX + textXOffset, textY, { align: headerAlign });
-            textY += 6;
-        }
-
-        // Adjust currentY based on what took more vertical space: Logo or Text
-        // If logo is center, text is below it, so currentY is already updated.
-        // If logo is side, we compare textY vs logo height.
-        const headerContentHeight = Math.max(textY, layout.logoPosition !== 'center' ? currentY + layout.logoSize + 5 : currentY);
-        
-        // If banner, ensure we jump below it
-        if (isBannerHeader) {
-             currentY = Math.max(40, layout.logoSize + 20) + 5; 
-        } else {
-             currentY = headerContentHeight;
-             // Divider line for Standard mode only
-             if (!isMinimalHeader) {
-                doc.setDrawColor(colors.borderColor || colors.secondary);
-                doc.setLineWidth(0.5);
-                doc.line(margin, currentY, pageWidth - margin, currentY);
-                currentY += 10;
-             } else {
-                 currentY += 5;
-             }
-        }
+        // Update currentY to be below the lowest element (Logo or Text)
+        const contentBottom = Math.max(textY + 5, hasLogo ? logoY + layout.logoSize + 5 : textY + 5);
+        currentY = contentBottom;
     } else {
+        currentY += 20;
+    }
+
+    if (!isBanner && layout.headerStyle !== 'minimal') {
+        doc.setDrawColor(colors.borderColor || '#ccc');
+        doc.line(margin, currentY, pageWidth - margin, currentY);
         currentY += 10;
+    } else {
+        currentY += 5;
     }
 
-    // --- 3. DOCUMENT TITLE ---
+    // --- TITLE ---
     doc.setFont(fonts.titleFont, 'bold');
     doc.setFontSize(16);
     doc.setTextColor(colors.text);
-    doc.text(content.titleText, centerX, currentY, { align: 'center' });
+    doc.text(content.titleText, pageWidth / 2, currentY, { align: 'center' });
     currentY += 10;
 
-    // --- 4. RECIPIENT & METADATA ---
-    const colWidth = (pageWidth - (margin * 2)) / 2;
-    let recipientY = currentY + 5;
-    let recipientAddrLines: string[] = [];
-
-    // Left Col (Recipient)
-    if (showCustomer) {
-        doc.setFontSize(11);
-        doc.setFont(fonts.bodyFont, 'bold');
-        doc.setTextColor(colors.primary);
-        doc.text(data.recipient.label, margin, currentY);
-        
-        doc.setFont(fonts.bodyFont, 'normal');
-        doc.setFontSize(fonts.bodySize);
-        doc.setTextColor(colors.text);
-        
-        doc.text(data.recipient.name, margin, recipientY);
-        recipientAddrLines = doc.splitTextToSize(data.recipient.address || '', colWidth - 5);
-        doc.text(recipientAddrLines, margin, recipientY + 5);
-    }
+    // --- DETAILS GRID (Recipient & Invoice Info) ---
+    const gridY = currentY;
+    const colWidth = (pageWidth - (margin * 3)) / 2;
     
-    // Right Col (Doc Details)
-    const rightColX = pageWidth - margin;
+    // Left Column: Recipient
     doc.setFont(fonts.bodyFont, 'bold');
     doc.setFontSize(11);
     doc.setTextColor(colors.primary);
-    doc.text(data.sender.label, rightColX, currentY, { align: 'right' });
+    doc.text(data.recipient.label, margin, gridY);
     
     doc.setFont(fonts.bodyFont, 'normal');
     doc.setFontSize(fonts.bodySize);
     doc.setTextColor(colors.text);
-    doc.text(`${data.sender.idLabel} ${data.id}`, rightColX, recipientY, { align: 'right' });
-    doc.text(`${labels.date}: ${formatDate(data.date, dateFormat)}`, rightColX, recipientY + 5, { align: 'right' });
-
+    doc.text(data.recipient.name, margin, gridY + 6);
+    const recipientAddr = doc.splitTextToSize(data.recipient.address, colWidth);
+    doc.text(recipientAddr, margin, gridY + 11);
+    
+    // Right Column: Invoice Details & QR
+    const rightColX = pageWidth - margin;
+    doc.setFont(fonts.bodyFont, 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(colors.primary);
+    doc.text(data.sender.label, rightColX, gridY, { align: 'right' });
+    
+    doc.setFont(fonts.bodyFont, 'normal');
+    doc.setFontSize(fonts.bodySize);
+    doc.setTextColor(colors.text);
+    
+    let infoY = gridY + 6;
+    doc.text(`${data.sender.idLabel} ${data.id}`, rightColX, infoY, { align: 'right' });
+    infoY += 5;
+    doc.text(`${labels.date}: ${formatDate(data.date, templateConfig.dateFormat)}`, rightColX, infoY, { align: 'right' });
+    
+    // QR Code
     if (content.showQr) {
+        const qrData = data.qrString || data.id;
         try {
-            // Prioritize UPI string if provided, else ID
-            const qrData = data.qrString || data.id;
-            const qrBase64 = await getQrCodeBase64(qrData);
-            if (qrBase64) {
-                doc.addImage(qrBase64, 'PNG', rightColX - 55, currentY, 20, 20);
+            const qrImg = await getQrCodeBase64(qrData);
+            if (qrImg) {
+                // Place QR to the left of the text block in right column
+                // QR Size 22mm. Text aligns right at rightColX.
+                // Place QR at rightColX - width_of_qr - spacing
+                doc.addImage(qrImg, 'PNG', rightColX - 22, infoY + 2, 22, 22);
             }
-        } catch (e) {}
+        } catch(e) {}
     }
 
-    currentY = Math.max(recipientY + 5 + (recipientAddrLines.length * 4), recipientY + 25) + 5;
+    currentY = Math.max(gridY + 11 + (recipientAddr.length * 5), infoY + 25) + 5;
 
-    // --- 5. TABLE ---
-    // Dynamic Columns
+    // --- TABLE ---
     const tableHead = ['#', labels.item];
-    if (!tableOpts.hideQty) tableHead.push(labels.qty);
-    if (!tableOpts.hideRate) tableHead.push(labels.rate);
+    const hideQty = layout.tableOptions?.hideQty;
+    const hideRate = layout.tableOptions?.hideRate;
+    
+    if (!hideQty) tableHead.push(labels.qty);
+    if (!hideRate) tableHead.push(labels.rate);
     tableHead.push(labels.amount);
 
-    const tableBody = data.items.map((item, index) => {
-        const row = [(index + 1).toString(), item.name];
-        if (!tableOpts.hideQty) row.push(item.quantity.toString());
-        if (!tableOpts.hideRate) row.push(`${currencySymbol} ${item.rate.toLocaleString('en-IN')}`);
-        row.push(`${currencySymbol} ${item.amount.toLocaleString('en-IN')}`);
+    const tableBody = data.items.map((item, i) => {
+        const row = [(i + 1).toString(), item.name];
+        if (!hideQty) row.push(item.quantity.toString());
+        if (!hideRate) row.push(formatCurrency(item.rate, currencySymbol, fonts.bodyFont));
+        row.push(formatCurrency(item.amount, currencySymbol, fonts.bodyFont));
         return row;
     });
 
-    // Determine Table Theme
-    let theme: 'striped' | 'grid' | 'plain' = 'plain';
-    if (tableOpts.bordered) theme = 'grid';
-    else if (tableOpts.stripedRows) theme = 'striped';
-
     autoTable(doc, {
         startY: currentY,
-        margin: { left: margin, right: margin },
         head: [tableHead],
         body: tableBody,
-        theme: theme,
-        styles: {
-            font: fonts.bodyFont,
-            fontSize: fonts.bodySize,
-            textColor: colors.text,
-            lineColor: colors.borderColor ? hexToRgbArray(colors.borderColor) : [200, 200, 200],
-            lineWidth: 0.1,
-            cellPadding: tableOpts.compact ? 1 : 3
+        theme: layout.tableOptions?.stripedRows ? 'striped' : 'plain',
+        styles: { font: fonts.bodyFont, fontSize: fonts.bodySize, cellPadding: 3, textColor: colors.text },
+        headStyles: { fillColor: colors.tableHeaderBg, textColor: colors.tableHeaderText, fontStyle: 'bold' },
+        columnStyles: {
+            0: { cellWidth: 10, halign: 'center' },
+            1: { cellWidth: 'auto' }, // Item
+            [tableHead.length - 1]: { halign: 'right', cellWidth: 35 }, // Amount
+            [tableHead.length - 2]: { halign: 'right', cellWidth: hideRate ? 15 : 25 }, // Rate/Qty
+            [tableHead.length - 3]: { halign: 'right', cellWidth: 15 }, // Qty (if rate exists)
         },
-        headStyles: { 
-            fillColor: colors.tableHeaderBg,
-            textColor: colors.tableHeaderText,
-            fontStyle: 'bold',
-            lineColor: colors.borderColor ? hexToRgbArray(colors.borderColor) : [200, 200, 200]
-        },
-        alternateRowStyles: {
-            fillColor: tableOpts.stripedRows ? (colors.alternateRowBg || '#f9fafb') : '#ffffff'
-        },
-        columnStyles: { 
-            0: { halign: 'center', cellWidth: 10 },
-            // Dynamically align columns based on presence
-            [tableHead.length - 1]: { halign: 'right', cellWidth: 35 }, // Amount always right
-            [tableHead.length - 2]: { halign: 'right' }, // Rate or Qty
-        }
+        margin: { left: margin, right: margin }
     });
 
-    // --- 6. TOTALS ---
-    let finalY = (doc as any).lastAutoTable.finalY + 10;
-    const totalsX = pageWidth - margin;
-    const labelX = totalsX - 40;
+    // --- TOTALS ---
+    let finalY = (doc as any).lastAutoTable.finalY + 5;
     
-    // Tax Breakdown Table (Optional)
-    if (content.showTaxBreakdown && data.taxBreakdown && data.taxBreakdown.length > 0) {
-        const breakdownY = finalY;
-        autoTable(doc, {
-            startY: breakdownY,
-            margin: { left: margin, right: pageWidth/2 + 10 }, // Limit width to left side
-            head: [['Rate', 'Taxable', 'Tax Amt']],
-            body: data.taxBreakdown.map(t => [
-                `${t.rate}%`, 
-                `${currencySymbol}${t.taxable.toLocaleString('en-IN')}`, 
-                `${currencySymbol}${t.tax.toLocaleString('en-IN')}`
-            ]),
-            theme: 'grid',
-            styles: { fontSize: fonts.bodySize - 2, cellPadding: 1 },
-            headStyles: { fillColor: colors.secondary, textColor: '#ffffff' },
-            columnStyles: { 1: { halign: 'right' }, 2: { halign: 'right' } }
-        });
-        // Don't advance finalY too much, let totals stack on right
-    }
-
-    data.totals.forEach((row, index) => {
-        // Draw line before the last item (usually Grand Total or Balance) if it's bold
-        if (row.isBold && index === data.totals.length - 1) {
-             doc.setDrawColor(colors.borderColor || colors.secondary);
-             doc.line(labelX - 20, finalY - 4, totalsX, finalY - 4);
-        }
-
-        doc.setFont(fonts.bodyFont, row.isBold ? 'bold' : 'normal');
-        doc.setFontSize(row.size || fonts.bodySize);
-        doc.setTextColor(row.color || colors.text);
-        doc.text(row.label, labelX, finalY, { align: 'right' });
-        doc.text(row.value, totalsX, finalY, { align: 'right' });
-        finalY += (row.size && row.size > fonts.bodySize ? 8 : 6);
-    });
-    
-    // --- 6a. AMOUNT IN WORDS ---
-    if (content.showAmountInWords && data.grandTotalNumeric) {
-        doc.setFont(fonts.bodyFont, 'bold');
-        doc.setFontSize(fonts.bodySize);
-        doc.setTextColor(colors.primary);
-        const words = convertNumberToWords(Math.round(data.grandTotalNumeric));
-        // Place below the table, aligned left
-        // Ensure we are below the tax table too if it exists
-        const wordY = Math.max((doc as any).lastAutoTable.finalY + 10, finalY + 5); 
-        doc.text(`Amount in Words: ${words}`, margin, wordY);
-        finalY = wordY; // Update pointer
-    }
-
-    // --- 6b. STATUS STAMP ---
-    if (content.showStatusStamp && typeof data.balanceDue !== 'undefined') {
-        const isPaid = data.balanceDue <= 0;
-        const stampText = isPaid ? "PAID" : "DUE";
-        const stampColor = isPaid ? "#22c55e" : "#ef4444"; // Green or Red
-        
-        doc.saveGraphicsState();
-        doc.setGState(new doc.GState({ opacity: 0.25 }));
-        
-        doc.setDrawColor(stampColor);
-        doc.setTextColor(stampColor);
-        doc.setLineWidth(1);
-        doc.setFontSize(30);
-        doc.setFont('helvetica', 'bold');
-        
-        // Position stamp roughly over the totals area
-        const stampX = pageWidth - margin - 40;
-        const stampY = finalY - 20; // Move up slightly into totals
-        
-        // Draw rotated text
-        doc.text(stampText, stampX, stampY, { align: 'center', angle: 30 });
-        
-        doc.restoreGraphicsState();
-    }
-
-    // --- 7. SIGNATURE, TERMS, BANK DETAILS ---
-    
-    // Check space for footer block (approx 50mm needed)
-    if (pageHeight - finalY < 60) {
+    // Ensure we don't split totals page awkwardly
+    if (pageHeight - finalY < 50) {
         doc.addPage();
         finalY = margin;
-    } else {
-        finalY += 10;
     }
 
-    // Signature Section
-    if (content.showSignature) {
-        const sigY = finalY + 10; 
-        const sigX = pageWidth - margin - 40;
+    const totalsX = pageWidth - margin;
+    const totalsLabelX = totalsX - 40;
+
+    data.totals.forEach((t) => {
+        doc.setFont(fonts.bodyFont, t.isBold ? 'bold' : 'normal');
+        doc.setFontSize(t.size || fonts.bodySize);
+        doc.setTextColor(t.color || colors.text);
         
-        if (content.signatureImage) {
-            try {
-                const format = getImageType(content.signatureImage);
-                doc.addImage(content.signatureImage, format, sigX - 20, sigY - 15, 40, 20);
-            } catch(e) {}
-        } else {
-            doc.setFont(fonts.bodyFont, 'normal');
-            doc.setFontSize(fonts.bodySize);
-            doc.setTextColor(colors.text);
-            doc.text("______________________", sigX, sigY + 15, { align: 'center' });
-        }
-        
-        if (content.signatureText) {
-            doc.setFont(fonts.bodyFont, 'normal');
-            doc.setFontSize(fonts.bodySize);
-            doc.setTextColor(colors.text);
-            doc.text(content.signatureText, sigX, sigY + 20, { align: 'center' });
-        }
-    }
+        doc.text(t.label, totalsLabelX, finalY, { align: 'right' });
+        doc.text(t.value, totalsX, finalY, { align: 'right' });
+        finalY += (t.size ? t.size * 0.5 : 6);
+    });
 
-    let leftColY = finalY;
-    const contentLeftWidth = pageWidth - margin - 80; // Available width for left content
-
-    if (content.bankDetails) {
-        doc.setFontSize(fonts.bodySize);
-        doc.setFont(fonts.bodyFont, 'bold');
-        doc.setTextColor(colors.text);
-        doc.text("Bank Details:", margin, leftColY);
-        leftColY += 5;
-        
-        doc.setFont(fonts.bodyFont, 'normal');
-        doc.setTextColor(colors.secondary);
-        const bankLines = doc.splitTextToSize(content.bankDetails, contentLeftWidth);
-        doc.text(bankLines, margin, leftColY);
-        leftColY += (bankLines.length * 4) + 5;
-    }
-
-    if (content.showTerms && content.termsText) {
-        doc.setFontSize(fonts.bodySize);
-        doc.setFont(fonts.bodyFont, 'bold');
-        doc.setTextColor(colors.text);
-        doc.text("Terms & Conditions:", margin, leftColY);
-        leftColY += 5;
-        
-        doc.setFont(fonts.bodyFont, 'normal');
-        doc.setTextColor(colors.secondary);
-        const termsLines = doc.splitTextToSize(content.termsText, contentLeftWidth);
-        doc.text(termsLines, margin, leftColY);
-    }
-
-    if (layout.showWatermark) {
-        doc.saveGraphicsState();
-        doc.setGState(new doc.GState({ opacity: layout.watermarkOpacity || 0.1 }));
-        doc.setFontSize(60);
-        doc.setTextColor(colors.primary);
-        const watermark = data.watermarkText || profile?.name || 'INVOICE';
-        doc.text(watermark, pageWidth/2, pageHeight/2, { align: 'center', angle: 45 });
-        doc.restoreGraphicsState();
-    }
-
-    // --- 8. FOOTER ---
-    const isBannerFooter = layout.footerStyle === 'banner';
-    const footerY = pageHeight - 15;
+    // --- FOOTER SECTION ---
+    const footerY = pageHeight - 20;
     
-    if (isBannerFooter) {
+    if (content.showSignature) {
+        const sigY = finalY + 15;
+        if (sigY < footerY) {
+            doc.setFont(fonts.bodyFont, 'normal');
+            doc.setFontSize(10);
+            doc.setTextColor(colors.text);
+            doc.text("Authorized Signatory", pageWidth - margin, sigY + 10, { align: 'right' });
+            // Placeholder line or image
+            if (content.signatureImage) {
+                try {
+                    doc.addImage(content.signatureImage, getImageType(content.signatureImage), pageWidth - margin - 40, sigY - 10, 40, 20);
+                } catch(e) {}
+            } else {
+                doc.text("___________________", pageWidth - margin, sigY, { align: 'right' });
+            }
+        }
+    }
+
+    // Terms (Bottom Left)
+    if (content.showTerms && content.termsText) {
+        doc.setFontSize(8);
+        doc.setTextColor(colors.secondary);
+        doc.text("Terms & Conditions:", margin, footerY - 15);
+        const terms = doc.splitTextToSize(content.termsText, pageWidth / 2);
+        doc.text(terms, margin, footerY - 10);
+    }
+
+    // Bottom Bar
+    if (layout.footerStyle === 'banner') {
         doc.setFillColor(colors.footerBg || '#f3f4f6');
-        doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
+        doc.rect(0, pageHeight - 15, pageWidth, 15, 'F');
         doc.setTextColor(colors.footerText || colors.secondary);
     } else {
         doc.setTextColor(colors.secondary);
     }
-
     doc.setFontSize(9);
-    doc.text(content.footerText, centerX, footerY, { align: 'center' });
+    doc.text(content.footerText, pageWidth / 2, pageHeight - 6, { align: 'center' });
 
     return doc;
 };
@@ -947,11 +653,42 @@ export const generateA4InvoicePdf = async (
     sale: Sale, 
     customer: Customer, 
     profile: ProfileData | null, 
-    templateConfig: InvoiceTemplateConfig,
+    templateConfig?: InvoiceTemplateConfig, // Made optional for backward compat
     customFonts?: CustomFont[]
 ): Promise<jsPDF> => {
-    const labels = { ...defaultLabels, ...templateConfig.content.labels };
-    const currency = templateConfig.currencySymbol || 'Rs.';
+    
+    // Fallback to default config if not provided (e.g. from legacy calls)
+    const defaultConfig: InvoiceTemplateConfig = {
+        id: 'default', 
+        currencySymbol: 'Rs.', 
+        dateFormat: 'DD/MM/YYYY',
+        colors: { 
+            primary: '#0d9488', secondary: '#333333', text: '#000000', 
+            tableHeaderBg: '#0d9488', tableHeaderText: '#ffffff', 
+            bannerBg: '#0d9488', bannerText: '#ffffff',
+            footerBg: '#f3f4f6', footerText: '#374151', 
+            borderColor: '#e5e7eb', alternateRowBg: '#f9fafb'
+        },
+        fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
+        layout: { 
+            margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, 
+            headerAlignment: 'center', headerStyle: 'standard', footerStyle: 'standard',
+            showWatermark: false, watermarkOpacity: 0.1,
+            tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false }
+        },
+        content: { 
+            titleText: 'TAX INVOICE', labels: defaultLabels, showQr: true, showTerms: true, showSignature: true, 
+            termsText: '', footerText: '', showBusinessDetails: true, showCustomerDetails: true,
+            signatureText: '', showAmountInWords: false, showStatusStamp: false, showTaxBreakdown: false, showGst: true,
+            qrType: 'INVOICE_ID', bankDetails: ''
+        }
+    };
+
+    const config = templateConfig || defaultConfig;
+
+    const labels = { ...defaultLabels, ...config.content.labels };
+    const currency = config.currencySymbol || 'Rs.';
+    const fontName = config.fonts.bodyFont;
     
     const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
     const paidAmount = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
@@ -959,34 +696,30 @@ export const generateA4InvoicePdf = async (
     const dueColor = dueAmount > 0.01 ? '#dc2626' : '#16a34a';
 
     let qrString = sale.id;
-    if (templateConfig.content.qrType === 'UPI_PAYMENT' && templateConfig.content.upiId) {
-       const pa = templateConfig.content.upiId;
-       const pn = templateConfig.content.payeeName || 'Merchant';
+    if (config.content.qrType === 'UPI_PAYMENT' && config.content.upiId) {
+       const pa = config.content.upiId;
+       const pn = config.content.payeeName || 'Merchant';
        const am = sale.totalAmount.toFixed(2);
        const tr = sale.id; 
        const tn = `Invoice ${sale.id}`; 
        qrString = `upi://pay?pa=${pa}&pn=${encodeURIComponent(pn)}&am=${am}&tr=${tr}&tn=${encodeURIComponent(tn)}&cu=INR`;
     }
     
-    // Construct Totals Array with explicit type
     const totals: GenericDocumentData['totals'] = [
-        { label: labels.subtotal, value: `${currency} ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-        { label: labels.discount, value: `- ${currency} ${Number(sale.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+        { label: labels.subtotal, value: formatCurrency(subTotal, currency, fontName) },
+        { label: labels.discount, value: `- ${formatCurrency(Number(sale.discount), currency, fontName)}` },
     ];
 
-    // Conditionally add GST line
-    if (templateConfig.content.showGst !== false) {
-        totals.push({ label: labels.gst, value: `${currency} ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` });
+    if (config.content.showGst !== false) {
+        totals.push({ label: labels.gst, value: formatCurrency(Number(sale.gstAmount), currency, fontName) });
     }
 
     totals.push(
-        { label: labels.grandTotal, value: `${currency} ${Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 },
-        { label: labels.paid, value: `${currency} ${paidAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-        { label: labels.balance, value: `${currency} ${dueAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: dueColor, size: templateConfig.fonts.bodySize + 2 }
+        { label: labels.grandTotal, value: formatCurrency(Number(sale.totalAmount), currency, fontName), isBold: true, color: config.colors.primary, size: config.fonts.bodySize + 2 },
+        { label: labels.paid, value: formatCurrency(paidAmount, currency, fontName) },
+        { label: labels.balance, value: formatCurrency(dueAmount, currency, fontName), isBold: true, color: dueColor, size: config.fonts.bodySize + 2 }
     );
 
-    // Generate Tax Breakdown if needed
-    // For now, only for Designer dummy items or if real items have gstPercent
     const enrichedItems = sale.items.map(i => ({...i, gstPercent: (i as any).gstPercent || 0 })); 
     const taxBreakdown = calculateTaxBreakdown(enrichedItems);
 
@@ -1012,10 +745,10 @@ export const generateA4InvoicePdf = async (
         qrString: qrString,
         grandTotalNumeric: Number(sale.totalAmount),
         balanceDue: dueAmount,
-        taxBreakdown: templateConfig.content.showTaxBreakdown ? taxBreakdown : undefined
+        taxBreakdown: config.content.showTaxBreakdown ? taxBreakdown : undefined
     };
 
-    return _generateConfigurablePDF(data, profile, templateConfig, customFonts);
+    return _generateConfigurablePDF(data, profile, config, customFonts);
 };
 
 export const generateEstimatePDF = async (
@@ -1027,18 +760,19 @@ export const generateEstimatePDF = async (
 ): Promise<jsPDF> => {
     const labels = { ...defaultLabels, ...templateConfig.content.labels };
     const currency = templateConfig.currencySymbol || 'Rs.';
+    const fontName = templateConfig.fonts.bodyFont;
     const subTotal = quote.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
 
     const totals: GenericDocumentData['totals'] = [
-        { label: labels.subtotal, value: `${currency} ${subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
-        { label: labels.discount, value: `- ${currency} ${Number(quote.discount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` },
+        { label: labels.subtotal, value: formatCurrency(subTotal, currency, fontName) },
+        { label: labels.discount, value: `- ${formatCurrency(Number(quote.discount), currency, fontName)}` },
     ];
 
     if (templateConfig.content.showGst !== false) {
-        totals.push({ label: labels.gst, value: `${currency} ${Number(quote.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}` });
+        totals.push({ label: labels.gst, value: formatCurrency(Number(quote.gstAmount), currency, fontName) });
     }
 
-    totals.push({ label: labels.grandTotal, value: `${currency} ${Number(quote.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 });
+    totals.push({ label: labels.grandTotal, value: formatCurrency(Number(quote.totalAmount), currency, fontName), isBold: true, color: templateConfig.colors.primary, size: templateConfig.fonts.bodySize + 2 });
 
     const data: GenericDocumentData = {
         id: quote.id,
@@ -1075,6 +809,7 @@ export const generateDebitNotePDF = async (
 ): Promise<jsPDF> => {
     const labels = { ...defaultLabels, ...templateConfig.content.labels };
     const currency = templateConfig.currencySymbol || 'Rs.';
+    const fontName = templateConfig.fonts.bodyFont;
     
     const data: GenericDocumentData = {
         id: returnData.id,
@@ -1095,7 +830,7 @@ export const generateDebitNotePDF = async (
             amount: Number(item.quantity) * Number(item.price)
         })),
         totals: [
-            { label: 'Total Debit Value:', value: `${currency} ${Number(returnData.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, isBold: true, size: templateConfig.fonts.bodySize + 2 }
+            { label: 'Total Debit Value:', value: formatCurrency(Number(returnData.amount), currency, fontName), isBold: true, size: templateConfig.fonts.bodySize + 2 }
         ],
         watermarkText: 'DEBIT NOTE',
         grandTotalNumeric: Number(returnData.amount)
