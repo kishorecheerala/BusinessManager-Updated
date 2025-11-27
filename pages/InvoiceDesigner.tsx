@@ -10,8 +10,14 @@ import { extractDominantColor } from '../utils/imageUtils';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useDialog } from '../context/DialogContext';
 
+// Fix for PDF.js import structure in Vite/ESM environments
+// The namespace import might contain the library on the 'default' property
+const pdfjs = (pdfjsLib as any).default || pdfjsLib;
+
 // Setup PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+if (pdfjs.GlobalWorkerOptions) {
+    pdfjs.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
+}
 
 // --- Dummy Data for Previews ---
 const dummyCustomer = {
@@ -163,7 +169,8 @@ const PDFCanvasPreview: React.FC<{
                 const blob = doc.output('blob');
                 const url = URL.createObjectURL(blob);
 
-                const loadingTask = pdfjsLib.getDocument(url);
+                // Use the correct pdfjs object
+                const loadingTask = pdfjs.getDocument(url);
                 const pdf = await loadingTask.promise;
                 const page = await pdf.getPage(1);
 
@@ -196,7 +203,7 @@ const PDFCanvasPreview: React.FC<{
             } catch (e: any) {
                 if (e.name !== 'RenderingCancelledException') {
                     console.error("Preview Render Error:", e);
-                    setError("Failed to render preview.");
+                    setError("Failed to render preview. " + (e.message || ''));
                 }
             } finally {
                 if (active) setLoading(false);
@@ -220,7 +227,7 @@ const PDFCanvasPreview: React.FC<{
                     </div>
                 )}
                 {error ? (
-                    <div className="text-red-500">{error}</div>
+                    <div className="text-red-500 p-4 text-center">{error}</div>
                 ) : (
                     <div className="relative shadow-2xl rounded-sm overflow-hidden transition-transform duration-200 ease-out">
                         <canvas ref={canvasRef} className="bg-white block" />
