@@ -57,28 +57,30 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc,
         
         const containerW = containerRef.current.clientWidth;
         const containerH = containerRef.current.clientHeight;
-        const padding = 32; // padding around mask
+        const padding = 20; // Reduced padding to fill more space
         
-        const maxMaskW = containerW - padding;
-        const maxMaskH = containerH - padding;
+        const maxAvailableW = containerW - padding;
+        const maxAvailableH = containerH - padding;
 
         let targetW, targetH;
 
         if (mode === 'square') {
-            const size = Math.min(maxMaskW, maxMaskH, 300); // Max 300px square
+            // Fill as much of the smaller dimension as possible (no hard cap)
+            const size = Math.min(maxAvailableW, maxAvailableH); 
             targetW = size;
             targetH = size;
         } else {
-            const naturalRatio = img.naturalWidth / img.naturalHeight;
-            
-            // Try to fit width first
-            targetW = Math.min(maxMaskW, img.naturalWidth * 2); // Allow some upscaling for small images
-            targetH = targetW / naturalRatio;
+            const imgRatio = img.naturalWidth / img.naturalHeight;
+            const containerRatio = maxAvailableW / maxAvailableH;
 
-            // If height overflows, fit height
-            if (targetH > maxMaskH) {
-                targetH = maxMaskH;
-                targetW = targetH * naturalRatio;
+            if (imgRatio > containerRatio) {
+                // Image is wider than container relative to height -> Fit Width
+                targetW = maxAvailableW;
+                targetH = targetW / imgRatio;
+            } else {
+                // Image is taller or same -> Fit Height
+                targetH = maxAvailableH;
+                targetW = targetH * imgRatio;
             }
         }
 
@@ -87,10 +89,12 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc,
         // Calculate min scale to cover the mask
         const scaleX = targetW / img.naturalWidth;
         const scaleY = targetH / img.naturalHeight;
-        const newMinScale = Math.max(scaleX, scaleY);
+        
+        // "Cover" fit means taking the larger of the two scales so no whitespace
+        const coverScale = Math.max(scaleX, scaleY);
 
-        setMinScale(newMinScale);
-        setScale(newMinScale); // Auto-fit
+        setMinScale(coverScale);
+        setScale(coverScale); // Auto-fit to cover
         setPosition({ x: 0, y: 0 }); // Center
     };
 
@@ -177,7 +181,7 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc,
                 <div 
                      ref={containerRef}
                      className="relative bg-gray-900 w-full overflow-hidden touch-none select-none flex items-center justify-center" 
-                     style={{ height: '400px' }}
+                     style={{ height: '60vh', maxHeight: '600px', minHeight: '300px' }}
                      onPointerDown={handlePointerDown}
                      onPointerMove={handlePointerMove}
                      onPointerUp={handlePointerUp}
