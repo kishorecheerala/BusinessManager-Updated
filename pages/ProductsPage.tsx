@@ -335,7 +335,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             setEditedProduct({ ...editedProduct, [name]: name === 'name' ? value : parseFloat(value) || 0 });
         };
 
-        // Using fixed z-[500] to ensure it covers app header (z-[60])
         return (
             <div className="fixed inset-0 top-0 left-0 w-screen h-screen z-[500] bg-white dark:bg-slate-900 flex flex-col md:flex-row animate-fade-in-fast overflow-hidden">
                 <BarcodeModal 
@@ -344,6 +343,21 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     product={selectedProduct} 
                     businessName={state.profile?.name || 'Business Manager'}
                 />
+                
+                {/* Lightbox Overlay for Details View */}
+                {previewImage && (
+                    <div className="fixed inset-0 bg-black bg-opacity-95 z-[600] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setPreviewImage(null)}>
+                        <div className="relative max-w-full max-h-full w-full h-full flex items-center justify-center">
+                             <button 
+                                onClick={(e) => { e.stopPropagation(); setPreviewImage(null); }}
+                                className="absolute top-4 right-4 p-3 bg-white/20 text-white rounded-full hover:bg-white/40 transition-colors z-50"
+                            >
+                                <X size={24} />
+                            </button>
+                            <img src={previewImage} alt="Full View" className="max-w-full max-h-full object-contain" />
+                        </div>
+                    </div>
+                )}
                 
                 {/* Floating Back Button - Visible always on top left, z-index above everything */}
                 <button 
@@ -355,8 +369,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 </button>
                 
                 {/* LEFT: IMAGE SECTION */}
-                {/* Mobile: 65% height. Tablet/Desktop: 50% width, full height */}
-                <div className="h-[65%] w-full md:h-full md:w-1/2 bg-gray-100 dark:bg-slate-900 relative group flex-shrink-0 transition-all duration-500">
+                {/* Mobile: 62% height. Tablet/Desktop: 50% width, full height */}
+                <div className="h-[62%] w-full md:h-full md:w-1/2 bg-gray-100 dark:bg-slate-900 relative group flex-shrink-0 transition-all duration-500">
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-slate-900">
                             <ProductImage 
@@ -408,7 +422,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 </div>
 
                 {/* RIGHT: DETAILS SECTION */}
-                {/* Mobile: Bottom 35-40%, overlaps with negative margin */}
+                {/* Mobile: Bottom ~40%, overlaps with negative margin */}
                 {/* Tablet/Desktop: Right 50%, Full Height */}
                 <div className="flex-1 h-full w-full md:w-1/2 bg-white dark:bg-slate-800 flex flex-col border-t md:border-t-0 md:border-l dark:border-slate-700 shadow-[0_-10px_30px_-5px_rgba(0,0,0,0.15)] md:shadow-none relative z-10 rounded-t-3xl md:rounded-none -mt-6 md:mt-0 overflow-hidden animate-slide-up-fade">
                     
@@ -536,17 +550,17 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 />
             )}
             
-            {/* Full Screen Image Preview Modal - Use for Grid Mode Only */}
+            {/* Full Screen Image Preview Modal - Use for Grid Mode Only & Details View */}
             {previewImage && (
                 <div className="fixed inset-0 bg-black bg-opacity-95 z-[600] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setPreviewImage(null)}>
-                    <div className="relative max-w-full max-h-full">
+                    <div className="relative max-w-full max-h-full w-full h-full flex items-center justify-center">
                         <button 
-                            onClick={() => setPreviewImage(null)} 
-                            className="absolute -top-12 right-0 p-2 rounded-full bg-white/20 text-white hover:bg-white/40 transition-colors"
+                            onClick={(e) => { e.stopPropagation(); setPreviewImage(null); }}
+                            className="absolute top-4 right-4 p-3 bg-white/20 text-white rounded-full hover:bg-white/40 transition-colors z-50"
                         >
                             <X size={24} />
                         </button>
-                        <img src={previewImage} alt="Full Preview" className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl" />
+                        <img src={previewImage} alt="Full Preview" className="max-w-full max-h-full object-contain" />
                     </div>
                 </div>
             )}
