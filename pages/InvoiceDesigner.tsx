@@ -10,6 +10,7 @@ import { extractDominantColor } from '../utils/imageUtils';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useDialog } from '../context/DialogContext';
 
+// Setup PDF.js worker
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
 
 // --- Dummy Data for Previews ---
@@ -211,7 +212,7 @@ const PDFCanvasPreview: React.FC<{
     }, [config, profile, docType, customFonts, zoomLevel]);
 
     return (
-        <div className="flex-1 relative h-full flex flex-col overflow-hidden">
+        <div className="flex-1 relative h-full flex flex-col overflow-hidden min-h-0">
             <div className="flex-1 bg-gray-100 dark:bg-slate-900 p-4 md:p-8 overflow-auto flex justify-center items-start" ref={containerRef}>
                 {loading && (
                     <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 z-10 backdrop-blur-sm">
@@ -412,7 +413,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
     };
 
     return (
-        <div className="flex h-screen bg-gray-50 dark:bg-slate-950 overflow-hidden font-sans">
+        <div className="flex h-full bg-gray-50 dark:bg-slate-950 overflow-hidden font-sans relative">
             {/* Color Picker Modal */}
             <ColorPickerModal
                 isOpen={showColorPicker}
@@ -839,7 +840,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
                     onMouseDown={startResizing}
                     onTouchStart={startResizing}
                 >
-                    <div className="w-1 h-8 bg-gray-300 dark:bg-slate-600 rounded-full group-hover:bg-indigo-500 transition-colors"></div>
+                    <div className="w-1 h-8 bg-gray-300 dark:bg-slate-600 rounded-full group-hover:bg-indigo-50 transition-colors"></div>
                 </div>
             </aside>
 
