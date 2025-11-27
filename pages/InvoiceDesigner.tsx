@@ -375,29 +375,55 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
     };
 
     const startResizing = useCallback((e: React.MouseEvent | React.TouchEvent) => {
-        e.preventDefault(); // Prevent text selection
-        e.stopPropagation(); // Prevent bubbling to parent click handlers
+        e.preventDefault(); 
+        e.stopPropagation(); 
         setIsResizing(true);
     }, []);
+    
     const stopResizing = useCallback(() => setIsResizing(false), []);
+    
     const resize = useCallback((e: MouseEvent | TouchEvent) => {
         if (isResizing) {
-            let clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
-            setSidebarWidth(Math.max(200, Math.min(clientX, window.innerWidth * 0.9)));
+            let clientX;
+            if ('touches' in e) {
+                clientX = e.touches[0].clientX;
+            } else {
+                clientX = (e as MouseEvent).clientX;
+            }
+            
+            // Ensure we have a valid coordinate
+            if (typeof clientX === 'number') {
+                setSidebarWidth(Math.max(200, Math.min(clientX, window.innerWidth * 0.9)));
+            }
         }
     }, [isResizing]);
 
     useEffect(() => {
+        const handleTouchMove = (e: TouchEvent) => {
+             if (isResizing) {
+                 e.preventDefault(); // Prevent scrolling on touch devices
+                 resize(e);
+             }
+        };
+
         if (isResizing) {
-            window.addEventListener("mousemove", resize); window.addEventListener("mouseup", stopResizing);
-            window.addEventListener("touchmove", resize); window.addEventListener("touchend", stopResizing);
-            document.body.style.cursor = 'col-resize'; document.body.style.userSelect = 'none';
-        } else {
-            window.removeEventListener("mousemove", resize); window.removeEventListener("mouseup", stopResizing);
-            window.removeEventListener("touchmove", resize); window.removeEventListener("touchend", stopResizing);
-            document.body.style.cursor = ''; document.body.style.userSelect = '';
+            window.addEventListener("mousemove", resize); 
+            window.addEventListener("mouseup", stopResizing);
+            window.addEventListener("touchmove", handleTouchMove, { passive: false }); 
+            window.addEventListener("touchend", stopResizing);
+            
+            document.body.style.cursor = 'col-resize'; 
+            document.body.style.userSelect = 'none';
         }
-        return () => { window.removeEventListener("mousemove", resize); window.removeEventListener("mouseup", stopResizing); };
+
+        return () => { 
+            window.removeEventListener("mousemove", resize); 
+            window.removeEventListener("mouseup", stopResizing);
+            window.removeEventListener("touchmove", handleTouchMove); 
+            window.removeEventListener("touchend", stopResizing);
+            document.body.style.cursor = ''; 
+            document.body.style.userSelect = '';
+        };
     }, [isResizing, resize, stopResizing]);
 
     const handleSave = () => {
@@ -571,7 +597,13 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
                 </div>
             </div>
 
-            <div className="hidden sm:flex w-4 cursor-col-resize items-center justify-center hover:bg-blue-500/10 transition-colors z-20 -ml-2 mr-[-2px] touch-none" onMouseDown={startResizing} onTouchStart={startResizing}><div className="w-1 h-12 bg-gray-300 dark:bg-slate-600 rounded-full shadow-sm"></div></div>
+            <div 
+                className="hidden sm:flex w-4 cursor-col-resize items-center justify-center hover:bg-blue-500/10 transition-colors z-20 -ml-2 mr-[-2px] touch-none select-none" 
+                onMouseDown={startResizing}
+                onTouchStart={startResizing}
+            >
+                <div className="w-1 h-12 bg-gray-300 dark:bg-slate-600 rounded-full shadow-sm pointer-events-none"></div>
+            </div>
 
             <div className={`flex-grow min-w-0 bg-gray-100 dark:bg-slate-900 relative overflow-hidden flex flex-col ${mobileView === 'preview' ? 'flex' : 'hidden sm:flex'}`}>
                 <div className="h-12 bg-white dark:bg-slate-800 border-b dark:border-slate-700 flex justify-between items-center px-4 shrink-0">
