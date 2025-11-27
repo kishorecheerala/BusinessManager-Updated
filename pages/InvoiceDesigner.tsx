@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { InvoiceTemplateConfig, DocumentType, InvoiceLabels, CustomFont, ProfileData } from '../types';
+import { InvoiceTemplateConfig, DocumentType, InvoiceLabels, CustomFont, ProfileData, Page } from '../types';
 import Button from '../components/Button';
 import ColorPickerModal from '../components/ColorPickerModal';
 import { generateA4InvoicePdf, generateEstimatePDF, generateDebitNotePDF, generateThermalInvoicePDF, generateGenericReportPDF } from '../utils/pdfGenerator';
@@ -296,9 +296,10 @@ const PDFCanvasPreview: React.FC<{
 // --- Main Editor Component ---
 interface InvoiceDesignerProps {
     setIsDirty: (isDirty: boolean) => void;
+    setCurrentPage: (page: Page) => void;
 }
 
-const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
+const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurrentPage }) => {
     const { state, dispatch, showToast } = useAppContext();
     const { showConfirm } = useDialog();
     
@@ -386,16 +387,22 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
     };
 
     const [localConfig, setLocalConfig] = useState<ExtendedLayoutConfig>(getInitialConfig('INVOICE'));
+    const [initialConfigJson, setInitialConfigJson] = useState('');
     
+    // Load initial config when docType changes
     useEffect(() => {
-        setLocalConfig(getInitialConfig(docType));
+        const conf = getInitialConfig(docType);
+        setLocalConfig(conf);
+        setInitialConfigJson(JSON.stringify(conf));
+        setIsDirty(false);
     }, [docType]);
 
+    // Track dirty state by comparing current localConfig with initial snapshot
     useEffect(() => {
-        // Simple dirty check (could be improved with deep compare)
-        setIsDirty(true);
-        return () => setIsDirty(false);
-    }, [localConfig, setIsDirty]);
+        if (!initialConfigJson) return;
+        const isChanged = JSON.stringify(localConfig) !== initialConfigJson;
+        setIsDirty(isChanged);
+    }, [localConfig, initialConfigJson, setIsDirty]);
 
     const handleConfigChange = (section: keyof ExtendedLayoutConfig, key: string, value: any) => {
         setLocalConfig(prev => ({
@@ -426,6 +433,9 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
             payload: { type: docType, config: localConfig } 
         });
         showToast(`${docType} template saved successfully!`);
+        
+        // Update baseline for dirty checking
+        setInitialConfigJson(JSON.stringify(localConfig));
         setIsDirty(false);
     };
 
@@ -519,6 +529,13 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
                 {/* Header */}
                 <div className="p-4 border-b dark:border-slate-800 flex justify-between items-center bg-gray-50 dark:bg-slate-900">
                     <div className="flex items-center gap-2">
+                        <button 
+                            onClick={() => setCurrentPage('DASHBOARD')} 
+                            className="p-2 rounded-lg hover:bg-white dark:hover:bg-slate-700 text-slate-500 transition-colors mr-1"
+                            title="Exit to Dashboard"
+                        >
+                             <ArrowLeft size={20} />
+                        </button>
                         <div className="p-2 bg-indigo-600 rounded-lg text-white shadow-lg">
                             <Wand2 size={18} />
                         </div>
@@ -933,7 +950,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty }) => {
                 {/* Top Action Bar */}
                 <div className="bg-white dark:bg-slate-900 border-b dark:border-slate-800 p-3 flex justify-between items-center shadow-sm z-10 shrink-0">
                     <div className="flex gap-2">
-                        <Button onClick={() => window.history.back()} variant="secondary" className="h-8 w-8 p-0 rounded-full flex items-center justify-center"><ArrowLeft size={16}/></Button>
+                        <Button onClick={() => setCurrentPage('DASHBOARD')} variant="secondary" className="h-8 w-8 p-0 rounded-full flex items-center justify-center" title="Back to Dashboard"><ArrowLeft size={16}/></Button>
                         <span className="text-sm font-semibold text-gray-500 self-center px-2 border-l ml-2">Live Preview</span>
                     </div>
                     

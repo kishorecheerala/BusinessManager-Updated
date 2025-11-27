@@ -363,7 +363,7 @@ const MainApp: React.FC = () => {
       case 'INSIGHTS': return <InsightsPage setCurrentPage={setCurrentPage} />;
       case 'EXPENSES': return <ExpensesPage {...commonProps} />;
       case 'QUOTATIONS': return <QuotationsPage />;
-      case 'INVOICE_DESIGNER': return <InvoiceDesigner {...commonProps} />;
+      case 'INVOICE_DESIGNER': return <InvoiceDesigner {...commonProps} setCurrentPage={setCurrentPage} />;
       default: return <Dashboard setCurrentPage={setCurrentPage} />;
     }
   };
