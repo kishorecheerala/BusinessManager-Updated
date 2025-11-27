@@ -17,7 +17,8 @@
     "html5-qrcode": "^2.3.8",
     "idb": "^8.0.0",
     "jsbarcode": "^3.12.1",
-    "@google/genai": "latest"
+    "@google/genai": "latest",
+    "pdfjs-dist": "3.11.174"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

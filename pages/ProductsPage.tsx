@@ -59,7 +59,6 @@ const ProductImage: React.FC<ProductImageProps> = ({ src, alt, className, onPrev
         } else if (e.pointerType === 'touch' && isLongPress.current) {
             e.stopPropagation(); // Stop row selection if it was a long press
         }
-        // If touch and NOT long press, let it bubble to select the row
     };
 
     const handlePointerCancel = () => {
@@ -131,7 +130,7 @@ const QRScannerModal: React.FC<{
     }, [onScanned]);
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex flex-col items-center justify-center z-[2100] p-4 animate-fade-in-fast">
+        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex flex-col items-center justify-center z-[5100] p-4 animate-fade-in-fast">
             <Card title="Scan Product QR Code" className="w-full max-w-md relative animate-scale-in">
                  <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
                     <X size={20}/>
@@ -156,18 +155,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
     
-    // State for multi-select
     const [isSelectMode, setIsSelectMode] = useState(false);
     const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
     const [isBatchBarcodeModalOpen, setIsBatchBarcodeModalOpen] = useState(false);
     
-    // State for Showcase Mode - Default to TRUE
     const [isShowcaseMode, setIsShowcaseMode] = useState(true);
-    
     const [isScanning, setIsScanning] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     
-    // Cropper State
     const [cropModalOpen, setCropModalOpen] = useState(false);
     const [tempImageSrc, setTempImageSrc] = useState<string | null>(null);
     
@@ -176,7 +171,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             const productToSelect = state.products.find(p => p.id === state.selection.id);
             if (productToSelect) {
                 setSelectedProduct(productToSelect);
-                setIsShowcaseMode(false); // Switch to details view if navigated to specific ID
+                setIsShowcaseMode(false); 
             }
             dispatch({ type: 'CLEAR_SELECTION' });
         }
@@ -198,7 +193,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         }
     }, [selectedProduct, isEditing, newQuantity, editedProduct, setIsDirty, isSelectMode, selectedProductIds]);
 
-    // On unmount, we must always clean up.
     useEffect(() => {
         return () => {
             setIsDirty(false);
@@ -215,11 +209,11 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             setEditedProduct(null);
         }
         setIsEditing(false);
-    }, [selectedProduct?.id, state.products]); // Depend on ID to avoid loop
+    }, [selectedProduct?.id, state.products]); 
     
     const toggleSelectMode = () => {
         setIsSelectMode(!isSelectMode);
-        setSelectedProductIds([]); // Reset selections when toggling
+        setSelectedProductIds([]); 
     };
 
     const handleProductClick = (product: Product) => {
@@ -261,7 +255,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         }
     };
     
-    // Updated Image Upload Handler
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0] && editedProduct) {
             const file = e.target.files[0];
@@ -273,7 +266,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 }
             };
             reader.readAsDataURL(file);
-            // Reset input to allow re-selecting same file if needed
             e.target.value = '';
         }
     };
@@ -291,15 +283,13 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         const product = state.products.find(p => p.id.toLowerCase() === scannedText.toLowerCase());
         if (product) {
             setSelectedProduct(product);
-            setSearchTerm(''); // Clear search so we see the selected item logic take over
+            setSearchTerm(''); 
         } else {
-            // If not found exactly, put it in search term to filter
             setSearchTerm(scannedText);
             showToast("Product not found. Filtered list by scanned code.", 'info');
         }
     };
 
-    // Optimized Filtering
     const filteredProducts = useMemo(() => {
         const lowerTerm = searchTerm.toLowerCase();
         return state.products.filter(p => 
@@ -316,20 +306,20 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         }
     };
 
-    // Prepare items for batch barcode printing
     const batchBarcodeItems: PurchaseItem[] = useMemo(() => {
         return state.products
             .filter(p => selectedProductIds.includes(p.id))
             .map(p => ({
                 productId: p.id,
                 productName: p.name,
-                quantity: p.quantity > 0 ? p.quantity : 1, // Default to 1 for printing if 0 stock, or use current stock
+                quantity: p.quantity > 0 ? p.quantity : 1, 
                 price: p.purchasePrice,
                 saleValue: p.salePrice,
                 gstPercent: p.gstPercent
             }));
     }, [selectedProductIds, state.products]);
 
+    // ** IMPORTANT: DETAILS VIEW (Highest Z-Index Overlay) **
     if (selectedProduct && editedProduct) {
         const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
             const { name, value } = e.target;
@@ -337,29 +327,36 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         };
 
         return (
-            <div className="fixed inset-0 top-0 left-0 w-full h-full z-[2000] bg-white dark:bg-slate-900 flex flex-col md:flex-row animate-fade-in-fast overflow-hidden">
-                {/* REQUIRED MODALS INJECTED INTO DETAILS VIEW */}
-                <BarcodeModal 
-                    isOpen={isDownloadModalOpen} 
-                    onClose={() => setIsDownloadModalOpen(false)} 
-                    product={selectedProduct} 
-                    businessName={state.profile?.name || 'Business Manager'}
-                />
+            <div className="fixed inset-0 w-full h-full z-[5000] bg-white dark:bg-slate-900 flex flex-col md:flex-row overflow-hidden animate-fade-in-fast">
+                {/* Modals inside Details View with extreme Z-Index to top everything */}
+                {isDownloadModalOpen && (
+                    <div className="fixed inset-0 z-[6000]">
+                        <BarcodeModal 
+                            isOpen={isDownloadModalOpen} 
+                            onClose={() => setIsDownloadModalOpen(false)} 
+                            product={selectedProduct} 
+                            businessName={state.profile?.name || 'Business Manager'}
+                        />
+                    </div>
+                )}
                 {cropModalOpen && (
-                    <ImageCropperModal 
-                        isOpen={cropModalOpen} 
-                        imageSrc={tempImageSrc} 
-                        onClose={() => { setCropModalOpen(false); setTempImageSrc(null); }} 
-                        onCrop={handleCropSave} 
-                    />
+                    <div className="fixed inset-0 z-[6000]">
+                        <ImageCropperModal 
+                            isOpen={cropModalOpen} 
+                            imageSrc={tempImageSrc} 
+                            onClose={() => { setCropModalOpen(false); setTempImageSrc(null); }} 
+                            onCrop={handleCropSave} 
+                        />
+                    </div>
                 )}
                 {isScanning && (
-                    <QRScannerModal onClose={() => setIsScanning(false)} onScanned={handleScan} />
+                    <div className="fixed inset-0 z-[6000]">
+                        <QRScannerModal onClose={() => setIsScanning(false)} onScanned={handleScan} />
+                    </div>
                 )}
                 
-                {/* Lightbox Overlay for Details View */}
                 {previewImage && (
-                    <div className="fixed inset-0 bg-black bg-opacity-95 z-[2100] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setPreviewImage(null)}>
+                    <div className="fixed inset-0 bg-black bg-opacity-95 z-[6000] flex items-center justify-center p-4" onClick={() => setPreviewImage(null)}>
                         <div className="relative max-w-full max-h-full w-full h-full flex items-center justify-center">
                              <button 
                                 onClick={(e) => { e.stopPropagation(); setPreviewImage(null); }}
@@ -372,18 +369,16 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     </div>
                 )}
                 
-                {/* Floating Back Button - Visible always on top left, z-index above everything */}
                 <button 
                     onClick={() => setSelectedProduct(null)} 
-                    className="absolute top-4 left-4 z-[2010] p-3 bg-black/30 hover:bg-black/50 backdrop-blur-md text-white rounded-full transition-all shadow-lg transform active:scale-90"
+                    className="absolute top-4 left-4 z-[5010] p-3 bg-black/30 hover:bg-black/50 backdrop-blur-md text-white rounded-full transition-all shadow-lg transform active:scale-90"
                     aria-label="Back to Inventory"
                 >
                     <ArrowLeft size={24} strokeWidth={2.5} />
                 </button>
                 
                 {/* LEFT: IMAGE SECTION */}
-                {/* Mobile: 62% height. Tablet/Desktop: 50% width, full height */}
-                <div className="h-[62%] w-full md:h-full md:w-1/2 bg-gray-100 dark:bg-slate-900 relative group flex-shrink-0 transition-all duration-500">
+                <div className="h-[62%] w-full md:h-full md:w-1/2 bg-gray-100 dark:bg-slate-900 relative group flex-shrink-0">
                     <div className="absolute inset-0 flex items-center justify-center">
                         <div className="relative w-full h-full flex items-center justify-center overflow-hidden bg-gray-50 dark:bg-slate-900">
                             <ProductImage 
@@ -396,8 +391,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                         </div>
                     </div>
 
-                    {/* Floating Toggle on Image (Top Right) */}
-                    <div className="absolute top-4 right-4 flex flex-col gap-2 z-[2010]">
+                    <div className="absolute top-4 right-4 flex flex-col gap-2 z-[5010]">
                         <button 
                             onClick={() => setPreviewImage(isEditing ? (editedProduct.image || '') : (selectedProduct.image || ''))}
                             className="p-2 bg-white/90 dark:bg-slate-800/90 text-gray-700 dark:text-white rounded-full shadow-lg hover:bg-white dark:hover:bg-slate-700 transition-all"
@@ -407,7 +401,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                         </button>
                     </div>
 
-                    {/* Edit Overlay */}
                     {isEditing && (
                         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent pt-20 flex justify-center gap-3 pb-10 md:pb-4 z-20">
                             <input 
@@ -435,11 +428,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 </div>
 
                 {/* RIGHT: DETAILS SECTION */}
-                {/* Mobile: Bottom ~40%, overlaps with negative margin */}
-                {/* Tablet/Desktop: Right 50%, Full Height */}
-                <div className="flex-1 h-full w-full md:w-1/2 bg-white dark:bg-slate-800 flex flex-col border-t md:border-t-0 md:border-l dark:border-slate-700 shadow-[0_-10px_30px_-5px_rgba(0,0,0,0.15)] md:shadow-none relative z-10 rounded-t-3xl md:rounded-none -mt-6 md:mt-0 overflow-hidden animate-slide-up-fade">
+                <div className="flex-1 h-full w-full md:w-1/2 bg-white dark:bg-slate-800 flex flex-col border-t md:border-t-0 md:border-l dark:border-slate-700 shadow-[0_-10px_30px_-5px_rgba(0,0,0,0.15)] md:shadow-none relative z-10 rounded-t-3xl md:rounded-none -mt-6 md:mt-0 overflow-hidden">
                     
-                    {/* Scrollable Form Content */}
                     <div className="flex-grow overflow-y-auto custom-scrollbar p-5 pt-6 space-y-4">
                         {isEditing ? (
                             <div className="space-y-4 animate-fade-in-fast">
@@ -500,7 +490,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                     </div>
                                 </div>
                                 
-                                {/* Stock Correction */}
                                 <div>
                                     <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1.5">Quick Stock Correction</label>
                                     <div className="flex gap-2">
@@ -517,257 +506,4 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 
                                 <Button onClick={() => setIsDownloadModalOpen(true)} className="w-full py-2.5 bg-gray-800 text-white hover:bg-gray-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-sm">
                                     <Barcode className="w-4 h-4 mr-2"/> Print Barcode
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Sticky Actions Footer inside Details */}
-                    <div className="p-3 bg-white dark:bg-slate-800 border-t dark:border-slate-700 shrink-0 pb-6 sm:pb-3">
-                        <div className="flex gap-3">
-                            {isEditing ? (
-                                <>
-                                    <button onClick={() => setIsEditing(false)} className="flex-1 py-2.5 rounded-xl font-bold bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-slate-700 dark:text-white dark:hover:bg-slate-600 transition-colors text-sm">
-                                        Cancel
-                                    </button>
-                                    <Button onClick={handleUpdateProduct} className="flex-[2] py-2.5 rounded-xl text-sm shadow-lg">
-                                        <Save size={16} className="mr-2"/> Save Changes
-                                    </Button>
-                                </>
-                            ) : (
-                                <Button onClick={() => setIsEditing(true)} variant="secondary" className="w-full py-2.5 rounded-xl text-sm bg-indigo-50 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-300 border-indigo-200">
-                                    <Edit size={16} className="mr-2"/> Edit Details
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-4">
-            {isScanning && <QRScannerModal onClose={() => setIsScanning(false)} onScanned={handleScan} />}
-            
-            {/* Image Cropper */}
-            {cropModalOpen && (
-                <ImageCropperModal 
-                    isOpen={cropModalOpen} 
-                    imageSrc={tempImageSrc} 
-                    onClose={() => {
-                        setCropModalOpen(false);
-                        setTempImageSrc(null);
-                    }} 
-                    onCrop={handleCropSave} 
-                />
-            )}
-            
-            {/* Full Screen Image Preview Modal - Use for Grid Mode Only & Details View */}
-            {previewImage && (
-                <div className="fixed inset-0 bg-black bg-opacity-95 z-[2100] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setPreviewImage(null)}>
-                    <div className="relative max-w-full max-h-full w-full h-full flex items-center justify-center">
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); setPreviewImage(null); }}
-                            className="absolute top-4 right-4 p-3 bg-white/20 text-white rounded-full hover:bg-white/40 transition-colors z-50"
-                        >
-                            <X size={24} />
-                        </button>
-                        <img src={previewImage} alt="Full Preview" className="max-w-full max-h-full object-contain" />
-                    </div>
-                </div>
-            )}
-            
-            {isBatchBarcodeModalOpen && (
-                <BatchBarcodeModal
-                    isOpen={isBatchBarcodeModalOpen}
-                    onClose={() => setIsBatchBarcodeModalOpen(false)}
-                    purchaseItems={batchBarcodeItems}
-                    businessName={state.profile?.name || 'Business Manager'}
-                    title="Batch Barcode Print"
-                />
-            )}
-
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-2xl font-bold text-primary">Inventory</h1>
-                    <DatePill />
-                </div>
-                
-                <div className="flex gap-2">
-                    <button 
-                        onClick={() => setIsShowcaseMode(!isShowcaseMode)} 
-                        className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${isShowcaseMode ? 'bg-indigo-600 text-white shadow-md' : 'bg-white dark:bg-slate-800 text-gray-600 dark:text-gray-300 border dark:border-slate-700'}`}
-                    >
-                        {isShowcaseMode ? <Grid size={16} /> : <List size={16} />}
-                        {isShowcaseMode ? 'Showcase Mode' : 'Admin View'}
-                    </button>
-                    
-                    {!isShowcaseMode && (
-                        <>
-                            {isSelectMode && (
-                                <Button 
-                                    onClick={() => setIsBatchBarcodeModalOpen(true)} 
-                                    disabled={selectedProductIds.length === 0}
-                                    variant="secondary"
-                                >
-                                    <Printer className="w-4 h-4 mr-2" /> Print ({selectedProductIds.length})
-                                </Button>
-                            )}
-                            <Button onClick={toggleSelectMode} variant={isSelectMode ? "secondary" : "primary"}>
-                                {isSelectMode ? 'Cancel' : 'Select'}
-                            </Button>
-                        </>
-                    )}
-                </div>
-            </div>
-            
-            {/* Search Bar with Scan */}
-            <div className="flex items-center gap-2">
-                <div className="relative flex-grow">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                    <input
-                        type="text"
-                        placeholder="Search products by name or ID..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full p-2 pl-10 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
-                    />
-                </div>
-                <button 
-                    onClick={() => setIsScanning(true)}
-                    className="p-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors shadow-sm"
-                    title="Scan QR Code"
-                >
-                    <QrCode size={20} />
-                </button>
-            </div>
-            
-            {/* Selection Tool (Admin Mode only) */}
-            {isSelectMode && !isShowcaseMode && (
-                 <div className="flex items-center gap-2 mb-2">
-                    <input 
-                        type="checkbox" 
-                        checked={selectedProductIds.length === filteredProducts.length && filteredProducts.length > 0}
-                        onChange={handleSelectAll}
-                        className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
-                        id="select-all"
-                    />
-                    <label htmlFor="select-all" className="text-sm text-gray-700 dark:text-gray-300">Select All ({filteredProducts.length})</label>
-                </div>
-            )}
-
-            {/* SHOWCASE MODE (GRID) */}
-            {isShowcaseMode ? (
-                filteredProducts.length > 0 ? (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 animate-fade-in-up">
-                        {filteredProducts.map((product) => (
-                            <div key={product.id} onClick={() => handleProductClick(product)} className="bg-white dark:bg-slate-800 rounded-xl overflow-hidden shadow-md border border-gray-100 dark:border-slate-700 hover:shadow-xl transition-shadow flex flex-col h-full cursor-pointer group relative">
-                                <div className="aspect-square w-full bg-gray-100 dark:bg-slate-700 relative overflow-hidden">
-                                    <ProductImage 
-                                        src={product.image} 
-                                        alt={product.name} 
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                        onPreview={setPreviewImage}
-                                        enableInteract={false} // Disable click-to-preview on the image directly in grid
-                                    />
-                                    
-                                    {/* Full Screen Button - Visible Always on All Devices */}
-                                    {product.image && (
-                                        <button 
-                                            onClick={(e) => { 
-                                                e.stopPropagation(); 
-                                                setPreviewImage(product.image!); 
-                                            }}
-                                            className="absolute top-2 right-2 p-2 bg-black/40 hover:bg-black/60 text-white rounded-full opacity-100 transition-all duration-200 transform active:scale-95 hover:scale-110 z-10"
-                                            title="View Full Screen"
-                                        >
-                                            <Maximize2 size={16} />
-                                        </button>
-                                    )}
-
-                                    {product.quantity < 1 && (
-                                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center pointer-events-none">
-                                            <span className="bg-red-600 text-white px-3 py-1 text-xs font-bold uppercase tracking-widest rounded-sm">Out of Stock</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="p-3 flex flex-col flex-grow">
-                                    <h3 className="font-semibold text-gray-800 dark:text-gray-100 text-sm line-clamp-2 mb-1 flex-grow">{product.name}</h3>
-                                    <div className="flex justify-between items-end mt-2">
-                                        <span className="text-lg font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</span>
-                                        {product.quantity > 0 && (
-                                            <span className="text-[10px] bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 px-2 py-0.5 rounded-full">In Stock</span>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <EmptyState 
-                        icon={Boxes}
-                        title="No Products Found"
-                        description={searchTerm ? `No products match "${searchTerm}"` : "Your inventory is empty. Add products to get started."}
-                    />
-                )
-            ) : (
-            /* ADMIN MODE (LIST) */
-            filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-1 gap-3 animate-fade-in-up">
-                    {filteredProducts.map((product, index) => (
-                        <div 
-                            key={product.id} 
-                            className={`bg-white dark:bg-slate-800 p-4 rounded-lg shadow-sm border transition-all flex items-center gap-3 ${isSelectMode && selectedProductIds.includes(product.id) ? 'border-primary ring-1 ring-primary bg-primary/10 dark:bg-primary/20' : 'border-gray-100 dark:border-slate-700 hover:shadow-md cursor-pointer'}`}
-                            style={{ animationDelay: `${index * 30}ms` }}
-                            onClick={() => handleProductClick(product)}
-                        >
-                            {isSelectMode && (
-                                 <div className={`w-5 h-5 rounded border flex items-center justify-center flex-shrink-0 ${selectedProductIds.includes(product.id) ? 'bg-primary border-primary' : 'border-gray-400 bg-white dark:bg-slate-700'}`}>
-                                    {selectedProductIds.includes(product.id) && <PackageCheck size={14} className="text-white" />}
-                                </div>
-                            )}
-                            
-                            <div className="w-12 h-12 rounded bg-gray-100 dark:bg-slate-700 overflow-hidden flex-shrink-0 border border-gray-200 dark:border-slate-600 relative">
-                                <ProductImage 
-                                    src={product.image} 
-                                    alt={product.name} 
-                                    className="w-full h-full object-cover"
-                                    onPreview={setPreviewImage}
-                                />
-                            </div>
-
-                            <div className="flex-grow min-w-0">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{product.name}</p>
-                                        <div className="flex items-center gap-2 mt-0.5">
-                                            <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">{product.id}</span>
-                                        </div>
-                                    </div>
-                                    <div className="text-right flex-shrink-0">
-                                        <p className="font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</p>
-                                        <div className="flex justify-end gap-2 text-xs">
-                                            <span className={`font-medium ${product.quantity < 5 ? 'text-red-500' : 'text-green-600'}`}>
-                                                Stock: {product.quantity}
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                <EmptyState 
-                    icon={Boxes}
-                    title="No Products Found"
-                    description={searchTerm ? `No products match "${searchTerm}"` : "Your inventory is empty. Add products via Purchase page or CSV import."}
-                />
-            )
-            )}
-        </div>
-    );
-};
-
-export default ProductsPage;
+                                </
