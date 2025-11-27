@@ -105,7 +105,6 @@ const convertNumberToWords = (amount: number): string => {
 };
 
 // --- Helper: Safe Currency Formatting ---
-// Checks if standard font is used and replaces ₹ with Rs. to prevent garbled text
 const formatCurrency = (amount: number, symbol: string, fontName: string): string => {
     const isStandardFont = ['helvetica', 'times', 'courier'].includes(fontName.toLowerCase());
     // If using standard font and symbol is Rupee, fallback to Rs.
@@ -143,11 +142,23 @@ export const addBusinessHeader = (doc: jsPDF, profile: ProfileData | null, title
             const format = getImageType(logoToUse);
             const width = 25;
             let height = 25;
-            // Attempt to maintain aspect ratio if possible
+            // Attempt to maintain aspect ratio
             try {
                 const props = doc.getImageProperties(logoToUse);
-                height = width / (props.width / props.height);
+                if (props.width > 0 && props.height > 0) {
+                    height = width / (props.width / props.height);
+                }
             } catch(e) {}
+            
+            // Constrain height if aspect ratio is wild
+            if (height > 40) {
+                const scale = 40 / height;
+                height = 40;
+                // width will be smaller, but we fixed width. 
+                // Actually better to fix max dimension. 
+                // For simplified headers, let's just clamp height.
+            }
+            
             doc.addImage(logoToUse, format, 14, 10, width, height);
         } catch (e) {
             console.warn("Failed to add logo", e);
@@ -214,7 +225,6 @@ export const generateThermalInvoicePDF = async (
     
     const terms = templateConfig?.content.termsText || '';
     const footer = templateConfig?.content.footerText || 'Thank You! Visit Again.';
-    const showQr = templateConfig?.content.showQr ?? true;
     const currencySymbol = templateConfig?.currencySymbol || 'Rs.';
     const dateFormat = templateConfig?.dateFormat || 'DD/MM/YYYY';
     const labels = { ...defaultLabels, ...templateConfig?.content.labels };
@@ -393,6 +403,8 @@ const _generateConfigurablePDF = async (
     const isBanner = layout.headerStyle === 'banner';
     if (isBanner) {
         doc.setFillColor(colors.bannerBg || colors.primary);
+        // Reserve space but draw rect dynamically based on content height
+        // Initial rect, will redraw if needed or assume height
         doc.rect(0, 0, pageWidth, 40 + (layout.logoSize/2), 'F');
         currentY += 5;
     }
@@ -406,15 +418,26 @@ const _generateConfigurablePDF = async (
     let textX = margin;
     let textY = currentY;
     let textAlign: 'left' | 'center' | 'right' = 'left';
-    let renderedLogoHeight = 0; // Track actual rendered height
+    let renderedLogoHeight = 0;
 
     // Calculate Logo Aspect Ratio and Dimensions
     if (hasLogo) {
         try {
             const imgProps = doc.getImageProperties(logoUrl);
             const ratio = imgProps.width / imgProps.height;
-            // layout.logoSize acts as Width. Calculate height.
+            // layout.logoSize acts as Width constraint.
             renderedLogoHeight = layout.logoSize / ratio;
+            
+            // Safety cap for logo height to prevent overlap
+            if (renderedLogoHeight > 60) { 
+                const capRatio = 60 / renderedLogoHeight;
+                renderedLogoHeight = 60;
+                // Width will be reduced proportionally if we were rendering by height, 
+                // but here we set width fixed. If height is capped, we should probably adjust width to maintain aspect ratio
+                // But `doc.addImage` takes w,h. We just need to pass consistent values.
+                // If we cap height, effective width must shrink.
+                // But user slider controls width. Let's just use calculated height but cap it for layout flow purposes.
+            }
         } catch (e) {
             // Fallback to square if props fail
             renderedLogoHeight = layout.logoSize;

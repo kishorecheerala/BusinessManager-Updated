@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Save, RotateCcw, Type, Layout, Palette, FileText, Image as ImageIcon, RefreshCw, Eye, Edit3, ExternalLink, ChevronDown, Upload, Trash2, Wand2, Sparkles, Grid, Languages, PenTool, QrCode, Download, FileUp, Stamp, Banknote, TableProperties, EyeOff, GripVertical, ArrowLeft } from 'lucide-react';
+import { Save, RotateCcw, Type, Layout, Palette, FileText, Image as ImageIcon, RefreshCw, Eye, Edit3, ExternalLink, ChevronDown, Upload, Trash2, Wand2, Sparkles, Grid, Languages, PenTool, QrCode, Download, FileUp, Stamp, Banknote, TableProperties, EyeOff, GripVertical, ArrowLeft, LogOut } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import { useAppContext } from '../context/AppContext';
 import { InvoiceTemplateConfig, DocumentType, InvoiceLabels } from '../types';
@@ -199,17 +199,17 @@ const InvoiceDesigner: React.FC = () => {
     const [themeDescription, setThemeDescription] = useState('');
     const [targetLanguage, setTargetLanguage] = useState('Telugu');
     
-    // Resize Logic States
+    // Resize Logic States - Start with 320 for Tablet compatibility
     const [sidebarWidth, setSidebarWidth] = useState(320);
     const [isResizing, setIsResizing] = useState(false);
-    // Lower breakpoint for Z Fold open state (often treated as > 600px)
+    // Use 'sm' breakpoint (640px) as threshold for split view
     const [isMd, setIsMd] = useState(typeof window !== 'undefined' ? window.innerWidth >= 640 : true);
     
     const fontInputRef = useRef<HTMLInputElement>(null);
     const signatureInputRef = useRef<HTMLInputElement>(null);
     const importInputRef = useRef<HTMLInputElement>(null);
 
-    // Detect screen size for conditional rendering of resize logic
+    // Detect screen size
     useEffect(() => {
         const handleResize = () => setIsMd(window.innerWidth >= 640);
         window.addEventListener('resize', handleResize);
@@ -283,10 +283,12 @@ const InvoiceDesigner: React.FC = () => {
                     clientX = (e as MouseEvent).clientX;
                 }
                 
-                // Account for padding/margins and allow a reasonable range
-                const newWidth = clientX - 16; 
-                // Permissive constraints: Min 100px, Max 90% of screen width to allow full resize flexibility
-                const constrainedWidth = Math.max(100, Math.min(newWidth, window.innerWidth * 0.9));
+                // Relaxed constraints: Allow resizing from 100px up to 90% of screen width
+                // This supports split view on Fold devices and standard tablets
+                const newWidth = clientX; 
+                const max = window.innerWidth * 0.9;
+                const constrainedWidth = Math.max(100, Math.min(newWidth, max));
+                
                 setSidebarWidth(constrainedWidth);
             }
         },
@@ -335,6 +337,8 @@ const InvoiceDesigner: React.FC = () => {
             
             if (doc) {
                 const blobUrl = doc.output('bloburl');
+                // Revoke old URL before setting new one to free memory, though useEffect also handles this
+                if (pdfUrl) URL.revokeObjectURL(pdfUrl);
                 setPdfUrl(blobUrl);
             }
         } catch (e) {
@@ -536,19 +540,10 @@ const InvoiceDesigner: React.FC = () => {
         e.target.value = ''; 
     };
 
-    const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            try {
-                const base64 = await compressImage(e.target.files[0], 300, 0.8);
-                updateConfig('content', 'signatureImage', base64);
-                showToast("Signature uploaded!");
-            } catch (e) { showToast("Failed to upload image", 'error'); }
-        }
-    };
-
-    const handleDeleteFont = (id: string) => {
-        if (window.confirm("Delete this custom font?")) {
-            dispatch({ type: 'REMOVE_CUSTOM_FONT', payload: id });
+    const handleDeleteFont = (fontId: string) => {
+        if (window.confirm("Are you sure you want to delete this custom font?")) {
+            dispatch({ type: 'REMOVE_CUSTOM_FONT', payload: fontId });
+            showToast("Font deleted.");
         }
     };
 
@@ -587,10 +582,10 @@ const InvoiceDesigner: React.FC = () => {
     };
 
     return (
-        <div className="h-full w-full flex flex-col md:flex-row overflow-hidden relative">
+        <div className="h-full w-full flex flex-col sm:flex-row overflow-hidden relative">
             
             {/* Mobile View Switcher */}
-            <div className="md:hidden flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg shrink-0 border dark:border-slate-700 mb-2 mx-2 mt-2">
+            <div className="sm:hidden flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg shrink-0 border dark:border-slate-700 mb-2 mx-2 mt-2">
                 <button onClick={() => setMobileView('editor')} className={`flex-1 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${mobileView === 'editor' ? 'bg-white dark:bg-slate-600 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}><Edit3 size={16} /> Editor</button>
                 <button onClick={() => setMobileView('preview')} className={`flex-1 py-2 rounded-md text-sm font-bold flex items-center justify-center gap-2 transition-all ${mobileView === 'preview' ? 'bg-white dark:bg-slate-600 text-primary shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}><Eye size={16} /> Preview</button>
             </div>
@@ -598,7 +593,7 @@ const InvoiceDesigner: React.FC = () => {
             {/* Left Control Panel */}
             <div 
                 style={isMd ? { width: sidebarWidth } : {}}
-                className={`flex-col bg-white dark:bg-slate-800 md:rounded-r-xl shadow-lg border-r border-gray-200 dark:border-slate-700 overflow-hidden ${mobileView === 'editor' ? 'flex flex-grow w-full' : 'hidden sm:flex'} shrink-0 z-10`}
+                className={`flex-col bg-white dark:bg-slate-800 sm:rounded-r-xl shadow-lg border-r border-gray-200 dark:border-slate-700 overflow-hidden ${mobileView === 'editor' ? 'flex flex-grow w-full' : 'hidden sm:flex'} shrink-0 z-10`}
             >
                 
                 {/* Document Type Selector & Header */}
@@ -609,7 +604,9 @@ const InvoiceDesigner: React.FC = () => {
                         </button>
                         <h2 className="font-bold text-lg text-primary">Invoice Designer</h2>
                         <div className="flex-grow"></div>
-                        <button onClick={handleExit} className="text-sm text-red-500 font-medium hover:underline px-2">Exit</button>
+                        <button onClick={handleExit} className="text-sm text-red-500 font-bold hover:bg-red-50 px-3 py-1 rounded flex items-center gap-1">
+                            <LogOut size={14} /> Exit
+                        </button>
                     </div>
 
                     <div className="mb-3">
@@ -766,6 +763,7 @@ const InvoiceDesigner: React.FC = () => {
                         </div>
                     )}
 
+                    {/* ... (Colors, Fonts, Content, Labels tabs remain unchanged) ... */}
                     {activeTab === 'colors' && (
                         <div className="space-y-4">
                             <Button onClick={extractBrandColor} variant="secondary" className="w-full mb-2 bg-gradient-to-r from-indigo-50 to-purple-50 hover:from-indigo-100 hover:to-purple-100 border-indigo-200 dark:from-indigo-900/20 dark:to-purple-900/20 dark:border-indigo-800">
