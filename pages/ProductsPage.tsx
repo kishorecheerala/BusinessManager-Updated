@@ -337,13 +337,25 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         };
 
         return (
-            <div className="fixed inset-0 top-0 left-0 w-screen h-screen z-[500] bg-white dark:bg-slate-900 flex flex-col md:flex-row animate-fade-in-fast overflow-hidden">
+            <div className="fixed inset-0 top-0 left-0 w-full h-full z-[500] bg-white dark:bg-slate-900 flex flex-col md:flex-row animate-fade-in-fast overflow-hidden">
+                {/* REQUIRED MODALS INJECTED INTO DETAILS VIEW */}
                 <BarcodeModal 
                     isOpen={isDownloadModalOpen} 
                     onClose={() => setIsDownloadModalOpen(false)} 
                     product={selectedProduct} 
                     businessName={state.profile?.name || 'Business Manager'}
                 />
+                {cropModalOpen && (
+                    <ImageCropperModal 
+                        isOpen={cropModalOpen} 
+                        imageSrc={tempImageSrc} 
+                        onClose={() => { setCropModalOpen(false); setTempImageSrc(null); }} 
+                        onCrop={handleCropSave} 
+                    />
+                )}
+                {isScanning && (
+                    <QRScannerModal onClose={() => setIsScanning(false)} onScanned={handleScan} />
+                )}
                 
                 {/* Lightbox Overlay for Details View */}
                 {previewImage && (

@@ -209,6 +209,11 @@ const InvoiceDesigner: React.FC = () => {
     const signatureInputRef = useRef<HTMLInputElement>(null);
     const importInputRef = useRef<HTMLInputElement>(null);
 
+    // Detect Mobile / Android for PDF Embed fallback
+    const isMobile = useMemo(() => {
+        return typeof navigator !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }, []);
+
     // Detect screen size
     useEffect(() => {
         const handleResize = () => setIsMd(window.innerWidth >= 640);
@@ -980,30 +985,35 @@ const InvoiceDesigner: React.FC = () => {
                      {/* PDF Preview Container */}
                      {pdfUrl ? (
                          <div className="w-full h-full relative shadow-xl rounded-lg overflow-hidden bg-white flex flex-col">
-                             {/* Use object tag for better compatibility */}
-                             <object 
-                                data={pdfUrl} 
-                                type="application/pdf" 
-                                className="w-full h-full flex-grow"
-                                key={pdfUrl} // Force refresh
-                             >
-                                {/* Fallback content for mobile browsers that don't support embedded PDF */}
-                                <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-4 bg-gray-50 dark:bg-slate-800">
-                                    <p className="text-gray-500 dark:text-gray-300 font-medium">Preview available via download</p>
-                                    <Button onClick={handleOpenPdf} className="shadow-lg">
-                                        <ExternalLink size={16} className="mr-2"/> Open PDF in Viewer
-                                    </Button>
-                                </div>
-                             </object>
-                             
-                            {/* Overlay button for mobile where object might fail to render PDF properly */}
-                            <div className="absolute bottom-4 right-4 md:hidden pointer-events-none">
-                                <div className="pointer-events-auto">
-                                    <Button onClick={handleOpenPdf} className="shadow-lg text-xs py-2 opacity-90 hover:opacity-100">
-                                        <ExternalLink size={14} className="mr-1"/> Full Screen
-                                    </Button>
-                                </div>
-                            </div>
+                             {isMobile ? (
+                                 /* Mobile Friendly View - Embeds often fail on Android */
+                                 <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-4 bg-gray-50 dark:bg-slate-800">
+                                     <div className="p-4 bg-gray-100 dark:bg-slate-700 rounded-full">
+                                         <FileText size={48} className="text-gray-400" />
+                                     </div>
+                                     <p className="text-gray-600 dark:text-gray-300 font-medium">
+                                         PDF Preview cannot be displayed inline on this device.
+                                     </p>
+                                     <Button onClick={handleOpenPdf} className="shadow-lg animate-pulse">
+                                         <ExternalLink size={16} className="mr-2"/> Open PDF Preview
+                                     </Button>
+                                 </div>
+                             ) : (
+                                 /* Desktop View - Use Object for better compatibility */
+                                 <object 
+                                    data={pdfUrl} 
+                                    type="application/pdf" 
+                                    className="w-full h-full flex-grow"
+                                    key={pdfUrl} // Force refresh
+                                 >
+                                    <div className="flex flex-col items-center justify-center h-full p-6 text-center space-y-4 bg-gray-50 dark:bg-slate-800">
+                                        <p className="text-gray-500 dark:text-gray-300 font-medium">Preview available via download</p>
+                                        <Button onClick={handleOpenPdf} className="shadow-lg">
+                                            <ExternalLink size={16} className="mr-2"/> Open PDF in Viewer
+                                        </Button>
+                                    </div>
+                                 </object>
+                             )}
                          </div>
                      ) : (
                          <div className="text-gray-400 text-sm">Generating preview...</div>
