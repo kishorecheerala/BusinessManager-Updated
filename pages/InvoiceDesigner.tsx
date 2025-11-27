@@ -275,9 +275,10 @@ const InvoiceDesigner: React.FC = () => {
                     clientX = (e as MouseEvent).clientX;
                 }
                 
-                // Account for typical padding/margins (approx 16px in layout)
+                // Account for padding/margins and allow a reasonable range
+                // Min 300px, Max 80% of screen width
                 const newWidth = clientX - 16; 
-                const constrainedWidth = Math.max(300, Math.min(newWidth, window.innerWidth * 0.7));
+                const constrainedWidth = Math.max(300, Math.min(newWidth, window.innerWidth * 0.8));
                 setSidebarWidth(constrainedWidth);
             }
         },
@@ -437,7 +438,6 @@ const InvoiceDesigner: React.FC = () => {
         setIsAiGenerating(true);
         try {
             const ai = new GoogleGenAI({ apiKey });
-            const model = ai.getGenerativeModel({ model: 'gemini-2.5-flash' });
             
             const businessType = state.profile?.name || "Retail Business";
             let prompt = "";
@@ -453,8 +453,11 @@ const InvoiceDesigner: React.FC = () => {
                 prompt = `Translate these invoice labels to ${targetLanguage}. Return ONLY a valid JSON object with the same keys: ${currentLabels}`;
             }
 
-            const result = await model.generateContent(prompt);
-            const response = result.text().replace(/```json|```/g, '').trim();
+            const result = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt
+            });
+            const response = (result.text || '').replace(/```json|```/g, '').trim();
 
             if (action === 'terms') {
                 updateConfig('content', 'termsText', response);
@@ -730,7 +733,7 @@ const InvoiceDesigner: React.FC = () => {
                                             type="range" 
                                             min="0.05" 
                                             max="0.5" 
-                                            step="0.05"
+                                            step="0.05" 
                                             value={config.layout.watermarkOpacity || 0.1} 
                                             onChange={(e) => updateConfig('layout', 'watermarkOpacity', parseFloat(e.target.value))} 
                                             className="w-full" 
@@ -883,88 +886,37 @@ const InvoiceDesigner: React.FC = () => {
                                             UPI Payment
                                         </button>
                                     </div>
-                                    
                                     {config.content.qrType === 'UPI_PAYMENT' && (
-                                        <div className="space-y-2 animate-fade-in-fast">
-                                            <div>
-                                                <label className="text-xs text-gray-500">UPI ID (VPA)</label>
-                                                <input type="text" value={config.content.upiId || ''} onChange={(e) => updateConfig('content', 'upiId', e.target.value)} placeholder="e.g. business@upi" className="w-full p-1.5 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
-                                            </div>
-                                            <div>
-                                                <label className="text-xs text-gray-500">Payee Name</label>
-                                                <input type="text" value={config.content.payeeName || ''} onChange={(e) => updateConfig('content', 'payeeName', e.target.value)} placeholder="Your Name" className="w-full p-1.5 text-sm border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
-                                            </div>
+                                        <div className="space-y-2 mt-2">
+                                            <input type="text" placeholder="UPI ID (e.g. name@okhdfcbank)" value={config.content.upiId || ''} onChange={(e) => updateConfig('content', 'upiId', e.target.value)} className="w-full p-2 text-xs border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                                            <input type="text" placeholder="Payee Name (Optional)" value={config.content.payeeName || ''} onChange={(e) => updateConfig('content', 'payeeName', e.target.value)} className="w-full p-2 text-xs border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
                                         </div>
                                     )}
                                 </div>
                             )}
-
-                            {/* Bank Details */}
-                            <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded border dark:border-slate-700">
-                                <label className="text-xs font-bold uppercase text-gray-500 mb-2 block">Bank Details Section</label>
-                                <textarea 
-                                    rows={3} 
-                                    value={config.content.bankDetails || ''} 
-                                    onChange={(e) => updateConfig('content', 'bankDetails', e.target.value)} 
-                                    className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white text-sm" 
-                                    placeholder="Bank Name: HDFC&#10;A/C No: 1234567890&#10;IFSC: HDFC0001234" 
-                                />
-                            </div>
-
-                            {config.content.showSignature && (
-                                <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded border dark:border-slate-700">
-                                    <label className="text-xs font-bold uppercase text-gray-500 mb-2 block">Signature Options</label>
-                                    <input type="text" value={config.content.signatureText || ''} onChange={(e) => updateConfig('content', 'signatureText', e.target.value)} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white mb-2" placeholder="Authorized Signatory" />
-                                    
-                                    <div className="flex items-center gap-2">
-                                        <input type="file" accept="image/*" ref={signatureInputRef} className="hidden" onChange={handleSignatureUpload} />
-                                        <Button onClick={() => signatureInputRef.current?.click()} variant="secondary" className="w-full text-xs"><PenTool size={14} className="mr-2"/> {config.content.signatureImage ? 'Change Signature Image' : 'Upload Signature Image'}</Button>
-                                        {config.content.signatureImage && <button onClick={() => updateConfig('content', 'signatureImage', undefined)} className="p-2 text-red-500 bg-white border rounded hover:bg-red-50"><Trash2 size={14}/></button>}
-                                    </div>
-                                </div>
-                            )}
-
-                            {config.content.showTerms && (
-                                <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Terms Text</label>
-                                        <button onClick={() => generateWithAI('terms')} disabled={isAiGenerating} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"><Sparkles size={12} /> {isAiGenerating ? 'Writing...' : 'Write with AI'}</button>
-                                    </div>
-                                    <textarea rows={3} value={config.content.termsText} onChange={(e) => updateConfig('content', 'termsText', e.target.value)} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" placeholder="e.g. No returns..." />
-                                </div>
-                            )}
-                            
-                            <div>
-                                <div className="flex justify-between items-center mb-1">
-                                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Footer Message</label>
-                                    <button onClick={() => generateWithAI('footer')} disabled={isAiGenerating} className="text-xs flex items-center gap-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400"><Sparkles size={12} /> {isAiGenerating ? 'Writing...' : 'Write with AI'}</button>
-                                </div>
-                                <input type="text" value={config.content.footerText} onChange={(e) => updateConfig('content', 'footerText', e.target.value)} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
-                            </div>
                         </div>
                     )}
 
                     {activeTab === 'labels' && (
                         <div className="space-y-4">
-                            <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-100 dark:border-blue-800">
-                                <label className="text-xs font-bold text-blue-800 dark:text-blue-300 mb-1 flex items-center gap-1"><Languages size={12}/> AI Translate Labels</label>
+                            <div className="p-3 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-100 dark:border-indigo-800">
+                                <label className="text-xs font-bold text-indigo-800 dark:text-indigo-300 mb-1 flex items-center gap-1"><Sparkles size={12}/> AI Translator</label>
                                 <div className="flex gap-2">
-                                    <select value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="flex-grow p-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white">
-                                        <option value="Telugu">Telugu</option><option value="Hindi">Hindi</option><option value="Tamil">Tamil</option><option value="Kannada">Kannada</option><option value="Malayalam">Malayalam</option><option value="Marathi">Marathi</option><option value="Gujarati">Gujarati</option><option value="Bengali">Bengali</option><option value="Spanish">Spanish</option><option value="French">French</option>
-                                    </select>
-                                    <button onClick={() => generateWithAI('translate')} disabled={isAiGenerating} className="bg-blue-600 text-white p-1.5 rounded text-xs hover:bg-blue-700 disabled:opacity-50">Translate</button>
+                                    <input type="text" placeholder="Language (e.g. Hindi, Tamil)" value={targetLanguage} onChange={(e) => setTargetLanguage(e.target.value)} className="flex-grow p-1.5 text-xs border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" />
+                                    <button onClick={() => generateWithAI('translate')} disabled={isAiGenerating} className="bg-indigo-600 text-white p-1.5 rounded text-xs hover:bg-indigo-700 disabled:opacity-50">Translate</button>
                                 </div>
                             </div>
-
-                            <div className="grid grid-cols-2 gap-3">
-                                {Object.entries(config.content.labels || defaultLabels).map(([key, val]) => (
+                            
+                            <div className="grid gap-3">
+                                {Object.entries(defaultLabels).map(([key, defaultVal]) => (
                                     <div key={key}>
-                                        <label className="text-xs text-gray-500 dark:text-gray-400 capitalize block mb-1">{key.replace(/([A-Z])/g, ' $1')}</label>
+                                        <label className="text-xs text-gray-500 uppercase font-bold mb-1 block">{key.replace(/([A-Z])/g, ' $1').trim()}</label>
                                         <input 
                                             type="text" 
-                                            value={val} 
-                                            onChange={(e) => updateLabel(key as any, e.target.value)} 
-                                            className="w-full p-2 border rounded text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                            value={(config.content.labels as any)[key] || defaultVal} 
+                                            onChange={(e) => updateLabel(key as keyof InvoiceLabels, e.target.value)}
+                                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                            placeholder={defaultVal}
                                         />
                                     </div>
                                 ))}
@@ -974,43 +926,40 @@ const InvoiceDesigner: React.FC = () => {
                 </div>
             </div>
 
-            {/* Resize Handle - Only Visible on MD+ */}
-            <div
-                className="hidden md:flex w-4 cursor-col-resize items-center justify-center hover:bg-indigo-500/10 active:bg-indigo-500/20 transition-colors z-20 shrink-0 select-none touch-none"
+            {/* Resizer */}
+            <div 
+                className="hidden md:flex w-4 cursor-col-resize items-center justify-center hover:bg-blue-500/10 transition-colors z-20 -ml-2 mr-[-2px]"
                 onMouseDown={startResizing}
                 onTouchStart={startResizing}
             >
-                <div className={`w-1 h-12 rounded-full transition-colors ${isResizing ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-slate-600'}`}></div>
+                <div className="w-1 h-8 bg-gray-300 dark:bg-slate-600 rounded-full"></div>
             </div>
 
-            {/* Right Preview Panel */}
-            <div className={`flex-grow bg-gray-200 dark:bg-slate-900 rounded-xl border border-gray-300 dark:border-slate-700 flex-col relative overflow-hidden ${mobileView === 'preview' ? 'flex' : 'hidden md:flex'} ${isResizing ? 'pointer-events-none' : ''}`}>
-                <div className="absolute top-0 left-0 right-0 bg-white/80 dark:bg-slate-800/80 backdrop-blur p-2 flex justify-between items-center border-b border-gray-200 dark:border-slate-700 z-10">
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Live Preview: {selectedDocType.replace('_', ' ')}</span>
-                    {isGenerating ? <span className="text-xs text-primary flex items-center gap-1"><RefreshCw size={12} className="animate-spin" /> Updating...</span> : <span className="text-xs text-green-600 flex items-center gap-1"><Eye size={12} /> Ready</span>}
+            {/* Preview Panel */}
+            <div className={`flex-grow bg-gray-100 dark:bg-slate-900 relative overflow-hidden flex flex-col ${mobileView === 'preview' ? 'flex' : 'hidden md:flex'}`}>
+                <div className="h-12 bg-white dark:bg-slate-800 border-b dark:border-slate-700 flex justify-between items-center px-4 shrink-0">
+                     <h3 className="font-bold text-sm text-gray-500 uppercase">Live Preview</h3>
+                     <div className="flex gap-2">
+                         <button onClick={generatePreview} disabled={isGenerating} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-gray-500" title="Refresh">
+                             <RefreshCw size={16} className={isGenerating ? "animate-spin" : ""} />
+                         </button>
+                         <button onClick={handleOpenPdf} disabled={!pdfUrl} className="p-1.5 hover:bg-gray-100 dark:hover:bg-slate-700 rounded text-gray-500" title="Open New Tab">
+                             <ExternalLink size={16} />
+                         </button>
+                     </div>
                 </div>
                 
-                <div className="flex-grow flex flex-col items-center justify-center p-2 sm:p-8 overflow-auto bg-gray-200 dark:bg-slate-900 relative">
-                    {/* Desktop: PDF Overlay Button */}
-                    <div className="hidden md:block absolute z-20 bottom-4 left-1/2 transform -translate-x-1/2 w-auto">
-                        <Button onClick={handleOpenPdf} className="shadow-xl bg-indigo-600 hover:bg-indigo-700 rounded-full px-6"><ExternalLink size={16} className="mr-2" /> Open PDF</Button>
-                    </div>
-
-                    {/* Mobile: Dedicated Download Card */}
-                    <div className="md:hidden flex flex-col items-center justify-center p-6 bg-white dark:bg-slate-800 rounded-xl shadow-lg text-center max-w-[80%]">
-                        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4"><FileText size={32} className="text-red-600" /></div>
-                        <h3 className="text-lg font-bold text-gray-800 dark:text-white mb-2">PDF Ready</h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Inline PDF preview is not supported on mobile devices.</p>
-                        <Button onClick={handleOpenPdf} className="w-full bg-indigo-600 hover:bg-indigo-700 shadow-md"><ExternalLink size={16} className="mr-2" /> Open PDF</Button>
-                    </div>
-
-                    {pdfUrl ? (
-                        <object data={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`} type="application/pdf" className="hidden md:block w-full h-full max-w-[210mm] shadow-2xl rounded-sm bg-white min-h-[400px]">
-                            <div className="flex flex-col items-center justify-center h-full bg-white p-4 text-center text-gray-500"><p className="mb-2">Preview not supported.</p></div>
-                        </object>
-                    ) : (
-                        <div className="hidden md:flex text-gray-400 flex-col items-center"><RefreshCw size={40} className="animate-spin mb-2" /><p>Generating Preview...</p></div>
-                    )}
+                <div className="flex-grow relative bg-slate-200/50 dark:bg-slate-900/50 p-4 flex items-center justify-center overflow-hidden">
+                     {isGenerating && (
+                         <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 z-10 backdrop-blur-sm">
+                             <RefreshCw className="animate-spin text-primary w-8 h-8" />
+                         </div>
+                     )}
+                     {pdfUrl ? (
+                         <iframe src={`${pdfUrl}#toolbar=0&navpanes=0`} className="w-full h-full rounded shadow-lg border dark:border-slate-700 bg-white" title="Invoice Preview" />
+                     ) : (
+                         <div className="text-gray-400 text-sm">Generating preview...</div>
+                     )}
                 </div>
             </div>
         </div>
