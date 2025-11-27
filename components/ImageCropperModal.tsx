@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { X, Check, ZoomIn, ZoomOut } from 'lucide-react';
+import { X, Check, ZoomIn, ZoomOut, Maximize, Square } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 
@@ -13,16 +13,21 @@ interface ImageCropperModalProps {
 
 const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc, onClose, onCrop }) => {
     const [scale, setScale] = useState(1);
+    const [minScale, setMinScale] = useState(0.1);
     const [position, setPosition] = useState({ x: 0, y: 0 });
     const [isDragging, setIsDragging] = useState(false);
+    
+    const [maskSize, setMaskSize] = useState({ w: 250, h: 250 });
+    const [aspectMode, setAspectMode] = useState<'original' | 'square'>('square');
+
     const dragStart = useRef({ x: 0, y: 0 });
     const imageRef = useRef<HTMLImageElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Reset when image changes
+    // Reset when image changes or modal opens
     useEffect(() => {
         if (isOpen) {
-            setScale(1);
+            setAspectMode('square'); // Default to square for inventory consistency, but allow change
             setPosition({ x: 0, y: 0 });
         }
     }, [isOpen, imageSrc]);
@@ -47,45 +52,107 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc,
         setIsDragging(false);
     };
 
+    const calculateMaskAndScale = (img: HTMLImageElement, mode: 'original' | 'square') => {
+        if (!containerRef.current) return;
+        
+        const containerW = containerRef.current.clientWidth;
+        const containerH = containerRef.current.clientHeight;
+        const padding = 32; // padding around mask
+        
+        const maxMaskW = containerW - padding;
+        const maxMaskH = containerH - padding;
+
+        let targetW, targetH;
+
+        if (mode === 'square') {
+            const size = Math.min(maxMaskW, maxMaskH, 300); // Max 300px square
+            targetW = size;
+            targetH = size;
+        } else {
+            const naturalRatio = img.naturalWidth / img.naturalHeight;
+            
+            // Try to fit width first
+            targetW = Math.min(maxMaskW, img.naturalWidth * 2); // Allow some upscaling for small images
+            targetH = targetW / naturalRatio;
+
+            // If height overflows, fit height
+            if (targetH > maxMaskH) {
+                targetH = maxMaskH;
+                targetW = targetH * naturalRatio;
+            }
+        }
+
+        setMaskSize({ w: targetW, h: targetH });
+
+        // Calculate min scale to cover the mask
+        const scaleX = targetW / img.naturalWidth;
+        const scaleY = targetH / img.naturalHeight;
+        const newMinScale = Math.max(scaleX, scaleY);
+
+        setMinScale(newMinScale);
+        setScale(newMinScale); // Auto-fit
+        setPosition({ x: 0, y: 0 }); // Center
+    };
+
+    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+        calculateMaskAndScale(e.currentTarget, aspectMode);
+    };
+
+    const toggleAspect = () => {
+        const newMode = aspectMode === 'square' ? 'original' : 'square';
+        setAspectMode(newMode);
+        if (imageRef.current) {
+            calculateMaskAndScale(imageRef.current, newMode);
+        }
+    };
+
     const handleSave = () => {
-        if (!imageRef.current || !containerRef.current) return;
+        if (!imageRef.current) return;
 
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Visual Mask Size is hardcoded to 256px in the UI (w-64)
-        const MASK_SIZE = 256;
-        // Output Size
-        const OUTPUT_SIZE = 500; 
+        // Determine Output Size
+        // We want a high-res output, max 800px dimension
+        const MAX_OUTPUT = 800;
+        const maskRatio = maskSize.w / maskSize.h;
         
-        canvas.width = OUTPUT_SIZE;
-        canvas.height = OUTPUT_SIZE;
+        let outW = MAX_OUTPUT;
+        let outH = MAX_OUTPUT / maskRatio;
+        
+        if (outH > MAX_OUTPUT) {
+            outH = MAX_OUTPUT;
+            outW = MAX_OUTPUT * maskRatio;
+        }
+        
+        canvas.width = outW;
+        canvas.height = outH;
 
-        // Fill white background
+        // Fill white background (transparency safety)
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillRect(0, 0, OUTPUT_SIZE, OUTPUT_SIZE);
+        ctx.fillRect(0, 0, outW, outH);
 
         const img = imageRef.current;
         
-        // Calculate the scale factor from Visual Mask pixels to Output Canvas pixels
-        const globalScale = OUTPUT_SIZE / MASK_SIZE;
+        // Calculate mapping from visual mask to output canvas
+        const globalScale = outW / maskSize.w;
 
         ctx.save();
         
-        // Move context origin to center of output canvas
-        ctx.translate(OUTPUT_SIZE / 2, OUTPUT_SIZE / 2);
+        // Move origin to center of output
+        ctx.translate(outW / 2, outH / 2);
         
-        // 1. Scale up everything to map the small visual mask to the large output canvas
+        // Scale to map visual pixels to output pixels
         ctx.scale(globalScale, globalScale);
         
-        // 2. Apply user translation (position is in screen pixels, which map 1:1 to mask pixels)
+        // Apply user translation
         ctx.translate(position.x, position.y);
         
-        // 3. Apply user zoom
+        // Apply user zoom
         ctx.scale(scale, scale);
         
-        // Draw image centered at origin
+        // Draw image centered at current origin
         ctx.drawImage(
             img, 
             -img.naturalWidth / 2, 
@@ -96,35 +163,27 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc,
 
         onCrop(canvas.toDataURL('image/jpeg', 0.85));
     };
-    
-    // Initial auto-fit logic
-    const handleImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-        const img = e.currentTarget;
-        const containerSize = 256; // Size of our viewport in pixels
-        
-        // Calculate scale to "cover" the viewport initially
-        const minScale = Math.max(containerSize / img.naturalWidth, containerSize / img.naturalHeight);
-        setScale(minScale);
-    };
 
     if (!isOpen || !imageSrc) return null;
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-90 z-[6000] flex items-center justify-center p-4 animate-fade-in-fast">
-            <Card className="w-full max-w-md p-0 overflow-hidden flex flex-col h-auto shadow-2xl bg-white dark:bg-slate-800">
+            <Card className="w-full max-w-lg p-0 overflow-hidden flex flex-col h-auto shadow-2xl bg-white dark:bg-slate-800">
                 <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 z-10">
-                    <h3 className="font-bold text-lg text-gray-800 dark:text-white">Adjust Product Image</h3>
+                    <h3 className="font-bold text-lg text-gray-800 dark:text-white">Adjust Image</h3>
                     <button onClick={onClose} className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors"><X size={24}/></button>
                 </div>
                 
-                <div ref={containerRef} className="relative bg-gray-900 w-full overflow-hidden touch-none select-none" 
-                     style={{ height: '350px' }}
+                <div 
+                     ref={containerRef}
+                     className="relative bg-gray-900 w-full overflow-hidden touch-none select-none flex items-center justify-center" 
+                     style={{ height: '400px' }}
                      onPointerDown={handlePointerDown}
                      onPointerMove={handlePointerMove}
                      onPointerUp={handlePointerUp}
                      onPointerLeave={handlePointerUp}
                 >
-                    {/* Image Layer - Rendered first (bottom) */}
+                    {/* Image Layer - Behind Mask */}
                     <div 
                         className="absolute left-1/2 top-1/2 w-0 h-0"
                         style={{ 
@@ -148,25 +207,44 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc,
                         />
                     </div>
 
-                    {/* Mask Overlay (Darkened areas outside crop) - Rendered last (top) */}
+                    {/* Mask Overlay */}
                     <div className="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
-                        <div className="w-64 h-64 border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] rounded-lg box-content"></div>
+                        <div 
+                            style={{ width: maskSize.w, height: maskSize.h }}
+                            className="border-2 border-white shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] rounded-lg box-content transition-all duration-300 ease-out"
+                        ></div>
                     </div>
                     
                     {/* Guide Text */}
                     <div className="absolute top-4 left-0 right-0 text-center z-20 pointer-events-none">
-                        <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs">Drag to Pan • Zoom to Fit</span>
+                        <span className="bg-black/50 text-white px-3 py-1 rounded-full text-xs backdrop-blur-sm">Drag to Pan • Zoom to Fit</span>
                     </div>
                 </div>
 
-                <div className="p-5 bg-white dark:bg-slate-800 space-y-6">
+                <div className="p-4 bg-white dark:bg-slate-800 space-y-4">
+                    {/* Toolbar */}
+                    <div className="flex justify-center gap-4 border-b dark:border-slate-700 pb-4">
+                        <button 
+                            onClick={toggleAspect}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${aspectMode === 'square' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300'}`}
+                        >
+                            <Square size={16} /> 1:1 Square
+                        </button>
+                        <button 
+                            onClick={toggleAspect}
+                            className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${aspectMode === 'original' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-slate-700 text-gray-700 dark:text-gray-300'}`}
+                        >
+                            <Maximize size={16} /> Original Ratio
+                        </button>
+                    </div>
+
                     <div className="flex items-center gap-4">
                         <ZoomOut size={20} className="text-gray-400"/>
                         <input 
                             type="range" 
-                            min="0.1" 
-                            max="3" 
-                            step="0.05" 
+                            min={minScale} 
+                            max={minScale * 4} 
+                            step={minScale * 0.05}
                             value={scale} 
                             onChange={e => setScale(parseFloat(e.target.value))}
                             className="flex-grow h-2 bg-gray-200 dark:bg-slate-700 rounded-lg appearance-none cursor-pointer accent-primary"
@@ -174,7 +252,7 @@ const ImageCropperModal: React.FC<ImageCropperModalProps> = ({ isOpen, imageSrc,
                         <ZoomIn size={20} className="text-gray-400"/>
                     </div>
                     
-                    <div className="flex gap-3">
+                    <div className="flex gap-3 pt-2">
                         <Button onClick={onClose} variant="secondary" className="flex-1 py-3">Cancel</Button>
                         <Button onClick={handleSave} className="flex-1 py-3 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg shadow-emerald-200 dark:shadow-none">
                             <Check size={18} className="mr-2"/> Save Image
