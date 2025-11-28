@@ -267,7 +267,7 @@ const AppContent: React.FC = () => {
                             </h1>
                             {state.googleUser && (
                                 <span className="text-[10px] font-medium text-white/80 leading-none mt-0.5 flex items-center gap-1">
-                                    {state.googleUser.name.split(' ')[0]} • {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Unsynced'}
+                                    {state.googleUser.name.split(' ')[0]} • {state.syncStatus === 'syncing' ? 'Syncing...' : (state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Unsynced')}
                                 </span>
                             )}
                         </button>
@@ -288,7 +288,7 @@ const AppContent: React.FC = () => {
                                 }
                             }} 
                             className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
-                            title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Debug)' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Not synced yet'}`}
+                            title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Debug)' : state.syncStatus === 'syncing' ? 'Auto-Sync in progress...' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Not synced yet'}`}
                         >
                             {state.syncStatus === 'syncing' ? (
                                 <RefreshCw size={20} className="animate-spin" />

@@ -1,6 +1,6 @@
 
-import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions } from '../types';
+import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
+import { Customer, Supplier, Product, Sale, Purchase, Return, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
@@ -466,12 +466,39 @@ const appReducer = (state: AppState, action: Action): AppState => {
         db.saveCollection('profile', [action.payload]);
         return { ...state, profile: action.payload, ...touch };
 
+    // Update Theme actions to ALSO save to app_metadata so they sync to cloud
     case 'SET_THEME':
-        return { ...state, theme: action.payload };
+        const themeMeta: AppMetadataTheme = {
+            id: 'themeSettings',
+            theme: action.payload,
+            color: state.themeColor,
+            gradient: state.themeGradient
+        };
+        const metaWithoutTheme = state.app_metadata.filter(m => m.id !== 'themeSettings');
+        db.saveCollection('app_metadata', [...metaWithoutTheme, themeMeta]);
+        return { ...state, theme: action.payload, app_metadata: [...metaWithoutTheme, themeMeta], ...touch };
+
     case 'SET_THEME_COLOR':
-        return { ...state, themeColor: action.payload };
+        const themeMetaColor: AppMetadataTheme = {
+            id: 'themeSettings',
+            theme: state.theme,
+            color: action.payload,
+            gradient: state.themeGradient
+        };
+        const metaWithoutThemeColor = state.app_metadata.filter(m => m.id !== 'themeSettings');
+        db.saveCollection('app_metadata', [...metaWithoutThemeColor, themeMetaColor]);
+        return { ...state, themeColor: action.payload, app_metadata: [...metaWithoutThemeColor, themeMetaColor], ...touch };
+
     case 'SET_THEME_GRADIENT':
-        return { ...state, themeGradient: action.payload };
+        const themeMetaGrad: AppMetadataTheme = {
+            id: 'themeSettings',
+            theme: state.theme,
+            color: state.themeColor,
+            gradient: action.payload
+        };
+        const metaWithoutThemeGrad = state.app_metadata.filter(m => m.id !== 'themeSettings');
+        db.saveCollection('app_metadata', [...metaWithoutThemeGrad, themeMetaGrad]);
+        return { ...state, themeGradient: action.payload, app_metadata: [...metaWithoutThemeGrad, themeMetaGrad], ...touch };
 
     case 'SET_PIN':
         const pinMeta: AppMetadata = { id: 'securityPin', pin: action.payload };
@@ -546,13 +573,13 @@ const appReducer = (state: AppState, action: Action): AppState => {
         const navOrderMeta: AppMetadataNavOrder = { id: 'navOrder', order: action.payload };
         const metaWithoutNav = state.app_metadata.filter(m => m.id !== 'navOrder');
         db.saveCollection('app_metadata', [...metaWithoutNav, navOrderMeta]);
-        return { ...state, navOrder: action.payload, app_metadata: [...metaWithoutNav, navOrderMeta] };
+        return { ...state, navOrder: action.payload, app_metadata: [...metaWithoutNav, navOrderMeta], ...touch };
 
     case 'UPDATE_QUICK_ACTIONS':
         const qaMeta: AppMetadataQuickActions = { id: 'quickActions', actions: action.payload };
         const metaWithoutQA = state.app_metadata.filter(m => m.id !== 'quickActions');
         db.saveCollection('app_metadata', [...metaWithoutQA, qaMeta]);
-        return { ...state, quickActions: action.payload, app_metadata: [...metaWithoutQA, qaMeta] };
+        return { ...state, quickActions: action.payload, app_metadata: [...metaWithoutQA, qaMeta], ...touch };
 
     case 'TOGGLE_PERFORMANCE_MODE':
         return { ...state, performanceMode: !state.performanceMode };
@@ -598,11 +625,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const [isDbLoaded, setIsDbLoaded] = useState(false);
 
     // --- Toast Logic ---
-    const showToast = (message: string, type: 'success' | 'info' | 'error' = 'info') => {
+    const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'info') => {
         dispatch({ type: 'SHOW_TOAST', payload: { message, type } });
-        // The Toast component handles its own timeout logic now, but dispatching hide can be double-safe
-        setTimeout(() => dispatch({ type: 'HIDE_TOAST' }), 3500); 
-    };
+        // The Toast component handles its own timeout logic
+    }, []);
 
     // --- Load Data from IDB on Mount ---
     useEffect(() => {
@@ -628,6 +654,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const invSettings = app_metadata.find(m => m.id === 'invoiceSettings') as AppMetadataInvoiceSettings;
             const navOrderMeta = app_metadata.find(m => m.id === 'navOrder') as AppMetadataNavOrder;
             const quickActionsMeta = app_metadata.find(m => m.id === 'quickActions') as AppMetadataQuickActions;
+            const themeMeta = app_metadata.find(m => m.id === 'themeSettings') as AppMetadataTheme;
 
             // Load Templates from Metadata or default to DEFAULT_TEMPLATE values if missing
             const invoiceTemplate = (app_metadata.find(m => m.id === 'invoiceTemplateConfig') as InvoiceTemplateConfig) || initialState.invoiceTemplate;
@@ -651,6 +678,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 lastSyncTime = storedSyncTime ? parseInt(storedSyncTime, 10) : null;
             } catch(e) { console.error("Failed to parse last sync time", e); }
 
+            // Theme Preferences: Prioritize metadata from DB (cloud sync), fall back to localStorage/initial
+            const loadedTheme = themeMeta?.theme || state.theme;
+            const loadedColor = themeMeta?.color || state.themeColor;
+            const loadedGradient = themeMeta?.gradient || state.themeGradient;
+
             dispatch({
                 type: 'SET_STATE',
                 payload: {
@@ -662,7 +694,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     navOrder: navOrderMeta ? navOrderMeta.order : DEFAULT_NAV_ORDER,
                     quickActions: quickActionsMeta ? quickActionsMeta.actions : DEFAULT_QUICK_ACTIONS,
                     invoiceTemplate, estimateTemplate, debitNoteTemplate, receiptTemplate, reportTemplate,
-                    googleUser, lastSyncTime
+                    googleUser, lastSyncTime,
+                    theme: loadedTheme,
+                    themeColor: loadedColor,
+                    themeGradient: loadedGradient
                 }
             });
             setIsDbLoaded(true);
@@ -712,7 +747,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showToast("Signed out.");
     };
 
-    const syncData = async () => {
+    const syncData = useCallback(async () => {
         if (!state.googleUser?.accessToken) {
             showToast("Please sign in to Google first.", 'info');
             return;
@@ -731,13 +766,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
             dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
-            showToast("Cloud Backup Successful!", 'success');
+            
+            // Subtle toast for auto-sync success
+            // showToast("Cloud Backup Successful!", 'success'); 
         } catch (error) {
             console.error("Sync failed:", error);
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-            showToast("Cloud Sync Failed.", 'error');
+            // showToast("Cloud Sync Failed.", 'error');
         }
-    };
+    }, [state.googleUser]);
     
     // Exposed function for manual restore from Debug Modal
     const restoreFromFileId = async (fileId: string) => {
@@ -758,6 +795,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     useEffect(() => {
         dispatch({ type: 'SET_STATE', payload: { restoreFromFileId } });
     }, [state.googleUser]); // Re-bind when user changes
+
+    // --- AUTO SYNC LOGIC ---
+    useEffect(() => {
+        // Only auto-sync if user is logged in and data has changed (lastLocalUpdate > 0)
+        // Also prevent sync if already syncing or in error state (wait for manual retry)
+        if (state.googleUser && state.lastLocalUpdate > 0 && state.syncStatus !== 'syncing') {
+            const timer = setTimeout(() => {
+                console.log("Auto-sync triggered due to local changes");
+                syncData();
+            }, 5000); // 5-second debounce to batch rapid changes
+
+            return () => clearTimeout(timer);
+        }
+    }, [state.lastLocalUpdate, state.googleUser, syncData, state.syncStatus]);
 
     return (
         <AppContext.Provider value={{ state: state as any, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData }}>
