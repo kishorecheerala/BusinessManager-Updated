@@ -647,7 +647,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             } catch(e) { console.error("Failed to parse stored user", e); }
 
             try {
-                lastSyncTime = storedSyncTime ? parseInt(storedSyncTime) : null;
+                // Ensure lastSyncTime is an integer
+                lastSyncTime = storedSyncTime ? parseInt(storedSyncTime, 10) : null;
             } catch(e) { console.error("Failed to parse last sync time", e); }
 
             dispatch({

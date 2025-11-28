@@ -239,7 +239,7 @@ const AppContent: React.FC = () => {
     if (!isDbLoaded) return <AppSkeletonLoader />;
 
     return (
-        <div className={`min-h-screen bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 pb-20 md:pb-0 ${state.theme}`}>
+        <div className={`min-h-screen bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             <Toast />
             
             {/* Header - Hidden on Invoice Designer to maximize space */}
@@ -260,11 +260,16 @@ const AppContent: React.FC = () => {
                     <div className="absolute left-0 right-0 flex justify-center pointer-events-none z-10">
                         <button 
                             onClick={() => handleNavigation('DASHBOARD')}
-                            className="pointer-events-auto hover:opacity-80 transition-opacity"
+                            className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-80 transition-opacity py-1"
                         >
-                            <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px]">
+                            <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight">
                                 {state.profile?.name || 'Business Manager'}
                             </h1>
+                            {state.googleUser && (
+                                <span className="text-[10px] font-medium text-white/80 leading-none mt-0.5 flex items-center gap-1">
+                                    {state.googleUser.name.split(' ')[0]} • {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Unsynced'}
+                                </span>
+                            )}
                         </button>
                     </div>
 
@@ -293,7 +298,7 @@ const AppContent: React.FC = () => {
                                 <Cloud size={20} className={!state.googleUser ? "opacity-70" : ""} />
                             )}
                             
-                            {/* Status Dot */}
+                            {/* Status Dot - Only visible if user is logged in */}
                             {state.googleUser && state.syncStatus !== 'syncing' && (
                                 <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white/20 ${
                                     state.syncStatus === 'success' ? 'bg-green-400' : 
@@ -329,7 +334,7 @@ const AppContent: React.FC = () => {
 
             {/* Main Content Area */}
             <main className={`flex-grow h-screen overflow-y-auto custom-scrollbar ${currentPage !== 'INVOICE_DESIGNER' ? 'pt-16' : ''}`}>
-                <div className={`mx-auto ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'p-4 max-w-7xl'}`}>
+                <div className={`mx-auto ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'p-4 pb-32 max-w-7xl'}`}>
                     {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
                     {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
                     {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}

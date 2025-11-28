@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, XCircle, CheckCircle, Info, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, ArrowRight, Zap, BrainCircuit, TrendingDown, Wallet, CalendarClock, Tag, Undo2, Crown, Calendar, Receipt, MessageCircle, Clock, History, PenTool, FileText, Loader2, RotateCw } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -241,19 +242,47 @@ const SmartAnalystCard: React.FC<{
     );
 };
 
-const BackupStatusAlert: React.FC<{ lastBackupDate: string | null }> = ({ lastBackupDate }) => {
+const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime: number | null }> = ({ lastBackupDate, lastSyncTime }) => {
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
     
     let status: 'no-backup' | 'overdue' | 'safe' = 'no-backup';
     let diffDays = 0;
     let backupDate: Date | null = null;
+    let isCloud = false;
 
-    if (lastBackupDate) {
-        backupDate = new Date(lastBackupDate);
-        const backupDateStr = backupDate.toISOString().slice(0, 10);
-        diffDays = Math.floor((now.getTime() - backupDate.getTime()) / (1000 * 60 * 60 * 24));
-        status = backupDateStr === todayStr ? 'safe' : 'overdue';
+    // Check Cloud Sync first
+    if (lastSyncTime) {
+        const syncD = new Date(lastSyncTime);
+        const syncStr = syncD.toISOString().slice(0, 10);
+        if (syncStr === todayStr) {
+            status = 'safe';
+            backupDate = syncD;
+            isCloud = true;
+        }
+    }
+
+    // Fallback to manual backup if cloud is not today
+    if (status !== 'safe' && lastBackupDate) {
+        const manualD = new Date(lastBackupDate);
+        const manualStr = manualD.toISOString().slice(0, 10);
+        if (manualStr === todayStr) {
+            status = 'safe';
+            backupDate = manualD;
+            isCloud = false;
+        } else {
+            // Determine most recent date for overdue calculation
+            const latestDate = lastSyncTime ? (manualD > new Date(lastSyncTime) ? manualD : new Date(lastSyncTime)) : manualD;
+            diffDays = Math.floor((now.getTime() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
+            status = 'overdue';
+            backupDate = latestDate;
+        }
+    } else if (status !== 'safe' && lastSyncTime) {
+         // Only cloud sync exists but old
+         const syncD = new Date(lastSyncTime);
+         diffDays = Math.floor((now.getTime() - syncD.getTime()) / (1000 * 60 * 60 * 24));
+         status = 'overdue';
+         backupDate = syncD;
     }
 
     const config = {
@@ -275,7 +304,7 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null }> = ({ lastBa
             icon: ShieldCheck,
             classes: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800',
             iconColor: 'text-emerald-600 dark:text-emerald-400',
-            title: 'Data is Safe',
+            title: `Data is Safe ${isCloud ? '(Cloud Sync)' : '(Manual Backup)'}`,
             message: `Backed up today at ${backupDate?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.`
         }
     };
@@ -878,7 +907,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     </Card>
 
                     <Card title="Data Management">
-                        <BackupStatusAlert lastBackupDate={lastBackupDate} />
+                        <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />
                         <div className="space-y-4 mt-4">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
                                 Your data is stored locally on this device. Please create regular backups to prevent data loss.

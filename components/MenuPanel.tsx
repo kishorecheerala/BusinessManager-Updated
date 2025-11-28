@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge } from 'lucide-react';
+import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud } from 'lucide-react';
 import { Page } from '../types';
 import { useAppContext } from '../context/AppContext';
 import AuditLogPanel from './AuditLogPanel';
@@ -184,24 +184,29 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
           onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()} 
         >
-            {/* User Header */}
-            <div className="p-4 bg-gray-50 dark:bg-slate-900/50 border-b border-gray-100 dark:border-slate-700 shrink-0">
+            {/* Header with Business Name & Google Profile */}
+            <div className="bg-theme p-5 text-white shrink-0">
+                <h3 className="font-bold text-xl mb-3 tracking-tight truncate">{state.profile?.name || 'Business Manager'}</h3>
+                
                 {state.googleUser ? (
-                    <div className="flex items-center gap-3">
-                        <img src={state.googleUser.picture} alt="User" className="w-10 h-10 rounded-full border-2 border-white dark:border-slate-600 shadow-sm" />
-                        <div className="overflow-hidden">
-                            <p className="text-sm font-bold truncate text-gray-800 dark:text-white">{state.googleUser.name}</p>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{state.googleUser.email}</p>
+                    <div className="flex items-center gap-3 p-2 bg-white/10 rounded-lg backdrop-blur-md border border-white/20">
+                        <img src={state.googleUser.picture} alt="User" className="w-10 h-10 rounded-full border-2 border-white/50" />
+                        <div className="overflow-hidden min-w-0">
+                            <p className="text-sm font-bold truncate">{state.googleUser.name}</p>
+                            <p className="text-[10px] text-white/80 truncate">{state.googleUser.email}</p>
+                            {state.lastSyncTime && (
+                                <p className="text-[9px] text-white/90 mt-0.5 font-medium flex items-center gap-1">
+                                    <RefreshCw size={8} />
+                                    Last Synced: {new Date(state.lastSyncTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                                </p>
+                            )}
                         </div>
                     </div>
                 ) : (
                     <div className="flex flex-col gap-2">
-                        <div className="text-center p-1">
-                            <p className="text-sm font-bold text-gray-800 dark:text-white">Guest User</p>
-                        </div>
                         <button
                             onClick={() => { googleSignIn(); onClose(); }}
-                            className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-primary text-white font-semibold text-sm shadow-md hover:bg-opacity-90 transition-all"
+                            className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-white text-primary font-bold text-sm shadow-md hover:bg-gray-50 transition-all"
                         >
                             <LogIn className="w-4 h-4" />
                             Sign In with Google
@@ -210,7 +215,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                 )}
             </div>
 
-            {/* Scrollable Content - Added min-h-0 and overscroll-contain for reliable scrolling */}
+            {/* Scrollable Content */}
             <div className="p-2 flex-grow overflow-y-auto custom-scrollbar space-y-1 min-h-0 overscroll-contain pb-10">
                 
                 {/* Main Navigation */}
@@ -234,7 +239,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                 
                 <button onClick={() => onNavigate('QUOTATIONS')} className="menu-item">
                     <FileText className="w-5 h-5 text-indigo-500" />
-                    <span className="flex-grow text-sm font-medium">Quotations / Estimates</span>
+                    <span className="flex-grow text-sm font-medium">Estimates</span>
                     <ChevronRight className="w-4 h-4 text-gray-400" />
                 </button>
 
@@ -378,16 +383,13 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                     <div className="px-2 pb-2 space-y-1">
                         <button
                             onClick={() => { syncData(); onClose(); }}
-                            className="menu-item text-blue-600 dark:text-blue-400"
+                            className="menu-item text-blue-600 dark:text-blue-400 justify-between group"
                         >
-                            <RefreshCw className={`w-5 h-5 ${state.syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
-                            <span className="flex-grow text-sm font-medium">Sync Now</span>
+                            <div className="flex items-center gap-2">
+                                <RefreshCw className={`w-5 h-5 ${state.syncStatus === 'syncing' ? 'animate-spin' : ''}`} />
+                                <span className="text-sm font-medium">Sync Now</span>
+                            </div>
                         </button>
-                        {state.lastSyncTime && (
-                            <p className="text-[10px] text-gray-400 text-center -mt-1 pb-2">
-                                Last synced: {new Date(state.lastSyncTime).toLocaleString()}
-                            </p>
-                        )}
                         
                         <button
                             onClick={() => { onClose(); setIsCloudDebugOpen(true); }}
