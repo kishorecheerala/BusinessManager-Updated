@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -11,8 +10,8 @@ import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { logoBase64 } from '../utils/logo';
-import AddCustomerModal from '../components/AddCustomerModal'; // Imported shared component
 import { generateA4InvoicePdf } from '../utils/pdfGenerator';
+
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -21,9 +20,75 @@ const getLocalDateString = (date = new Date()) => {
   return `${year}-${month}-${day}`;
 };
 
+const fetchImageAsBase64 = (url: string): Promise<string> =>
+  fetch(url)
+    .then(response => response.blob())
+    .then(blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    }));
+
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
 }
+
+const newCustomerInitialState = { id: '', name: '', phone: '', address: '', area: '', reference: '' };
+
+const AddCustomerModal: React.FC<{
+    newCustomer: typeof newCustomerInitialState;
+    onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    onSave: () => void;
+    onCancel: () => void;
+}> = React.memo(({ newCustomer, onInputChange, onSave, onCancel }) => (
+    <div className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in-fast">
+        <Card title="Add New Customer" className="w-full max-w-md animate-scale-in">
+            <div className="space-y-4">
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Customer ID</label>
+                    <div className="flex items-center mt-1">
+                        <span className="inline-flex items-center px-3 rounded-l-md border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm dark:bg-slate-700 dark:border-slate-600 dark:text-gray-400">
+                            CUST-
+                        </span>
+                        <input
+                            type="text"
+                            name="id"
+                            placeholder="Enter unique ID"
+                            value={newCustomer.id}
+                            onChange={onInputChange}
+                            className="w-full p-2 border rounded-r-md dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                        />
+                    </div>
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Name</label>
+                    <input type="text" placeholder="Full Name" name="name" value={newCustomer.name} onChange={onInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone</label>
+                    <input type="text" placeholder="Phone Number" name="phone" value={newCustomer.phone} onChange={onInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
+                    <input type="text" placeholder="Full Address" name="address" value={newCustomer.address} onChange={onInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
+                </div>
+                <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Area/Location</label>
+                    <input type="text" placeholder="e.g. Ameerpet" name="area" value={newCustomer.area} onChange={onInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
+                </div>
+                 <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Reference (Optional)</label>
+                    <input type="text" placeholder="Referred by..." name="reference" value={newCustomer.reference} onChange={onInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />
+                </div>
+                <div className="flex gap-2">
+                    <Button onClick={onSave} className="w-full">Save Customer</Button>
+                    <Button onClick={onCancel} variant="secondary" className="w-full">Cancel</Button>
+                </div>
+            </div>
+        </Card>
+    </div>
+));
 
 const ProductSearchModal: React.FC<{
     products: Product[];
@@ -90,6 +155,7 @@ const QRScannerModal: React.FC<{
                     onScanned(decodedText);
                 }).catch(err => {
                     console.error("Error stopping scanner", err);
+                    // Still call onScanned even if stopping fails, to proceed with logic
                     onScanned(decodedText);
                 });
             }
@@ -145,7 +211,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [isScanning, setIsScanning] = useState(false);
     
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
-    
+    const [newCustomer, setNewCustomer] = useState(newCustomerInitialState);
     const isDirtyRef = useRef(false);
 
     const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
@@ -158,6 +224,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         }
     });
 
+    // Effect to handle switching to edit mode from another page
     useEffect(() => {
         if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
             const sale = state.sales.find(s => s.id === state.selection.id);
@@ -177,13 +244,16 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     useEffect(() => {
         const dateIsDirty = mode === 'add' && saleDate !== getLocalDateString();
         const formIsDirty = !!customerId || items.length > 0 || discount !== '0' || !!paymentDetails.amount || dateIsDirty;
-        const currentlyDirty = formIsDirty || isAddingCustomer;
+        const newCustomerFormIsDirty = isAddingCustomer && !!(newCustomer.id || newCustomer.name || newCustomer.phone || newCustomer.address || newCustomer.area);
+        const currentlyDirty = formIsDirty || newCustomerFormIsDirty;
         if (currentlyDirty !== isDirtyRef.current) {
             isDirtyRef.current = currentlyDirty;
             setIsDirty(currentlyDirty);
         }
-    }, [customerId, items, discount, paymentDetails.amount, isAddingCustomer, setIsDirty, saleDate, mode]);
+    }, [customerId, items, discount, paymentDetails.amount, isAddingCustomer, newCustomer, setIsDirty, saleDate, mode]);
 
+
+    // On unmount, we must always clean up.
     useEffect(() => {
         return () => {
             setIsDirty(false);
@@ -221,13 +291,13 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
         if (existingItem) {
             if (existingItem.quantity + 1 > availableStock) {
-                 showToast(`Not enough stock for ${product.name}. Only ${availableStock} available.`, 'error');
+                 alert(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`);
                  return;
             }
             setItems(items.map(i => i.productId === newItem.productId ? { ...i, quantity: i.quantity + 1 } : i));
         } else {
              if (1 > availableStock) {
-                 showToast(`Not enough stock for ${product.name}. Only ${availableStock} available.`, 'error');
+                 alert(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`);
                  return;
             }
             setItems([...items, newItem]);
@@ -242,7 +312,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         if (product) {
             handleSelectProduct(product);
         } else {
-            showToast("Product not found in inventory.", 'error');
+            alert("Product not found in inventory.");
         }
     };
 
@@ -257,7 +327,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     const originalQtyInSale = mode === 'edit' ? saleToEdit?.items.find(i => i.productId === productId)?.quantity || 0 : 0;
                     const availableStock = (Number(product?.quantity) || 0) + originalQtyInSale;
                     if (numValue > availableStock) {
-                        showToast(`Not enough stock for ${item.productName}. Only ${availableStock} available.`, 'error');
+                        alert(`Not enough stock for ${item.productName}. Only ${availableStock} available for this sale.`);
                         return { ...item, quantity: availableStock };
                     }
                 }
@@ -266,6 +336,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             return item;
         }));
     };
+
 
     const handleRemoveItem = (productId: string) => {
         setItems(items.filter(item => item.productId !== productId));
@@ -312,13 +383,50 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         return totalBilled - totalPaid;
     }, [customerId, state.sales]);
 
-    // Use the shared component handler
-    const handleAddCustomer = (customer: Customer) => {
-        dispatch({ type: 'ADD_CUSTOMER', payload: customer });
+    const handleNewCustomerChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setNewCustomer(prev => ({...prev, [name]: value}));
+    }, []);
+
+    const handleCancelAddCustomer = useCallback(() => {
         setIsAddingCustomer(false);
-        setCustomerId(customer.id);
+        setNewCustomer(newCustomerInitialState);
+    }, []);
+
+    const handleAddCustomer = useCallback(() => {
+        const trimmedId = newCustomer.id.trim();
+        if (!trimmedId) {
+            alert('Customer ID is required.');
+            return;
+        }
+        if (!newCustomer.name || !newCustomer.phone || !newCustomer.address || !newCustomer.area) {
+            alert('Please fill all required fields (Name, Phone, Address, Area).');
+            return;
+        }
+
+        const finalId = `CUST-${trimmedId}`;
+        const isIdTaken = state.customers.some(c => c.id.toLowerCase() === finalId.toLowerCase());
+
+        if (isIdTaken) {
+            alert(`Customer ID "${finalId}" is already taken. Please choose another one.`);
+            return;
+        }
+
+        const customerWithId: Customer = {
+            name: newCustomer.name,
+            phone: newCustomer.phone,
+            address: newCustomer.address,
+            area: newCustomer.area,
+            id: finalId,
+            reference: newCustomer.reference || ''
+        };
+        dispatch({ type: 'ADD_CUSTOMER', payload: customerWithId });
+        setNewCustomer(newCustomerInitialState);
+        setIsAddingCustomer(false);
+        setCustomerId(customerWithId.id);
         showToast("Customer added successfully!");
-    };
+    }, [newCustomer, state.customers, dispatch, showToast]);
+
 
     const generateAndSharePDF = async (sale: Sale, customer: Customer, paidAmountOnSale: number) => {
       try {
@@ -352,19 +460,19 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         }
       } catch (error) {
         console.error("PDF generation or sharing failed:", error);
-        showToast(`Error generating PDF: ${(error as Error).message}`, 'error');
+        alert(`Sale created successfully, but the PDF invoice could not be generated or shared. Error: ${(error as Error).message}`);
       }
     };
 
     const handleSubmitSale = async () => {
         if (!customerId || items.length === 0) {
-            showToast("Please select a customer and add at least one item.", 'error');
+            alert("Please select a customer and add at least one item.");
             return;
         }
 
         const customer = state.customers.find(c => c.id === customerId);
         if(!customer) {
-            showToast("Could not find the selected customer.", 'error');
+            alert("Could not find the selected customer.");
             return;
         }
         
@@ -373,7 +481,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         if (mode === 'add') {
             const paidAmount = parseFloat(paymentDetails.amount) || 0;
             if (paidAmount > totalAmount + 0.01) {
-                showToast(`Paid amount cannot be greater than the total amount.`, 'error');
+                alert(`Paid amount (₹${paidAmount.toLocaleString('en-IN')}) cannot be greater than the total amount (₹${totalAmount.toLocaleString('en-IN')}).`);
                 return;
             }
             const payments: Payment[] = [];
@@ -404,7 +512,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             const totalPaid = existingPayments.reduce((sum, p) => sum + Number(p.amount), 0);
 
             if (totalAmount < totalPaid - 0.01) {
-                showToast(`New total cannot be less than amount already paid.`, 'error');
+                alert(`The new total amount (₹${totalAmount.toLocaleString('en-IN')}) cannot be less than the amount already paid (₹${totalPaid.toLocaleString('en-IN')}).`);
                 return;
             }
 
@@ -420,13 +528,13 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
      const handleRecordStandalonePayment = () => {
         if (!customerId) {
-            showToast('Please select a customer to record a payment for.', 'error');
+            alert('Please select a customer to record a payment for.');
             return;
         }
 
         const paidAmount = parseFloat(paymentDetails.amount || '0');
         if (paidAmount <= 0) {
-            showToast('Please enter a valid payment amount.', 'error');
+            alert('Please enter a valid payment amount.');
             return;
         }
 
@@ -438,7 +546,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
         if (outstandingSales.length === 0) {
-            showToast('This customer has no outstanding dues.', 'info');
+            alert('This customer has no outstanding dues.');
             return;
         }
         
@@ -475,12 +583,14 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     return (
         <div className="space-y-4">
-            <AddCustomerModal 
-                isOpen={isAddingCustomer}
-                onClose={() => setIsAddingCustomer(false)}
-                onAdd={handleAddCustomer}
-                existingCustomers={state.customers}
-            />
+            {isAddingCustomer && 
+                <AddCustomerModal 
+                    newCustomer={newCustomer}
+                    onInputChange={handleNewCustomerChange}
+                    onSave={handleAddCustomer}
+                    onCancel={handleCancelAddCustomer}
+                />
+            }
             {isSelectingProduct && 
                 <ProductSearchModal 
                     products={state.products}

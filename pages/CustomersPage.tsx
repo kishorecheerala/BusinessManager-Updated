@@ -1,18 +1,15 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, User, Phone, MapPin, Search, Edit, Save, X, Trash2, IndianRupee, ShoppingCart, Download, Share2, ChevronDown, FileText, MessageCircle, Crown, ShieldAlert, BadgeCheck } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, ChevronDown, Crown, ShieldAlert, BadgeCheck } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Payment, Sale, Page } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import ConfirmationModal from '../components/ConfirmationModal';
 import DeleteButton from '../components/DeleteButton';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { generateA4InvoicePdf, generateThermalInvoicePDF, generateGenericReportPDF } from '../utils/pdfGenerator';
 import { useDialog } from '../context/DialogContext';
-import PaymentModal from '../components/PaymentModal'; // Imported shared component
+import PaymentModal from '../components/PaymentModal';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();

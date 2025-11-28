@@ -95,6 +95,17 @@ type Action =
   | { type: 'CLEANUP_OLD_DATA' }
   | { type: 'REPLACE_COLLECTION'; payload: { storeName: StoreName; data: any[] } };
 
+// Default Template to prevent crashes
+const DEFAULT_TEMPLATE: InvoiceTemplateConfig = {
+    id: 'defaultConfig',
+    currencySymbol: '₹',
+    dateFormat: 'DD/MM/YYYY',
+    colors: { primary: '#0d9488', secondary: '#333333', text: '#000000', tableHeaderBg: '#0d9488', tableHeaderText: '#ffffff', bannerBg: '#0d9488', bannerText: '#ffffff', footerBg: '#f3f4f6', footerText: '#374151', borderColor: '#e5e7eb', alternateRowBg: '#f9fafb' },
+    fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
+    layout: { margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', footerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1, tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false } },
+    content: { titleText: 'TAX INVOICE', showTerms: true, showQr: true, termsText: '', footerText: 'Thank you!', showBusinessDetails: true, showCustomerDetails: true, showSignature: true, showAmountInWords: false, showStatusStamp: false, showTaxBreakdown: false, showGst: true }
+};
+
 const initialState: AppState = {
     customers: [],
     suppliers: [],
@@ -109,11 +120,11 @@ const initialState: AppState = {
     notifications: [],
     audit_logs: [],
     profile: null,
-    invoiceTemplate: {} as any, 
-    estimateTemplate: {} as any,
-    debitNoteTemplate: {} as any,
-    receiptTemplate: {} as any,
-    reportTemplate: {} as any,
+    invoiceTemplate: DEFAULT_TEMPLATE, 
+    estimateTemplate: { ...DEFAULT_TEMPLATE, content: { ...DEFAULT_TEMPLATE.content, titleText: 'ESTIMATE' } },
+    debitNoteTemplate: { ...DEFAULT_TEMPLATE, content: { ...DEFAULT_TEMPLATE.content, titleText: 'DEBIT NOTE' } },
+    receiptTemplate: { ...DEFAULT_TEMPLATE, content: { ...DEFAULT_TEMPLATE.content, titleText: 'RECEIPT' } },
+    reportTemplate: { ...DEFAULT_TEMPLATE, content: { ...DEFAULT_TEMPLATE.content, titleText: 'REPORT' } },
     toast: { message: '', show: false, type: 'info' },
     selection: null,
     installPromptEvent: null,
@@ -556,7 +567,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             
             const invSettings = app_metadata.find(m => m.id === 'invoiceSettings') as AppMetadataInvoiceSettings;
 
-            // Load Templates from Metadata or default to testData values
+            // Load Templates from Metadata or default to DEFAULT_TEMPLATE values if missing
             const invoiceTemplate = (app_metadata.find(m => m.id === 'invoiceTemplateConfig') as InvoiceTemplateConfig) || initialState.invoiceTemplate;
             const estimateTemplate = (app_metadata.find(m => m.id === 'estimateTemplateConfig') as InvoiceTemplateConfig) || initialState.estimateTemplate;
             const debitNoteTemplate = (app_metadata.find(m => m.id === 'debitNoteTemplateConfig') as InvoiceTemplateConfig) || initialState.debitNoteTemplate;

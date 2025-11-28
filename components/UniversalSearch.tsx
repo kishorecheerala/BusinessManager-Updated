@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, X, User, Package, Boxes, ShoppingCart, QrCode } from 'lucide-react';
+import { Search, User, Package, Boxes, ShoppingCart, QrCode } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Page } from '../types';
 import { Customer, Supplier, Product, Sale, Purchase } from '../types';
-import { Html5Qrcode } from 'html5-qrcode';
+import QRScannerModal from './QRScannerModal';
 
 interface SearchResults {
     customers: Customer[];
@@ -19,61 +18,6 @@ interface UniversalSearchProps {
     onClose: () => void;
     onNavigate: (page: Page, id: string) => void;
 }
-
-const QRScannerModal: React.FC<{ onClose: () => void; onScanned: (text: string) => void }> = ({ onClose, onScanned }) => {
-    const [scanStatus, setScanStatus] = useState<string>("Initializing scanner...");
-    const scannerId = "qr-reader-universal";
-
-    useEffect(() => {
-        // Ensure container is clean
-        if (!document.getElementById(scannerId)) return;
-
-        const html5QrCode = new Html5Qrcode(scannerId);
-
-        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
-
-        html5QrCode.start(
-            { facingMode: "environment" }, 
-            config, 
-            (decodedText) => {
-                html5QrCode.pause(true);
-                onScanned(decodedText);
-            }, 
-            (errorMessage) => {}
-        ).then(() => setScanStatus("Scanning for QR Code..."))
-        .catch(err => {
-            setScanStatus(`Camera Permission Error. Please allow camera access.`);
-            console.error("Camera start failed.", err);
-        });
-
-        return () => {
-            try {
-                if (html5QrCode.isScanning) {
-                    html5QrCode.stop().then(() => html5QrCode.clear()).catch(e => console.warn("Scanner stop error", e));
-                } else {
-                    html5QrCode.clear();
-                }
-            } catch (e) {
-                console.warn("Scanner cleanup error", e);
-            }
-        };
-    }, [onScanned]);
-
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center z-[110] p-4 animate-fade-in-fast">
-            <div className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-4 w-full max-w-md relative animate-scale-in">
-                <div className="flex justify-between items-center mb-2">
-                     <h3 className="text-lg font-bold text-primary">Scan QR Code</h3>
-                     <button onClick={onClose} className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-slate-700 transition-colors">
-                        <X size={20}/>
-                     </button>
-                </div>
-                <div id={scannerId} className="w-full rounded-lg overflow-hidden border bg-black min-h-[250px] dark:border-slate-600"></div>
-                <p className="text-center text-sm my-2 text-gray-600 dark:text-gray-400">{scanStatus}</p>
-            </div>
-        </div>
-    );
-};
 
 const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNavigate }) => {
     const { state } = useAppContext();

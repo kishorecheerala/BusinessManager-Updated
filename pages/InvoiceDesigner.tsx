@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -361,15 +360,37 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
             case 'REPORT': baseConfig = state.reportTemplate; break;
             default: baseConfig = state.invoiceTemplate; break;
         }
+
+        // Safety check if state hasn't loaded or is empty
+        if (!baseConfig || !baseConfig.layout || Object.keys(baseConfig).length === 0) {
+             baseConfig = PRESETS['Modern']; // Safe fallback
+        }
+
+        // Define defaults for required layout fields to satisfy Typescript
+        const defaults = {
+            margin: 10,
+            logoSize: 25,
+            logoPosition: 'center' as const,
+            headerAlignment: 'center' as const,
+            showWatermark: false,
+            watermarkOpacity: 0.1,
+            tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false }
+        };
+
+        // Fix: Explicitly cast to 'any' to allow accessing potentially missing properties
+        // This avoids Typescript errors when properties like sectionOrdering exist in runtime but not in inferred type
+        const srcLayout = (baseConfig.layout || {}) as any;
+
         return {
             ...baseConfig,
             layout: {
-                ...baseConfig.layout,
-                sectionOrdering: baseConfig.layout.sectionOrdering || ['header', 'title', 'details', 'table', 'totals', 'terms', 'signature', 'footer'],
-                columnWidths: baseConfig.layout.columnWidths || { qty: 15, rate: 20, amount: 35 },
-                tablePadding: baseConfig.layout.tablePadding || 3,
-                borderRadius: 4,
-                uppercaseHeadings: true
+                ...defaults,
+                ...srcLayout,
+                sectionOrdering: srcLayout.sectionOrdering || ['header', 'title', 'details', 'table', 'totals', 'terms', 'signature', 'footer'],
+                columnWidths: srcLayout.columnWidths || { qty: 15, rate: 20, amount: 35 },
+                tablePadding: srcLayout.tablePadding || 3,
+                borderRadius: srcLayout.borderRadius ?? 4,
+                uppercaseHeadings: srcLayout.uppercaseHeadings ?? true
             }
         };
     };

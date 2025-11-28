@@ -1,8 +1,4 @@
 
-
-
-
-
 import React, { useState, useRef } from 'react';
 import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge } from 'lucide-react';
 import { Page } from '../types';
@@ -179,10 +175,13 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
         )}
         
         {isOpen && (
+        <>
+        <div className="fixed inset-0 z-40 bg-transparent" onClick={onClose}></div>
         <div 
-          className="absolute top-full left-0 mt-2 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 text-text dark:text-slate-200 animate-scale-in origin-top-left z-40 flex flex-col overflow-hidden max-h-[calc(100vh-6rem)]"
+          className="fixed top-16 left-4 mt-2 w-80 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 text-text dark:text-slate-200 animate-scale-in origin-top-left z-50 flex flex-col overflow-hidden max-h-[calc(100vh-6rem)]"
           role="dialog"
           aria-label="Main Menu"
+          onClick={(e) => e.stopPropagation()}
           onTouchStart={(e) => e.stopPropagation()} 
         >
             {/* User Header */}
@@ -423,6 +422,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                 }
             `}</style>
         </div>
+        </>
         )}
         </>
     );

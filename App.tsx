@@ -1,666 +1,393 @@
-
-
-
-import React, { useState, useEffect, useRef, useMemo, Suspense } from 'react';
-import { Home, Users, ShoppingCart, Package, FileText, Undo2, Boxes, Search, HelpCircle, Bell, Menu, Plus, UserPlus, PackagePlus, Download, X, Sun, Moon, Cloud, CloudOff, RefreshCw, Sparkles, BarChart2, Receipt, Lock, AlertCircle, CheckCircle, Info, PenTool, Gauge } from 'lucide-react';
-
+import React, { useState, useRef, useEffect } from 'react';
+import { 
+  Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
+  Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
+  Sparkles, Bell, HelpCircle
+} from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
-// Lazy load pages for better performance (Code Splitting)
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const CustomersPage = React.lazy(() => import('./pages/CustomersPage'));
-const SalesPage = React.lazy(() => import('./pages/SalesPage'));
-const PurchasesPage = React.lazy(() => import('./pages/PurchasesPage'));
-const ReportsPage = React.lazy(() => import('./pages/ReportsPage'));
-const ReturnsPage = React.lazy(() => import('./pages/ReturnsPage'));
-const ProductsPage = React.lazy(() => import('./pages/ProductsPage'));
-const InsightsPage = React.lazy(() => import('./pages/InsightsPage'));
-const ExpensesPage = React.lazy(() => import('./pages/ExpensesPage'));
-const QuotationsPage = React.lazy(() => import('./pages/QuotationsPage'));
-const InvoiceDesigner = React.lazy(() => import('./pages/InvoiceDesigner'));
-const SystemOptimizerPage = React.lazy(() => import('./pages/SystemOptimizerPage'));
+import { Page } from './types';
 
-import UniversalSearch from './components/UniversalSearch';
-import HelpModal from './components/HelpModal';
-import AppSkeletonLoader from './components/AppSkeletonLoader';
-import NotificationsPanel from './components/NotificationsPanel';
+// Pages
+import Dashboard from './pages/Dashboard';
+import CustomersPage from './pages/CustomersPage';
+import SalesPage from './pages/SalesPage';
+import PurchasesPage from './pages/PurchasesPage';
+import ProductsPage from './pages/ProductsPage';
+import ReportsPage from './pages/ReportsPage';
+import ReturnsPage from './pages/ReturnsPage';
+import InsightsPage from './pages/InsightsPage';
+import ExpensesPage from './pages/ExpensesPage';
+import QuotationsPage from './pages/QuotationsPage';
+import InvoiceDesigner from './pages/InvoiceDesigner';
+import SystemOptimizerPage from './pages/SystemOptimizerPage';
+
+// Components
 import MenuPanel from './components/MenuPanel';
-import ProfileModal from './components/ProfileModal';
+import NotificationsPanel from './components/NotificationsPanel';
 import AskAIModal from './components/AskAIModal';
+import HelpModal from './components/HelpModal';
+import FloatingActionButton from './components/FloatingActionButton';
+import UniversalSearch from './components/UniversalSearch';
 import DeveloperToolsModal from './components/DeveloperToolsModal';
 import CloudDebugModal from './components/CloudDebugModal';
-import { BeforeInstallPromptEvent, Page, SyncStatus } from './types';
-import { useOnClickOutside } from './hooks/useOnClickOutside';
+import ProfileModal from './components/ProfileModal';
+import AppSkeletonLoader from './components/AppSkeletonLoader';
 import { useSwipe } from './hooks/useSwipe';
-import ConfirmationModal from './components/ConfirmationModal';
-import PinModal from './components/PinModal';
-import ErrorBoundary from './components/ErrorBoundary';
+import { useOnClickOutside } from './hooks/useOnClickOutside';
 
-const Toast = () => {
-    const { state } = useAppContext();
-    if (!state.toast.show) return null;
-    
-    let bgColor = "bg-slate-800";
-    let icon = <Info className="w-5 h-5 text-white" />;
+interface NavItemProps {
+    page: string;
+    label: string;
+    icon: React.ElementType;
+    onClick: () => void;
+    isActive: boolean;
+}
 
-    if (state.toast.type === 'success') {
-        bgColor = "bg-emerald-600";
-        icon = <CheckCircle className="w-5 h-5 text-white" />;
-    } else if (state.toast.type === 'error') {
-        bgColor = "bg-red-600";
-        icon = <AlertCircle className="w-5 h-5 text-white" />;
-    }
-
-    const containerClasses = "fixed top-5 inset-x-0 flex justify-center z-[200]";
-    const toastClasses = `${bgColor} text-white px-6 py-3 rounded-full shadow-xl animate-fade-in-up font-medium flex items-center gap-3 border border-white/10`;
-
-    return (
-        <div className={containerClasses} style={{ pointerEvents: 'none' }}>
-            <div className={toastClasses} style={{ pointerEvents: 'auto' }}>
-                {icon}
-                <span>{state.toast.message}</span>
-            </div>
-        </div>
-    );
-};
-
-const NavItem: React.FC<{
-  page: Page;
-  label: string;
-  icon: React.ElementType;
-  onClick: () => void;
-  isActive: boolean;
-}> = ({ page, label, icon: Icon, onClick, isActive }) => (
-    <button
-      onClick={onClick}
-      className={`group flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 ${
-        isActive 
-          ? 'text-primary transform -translate-y-1' 
-          : 'text-gray-400 dark:text-gray-500 md:hover:text-gray-600 dark:md:hover:text-gray-300'
-      }`}
+const NavItem: React.FC<NavItemProps> = ({ page, label, icon: Icon, onClick, isActive }) => (
+    <button 
+        onClick={onClick}
+        className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
+            isActive 
+            ? 'text-primary transform -translate-y-1' 
+            : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50/50 dark:hover:bg-slate-700/30'
+        }`}
     >
-      <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-primary/10 scale-110' : 'group-hover:bg-gray-100 dark:group-hover:bg-slate-800'}`}>
-        <Icon 
-            className={`w-6 h-6 transition-transform duration-300 ${isActive ? 'fill-primary/20 -rotate-6' : 'group-hover:scale-110'}`} 
-            strokeWidth={isActive ? 2.5 : 2} 
-        />
-      </div>
-      <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 transition-all duration-300 truncate w-full text-center leading-tight ${isActive ? 'opacity-100' : 'opacity-70'}`}>{label}</span>
+        <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-primary/10 scale-110' : ''}`}>
+            <Icon className={`w-6 h-6 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} strokeWidth={isActive ? 2.5 : 2} />
+        </div>
+        <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>{label}</span>
     </button>
 );
 
-const QuickAddMenu: React.FC<{
-  isOpen: boolean;
-  onNavigate: (page: Page, action?: 'new') => void;
-}> = ({ isOpen, onNavigate }) => {
-    if (!isOpen) return null;
+const AppContent: React.FC = () => {
+    const { state, dispatch, isDbLoaded } = useAppContext();
+    const [currentPage, setCurrentPage] = useState<Page>('DASHBOARD');
+    const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+    const [isAskAIOpen, setIsAskAIOpen] = useState(false);
+    const [isHelpOpen, setIsHelpOpen] = useState(false);
+    const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
+    const [isCloudDebugOpen, setIsCloudDebugOpen] = useState(false);
+    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+    const [isMobileQuickAddOpen, setIsMobileQuickAddOpen] = useState(false);
+    const [isDirty, setIsDirty] = useState(false);
 
-    const actions = [
-        { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS' as Page, action: 'new' as const, color: 'text-blue-500' },
-        { icon: ShoppingCart, label: 'New Sale', page: 'SALES' as Page, color: 'text-emerald-500' },
-        { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES' as Page, action: 'new' as const, color: 'text-amber-500' },
-        { icon: Receipt, label: 'Add Expense', page: 'EXPENSES' as Page, color: 'text-rose-500' },
-    ];
+    const moreMenuRef = useRef<HTMLDivElement>(null);
+    const mobileQuickAddRef = useRef<HTMLDivElement>(null);
+    const notificationsRef = useRef<HTMLDivElement>(null);
 
-    return (
-        <div 
-          className="absolute top-full right-0 mt-3 w-60 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 animate-scale-in origin-top-right z-40 overflow-hidden ring-1 ring-black/5"
-        >
-            <div className="p-2">
-                {actions.map(action => (
-                    <button
-                        key={action.page}
-                        onClick={() => onNavigate(action.page, action.action)}
-                        className="w-full flex items-center gap-3 text-left p-3 rounded-xl hover:bg-gray-50 dark:hover:bg-slate-700/50 transition-all duration-200 group"
-                    >
-                        <div className={`p-2 rounded-lg bg-gray-50 dark:bg-slate-700 group-hover:bg-white dark:group-hover:bg-slate-600 shadow-sm ${action.color} transition-transform group-hover:scale-110`}>
-                            <action.icon className="w-5 h-5" />
-                        </div>
-                        <span className="font-semibold text-sm text-gray-700 dark:text-gray-200">{action.label}</span>
-                    </button>
-                ))}
-            </div>
-        </div>
-    );
-};
+    useOnClickOutside(moreMenuRef, () => setIsMoreMenuOpen(false));
+    useOnClickOutside(mobileQuickAddRef, () => setIsMobileQuickAddOpen(false));
+    useOnClickOutside(notificationsRef, () => setIsNotificationsOpen(false));
 
-const SyncIndicator: React.FC<{ status: SyncStatus, user: any }> = ({ status, user }) => {
-    if (!user) return <CloudOff className="w-5 h-5 text-white/50" />;
-    
-    if (status === 'syncing') return <RefreshCw className="w-5 h-5 text-white animate-spin" />;
-    
-    const isError = status === 'error';
-    const dotColor = isError ? 'bg-red-500' : 'bg-green-400';
-    
-    return (
-        <div className="relative flex items-center justify-center">
-            <Cloud className="w-5 h-5 text-white" />
-            <span 
-                className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-transparent ${dotColor}`}
-            />
-        </div>
-    );
-};
+    // Handle initial selection from context if any
+    useEffect(() => {
+        if (state.selection && state.selection.page) {
+            setCurrentPage(state.selection.page);
+        }
+    }, [state.selection]);
 
-const formatTime = (timestamp: number | null) => {
-    if (!timestamp) return "";
-    const date = new Date(timestamp);
-    return `Synced ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-}
+    // Apply Theme
+    useEffect(() => {
+        // 1. Dark Mode Class
+        if (state.theme === 'dark') {
+            document.documentElement.classList.add('dark');
+        } else {
+            document.documentElement.classList.remove('dark');
+        }
+        
+        const root = document.documentElement;
+        
+        // 2. Dynamic Primary Color (Convert Hex to RGB for Tailwind opacity)
+        // Tailwind config uses: rgb(var(--primary-color) / <alpha-value>)
+        const hex = state.themeColor.replace(/^#/, '');
+        if (/^[0-9A-F]{6}$/i.test(hex)) {
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            root.style.setProperty('--primary-color', `${r} ${g} ${b}`);
+        } else {
+            // Fallback default teal if invalid
+            root.style.setProperty('--primary-color', '13 148 136'); 
+        }
 
-const MainApp: React.FC = () => {
-  const [currentPage, _setCurrentPage] = useState<Page>(
-    () => (sessionStorage.getItem('currentPage') as Page) || 'DASHBOARD'
-  );
-  const isDirtyRef = useRef(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
-  const [isQuickAddOpen, setIsQuickAddOpen] = useState(false);
-  const [isMobileQuickAddOpen, setIsMobileQuickAddOpen] = useState(false);
-  const [isAskAIOpen, setIsAskAIOpen] = useState(false);
-  const [isDevToolsOpen, setIsDevToolsOpen] = useState(false);
-  const [isCloudDebugOpen, setIsCloudDebugOpen] = useState(false);
-  const [navConfirm, setNavConfirm] = useState<{ show: boolean, page: Page | null }>({ show: false, page: null });
-  const [exitAttempt, setExitAttempt] = useState(false);
-  
-  // Manual Lock State
-  const [isAppLocked, setIsAppLocked] = useState(false);
+        // 3. Header Background (Gradient or Solid)
+        if (state.themeGradient) {
+            root.style.setProperty('--header-bg', state.themeGradient);
+            root.style.setProperty('--theme-gradient', state.themeGradient);
+        } else {
+            root.style.setProperty('--header-bg', state.themeColor);
+            root.style.setProperty('--theme-gradient', `linear-gradient(135deg, ${state.themeColor} 0%, ${state.themeColor} 100%)`);
+        }
 
-  const { state, dispatch, isDbLoaded, showToast, googleSignIn, syncData } = useAppContext();
-  const { installPromptEvent, theme, themeColor, themeGradient, performanceMode } = state;
-  const [isInstallBannerVisible, setIsInstallBannerVisible] = useState(true);
+        // 4. Persist to LocalStorage (for index.html script to pick up on reload)
+        localStorage.setItem('theme', state.theme);
+        localStorage.setItem('themeColor', state.themeColor);
+        if (state.themeGradient) {
+            localStorage.setItem('themeGradient', state.themeGradient);
+        } else {
+            localStorage.removeItem('themeGradient');
+        }
 
-  const menuRef = useRef<HTMLDivElement>(null);
-  const quickAddRef = useRef<HTMLDivElement>(null);
-  const mobileQuickAddRef = useRef<HTMLDivElement>(null);
-  const notificationsRef = useRef<HTMLDivElement>(null);
-  const moreMenuRef = useRef<HTMLDivElement>(null);
+    }, [state.theme, state.themeColor, state.themeGradient]);
 
-  useOnClickOutside(menuRef, () => setIsMenuOpen(false));
-  useOnClickOutside(quickAddRef, () => setIsQuickAddOpen(false));
-  useOnClickOutside(mobileQuickAddRef, () => setIsMobileQuickAddOpen(false));
-  useOnClickOutside(notificationsRef, () => setIsNotificationsOpen(false));
-  useOnClickOutside(moreMenuRef, () => setIsMoreMenuOpen(false));
-
-  // Keyboard Shortcuts
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault();
-        setIsSearchOpen(true);
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  // --- NETWORK STATUS MONITORING ---
-  useEffect(() => {
-      const handleOnline = () => showToast("You are back online", "success");
-      const handleOffline = () => showToast("You are offline. App will work locally.", "info");
-      
-      window.addEventListener('online', handleOnline);
-      window.addEventListener('offline', handleOffline);
-      
-      return () => {
-          window.removeEventListener('online', handleOnline);
-          window.removeEventListener('offline', handleOffline);
-      };
-  }, [showToast]);
-
-  useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-    // Always set theme-color to light color as requested, regardless of dark mode
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', '#f8fafc');
-    
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  // Performance Mode Body Class
-  useEffect(() => {
-      if (performanceMode) {
-          document.body.classList.add('performance-mode');
-      } else {
-          document.body.classList.remove('performance-mode');
-      }
-  }, [performanceMode]);
-
-  // Apply dynamic theme color with Adaptive Lightening for Dark Mode
-  useEffect(() => {
-      let r=0, g=0, b=0;
-      if (themeColor) {
-          // Convert Hex to RGB
-          const hex = themeColor.replace('#', '');
-          r = parseInt(hex.substring(0, 2), 16);
-          g = parseInt(hex.substring(2, 4), 16);
-          b = parseInt(hex.substring(4, 6), 16);
-          
-          // If in dark mode, we might need to lighten the primary color if it's too dark
-          if (theme === 'dark') {
-              // Calculate relative luminance
-              const lum = (0.299 * r + 0.587 * g + 0.114 * b);
-              // If luminance is low (dark color), lighten it
-              if (lum < 120) {
-                  const mix = 0.4; // Blend 40% with white
-                  r = Math.round(r + (255 - r) * mix);
-                  g = Math.round(g + (255 - g) * mix);
-                  b = Math.round(b + (255 - b) * mix);
-              }
-          }
-
-          document.documentElement.style.setProperty('--primary-color', `${r} ${g} ${b}`);
-          localStorage.setItem('themeColor', themeColor);
-      }
-
-      // Apply gradient or solid fallback
-      if (themeGradient) {
-          document.documentElement.style.setProperty('--header-bg', themeGradient);
-          localStorage.setItem('themeGradient', themeGradient);
-      } else {
-          // Fallback to current primary solid color
-          document.documentElement.style.setProperty('--header-bg', `rgb(${r} ${g} ${b})`);
-          localStorage.removeItem('themeGradient');
-      }
-
-  }, [themeColor, theme, themeGradient]);
-  
-  const handleInstallClick = async () => {
-    if (!installPromptEvent) return;
-    installPromptEvent.prompt();
-    dispatch({ type: 'SET_INSTALL_PROMPT_EVENT', payload: null });
-  };
-
-  const handleManualLock = () => {
-      setIsAppLocked(true);
-      setIsMenuOpen(false);
-  };
-
-  useEffect(() => { sessionStorage.setItem('currentPage', currentPage); }, [currentPage]);
-
-  const setIsDirty = (dirty: boolean) => { isDirtyRef.current = dirty; };
-  
-  const setCurrentPage = (page: Page) => {
-    if (page === currentPage) return;
-    if (isDirtyRef.current) {
-      setNavConfirm({ show: true, page });
-    } else {
-      // Always push a state when navigating forward to a new page to build history
-      if (page !== 'DASHBOARD') {
-          window.history.pushState({ page }, '');
-      }
-      _setCurrentPage(page);
-    }
-  };
-
-  // --- HISTORY TRAP & BACK BUTTON HANDLING ---
-  useEffect(() => {
-      const initHistory = () => {
-          if (!window.history.state || window.history.state.id !== 'trap') {
-              window.history.replaceState({ page: 'DASHBOARD', id: 'root' }, '');
-              window.history.pushState({ page: 'DASHBOARD', id: 'trap' }, '');
-          }
-      };
-      initHistory();
-  }, []);
-
-  useEffect(() => {
-    const handlePopState = (event: PopStateEvent) => {
-      if (currentPage === 'DASHBOARD') {
-          if (exitAttempt) {
-              window.history.back(); 
-          } else {
-              window.history.pushState({ page: 'DASHBOARD', id: 'trap' }, '');
-              showToast("Press Back again to exit", 'info');
-              setExitAttempt(true);
-              setTimeout(() => setExitAttempt(false), 3500);
-          }
-      } else {
-          if (!isDirtyRef.current) {
-              _setCurrentPage('DASHBOARD');
-          } else {
-              _setCurrentPage('DASHBOARD');
-          }
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    return () => window.removeEventListener('popstate', handlePopState);
-  }, [currentPage, exitAttempt, showToast]);
-
-
-  useSwipe({
-    onSwipeRight: () => {
-        // Disable swipe on specific pages or when modals/overlays are open
-        if (currentPage === 'INVOICE_DESIGNER') return;
-        if (isMenuOpen || isSearchOpen || isNotificationsOpen || isQuickAddOpen || isMobileQuickAddOpen || isMoreMenuOpen || isAppLocked) return;
-
-        if (currentPage === 'DASHBOARD') {
-            if (exitAttempt) {
-                window.history.back();
-            } else {
-                showToast("Press Back again to exit", 'info');
-                setExitAttempt(true);
-                setTimeout(() => setExitAttempt(false), 3500);
+    // Handle Unsaved Changes
+    const handleNavigation = (page: Page) => {
+        if (isDirty) {
+            if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
+                setIsDirty(false);
+                setCurrentPage(page);
             }
         } else {
-            window.history.back();
+            setCurrentPage(page);
         }
-    }
-  }, {
-      edgeThreshold: 200, 
-      threshold: 50,      
-      timeout: 600        
-  });
+    };
 
-  const renderPage = () => {
-    const commonProps = { setIsDirty };
-    // All pages are now lazy loaded
-    switch (currentPage) {
-      case 'DASHBOARD': return <Dashboard setCurrentPage={setCurrentPage} />;
-      case 'CUSTOMERS': return <CustomersPage {...commonProps} setCurrentPage={setCurrentPage} />;
-      case 'SALES': return <SalesPage {...commonProps} />;
-      case 'PURCHASES': return <PurchasesPage {...commonProps} setCurrentPage={setCurrentPage} />;
-      case 'REPORTS': return <ReportsPage setCurrentPage={setCurrentPage} />;
-      case 'RETURNS': return <ReturnsPage {...commonProps} />;
-      case 'PRODUCTS': return <ProductsPage {...commonProps} />;
-      case 'INSIGHTS': return <InsightsPage setCurrentPage={setCurrentPage} />;
-      case 'EXPENSES': return <ExpensesPage {...commonProps} />;
-      case 'QUOTATIONS': return <QuotationsPage />;
-      case 'INVOICE_DESIGNER': return <InvoiceDesigner {...commonProps} setCurrentPage={setCurrentPage} />;
-      case 'SYSTEM_OPTIMIZER': return <SystemOptimizerPage />;
-      default: return <Dashboard setCurrentPage={setCurrentPage} />;
-    }
-  };
-  
-  const mainNavItems = [
-    { page: 'DASHBOARD' as Page, label: 'Home', icon: Home },
-    { page: 'CUSTOMERS' as Page, label: 'Customers', icon: Users },
-    { page: 'SALES' as Page, label: 'Sales', icon: ShoppingCart },
-    { page: 'PURCHASES' as Page, label: 'Purchases', icon: Package },
-  ];
+    // Nav Items Configuration
+    const mainNavItems = [
+        { page: 'DASHBOARD', label: 'Home', icon: Home },
+        { page: 'CUSTOMERS', label: 'Customers', icon: Users },
+        { page: 'SALES', label: 'Sales', icon: ShoppingCart },
+        { page: 'PURCHASES', label: 'Purchases', icon: Package },
+        { page: 'INSIGHTS', label: 'Insights', icon: BarChart2 },
+    ];
 
-  const moreNavItems = [
-      { page: 'QUOTATIONS' as Page, label: 'Estimates', icon: FileText },
-      { page: 'EXPENSES' as Page, label: 'Expenses', icon: Receipt },
-      { page: 'PRODUCTS' as Page, label: 'Products', icon: Boxes },
-      { page: 'RETURNS' as Page, label: 'Returns', icon: Undo2 },
-      { page: 'REPORTS' as Page, label: 'Reports', icon: FileText },
-      { page: 'INSIGHTS' as Page, label: 'Insights', icon: BarChart2 },
-      { page: 'INVOICE_DESIGNER' as Page, label: 'Inv. Designer', icon: PenTool },
-      { page: 'SYSTEM_OPTIMIZER' as Page, label: 'Optimizer', icon: Gauge },
-  ];
+    const moreNavItems = [
+        { page: 'PRODUCTS', label: 'Products', icon: Package }, // Use Package or similar
+        { page: 'REPORTS', label: 'Reports', icon: FileText },
+        { page: 'EXPENSES', label: 'Expenses', icon: Receipt },
+        { page: 'RETURNS', label: 'Returns', icon: Undo2 },
+        { page: 'QUOTATIONS', label: 'Estimates', icon: FileText },
+        { page: 'INVOICE_DESIGNER', label: 'Designer', icon: PenTool },
+        { page: 'SYSTEM_OPTIMIZER', label: 'System', icon: Gauge },
+    ];
 
-  const mobileMoreItems = moreNavItems;
-  
-  const isMoreBtnActive = (mobileMoreItems.some(i => i.page === currentPage) || isMoreMenuOpen) && !isMobileQuickAddOpen;
+    const mobileMoreItems = [
+        { page: 'PRODUCTS', label: 'Products', icon: Package },
+        { page: 'REPORTS', label: 'Reports', icon: FileText },
+        { page: 'EXPENSES', label: 'Expenses', icon: Receipt },
+        { page: 'QUOTATIONS', label: 'Estimates', icon: FileText },
+        { page: 'RETURNS', label: 'Returns', icon: Undo2 },
+        { page: 'INSIGHTS', label: 'Insights', icon: BarChart2 },
+        { page: 'INVOICE_DESIGNER', label: 'Designer', icon: PenTool },
+        { page: 'SYSTEM_OPTIMIZER', label: 'System', icon: Gauge },
+    ];
 
-  return (
-    <>
-        {/* SECURITY OVERLAY: Renders on top of app but keeps app mounted to preserve state */}
-        {isAppLocked && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center animate-fade-in-fast">
-                {/* Blurred backdrop */}
-                <div className="absolute inset-0 bg-black/60 backdrop-blur-md"></div>
-                {/* Blurred Theme tint */}
-                <div className="absolute inset-0 bg-theme opacity-30 blur-3xl"></div>
-                
-                <div className="relative z-10 w-full max-w-md px-4">
-                    <PinModal 
-                        mode="enter"
-                        correctPin={state.pin}
-                        onCorrectPin={() => {
-                            setIsAppLocked(false);
-                        }}
-                        // Pass undefined/empty to hide "Cancel/Go Back" button when app is securely locked
-                        onCancel={undefined} 
-                    />
-                </div>
-            </div>
-        )}
+    const isMoreBtnActive = mobileMoreItems.some(item => item.page === currentPage);
 
-        <div 
-            className={`flex flex-col h-screen font-sans text-slate-800 dark:text-slate-200 bg-transparent touch-pan-y ${isAppLocked ? 'filter blur-sm pointer-events-none overflow-hidden h-screen fixed w-full' : ''}`}
-            aria-hidden={isAppLocked}
-        >
-        <Toast />
-        <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-        <ProfileModal isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />
-        <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
-        <DeveloperToolsModal 
-            isOpen={isDevToolsOpen} 
-            onClose={() => setIsDevToolsOpen(false)} 
-            onOpenCloudDebug={() => setIsCloudDebugOpen(true)} 
-        />
-        <CloudDebugModal isOpen={isCloudDebugOpen} onClose={() => setIsCloudDebugOpen(false)} />
-        <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={(p, id) => { dispatch({ type: 'SET_SELECTION', payload: { page: p, id } }); setCurrentPage(p); setIsSearchOpen(false); }} />
-        <ConfirmationModal isOpen={navConfirm.show} onClose={() => setNavConfirm({ show: false, page: null })} onConfirm={() => { if (navConfirm.page) { setIsDirty(false); setCurrentPage(navConfirm.page); } setNavConfirm({ show: false, page: null }); }} title="Unsaved Changes">You have unsaved changes. Leave anyway?</ConfirmationModal>
-        
-        {/* Dynamic Theme Header - Using bg-theme class which uses CSS variable */}
-        <header className="bg-theme text-white shadow-lg p-3 px-4 flex items-center justify-between relative z-[60] sticky top-0">
-            <div className="flex items-center gap-1">
-                <div className="relative" ref={menuRef}>
-                <button onClick={() => setIsMenuOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95">
-                    <Menu className={`w-6 h-6 transition-transform duration-300 ${isMenuOpen ? 'rotate-90' : ''}`} />
-                </button>
-                <MenuPanel 
-                    isOpen={isMenuOpen} 
-                    onClose={() => setIsMenuOpen(false)} 
-                    onProfileClick={() => { setIsMenuOpen(false); setIsProfileOpen(true); }} 
-                    onNavigate={(page) => { setIsMenuOpen(false); setCurrentPage(page); }} 
-                    onOpenDevTools={() => { setIsMenuOpen(false); setIsDevToolsOpen(true); }}
-                    onLockApp={handleManualLock}
-                />
-                </div>
-                <button onClick={() => setIsSearchOpen(true)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95" title="Search (Ctrl + K)">
-                <Search className="w-6 h-6" />
-                </button>
-            </div>
+    // Swipe handlers for mobile navigation
+    useSwipe({
+        onSwipeLeft: () => {
+            // Find current index in mainNavItems
+            const idx = mainNavItems.findIndex(i => i.page === currentPage);
+            if (idx >= 0 && idx < mainNavItems.length - 1) {
+                handleNavigation(mainNavItems[idx + 1].page as Page);
+            }
+        },
+        onSwipeRight: () => {
+            const idx = mainNavItems.findIndex(i => i.page === currentPage);
+            if (idx > 0) {
+                handleNavigation(mainNavItems[idx - 1].page as Page);
+            }
+        }
+    });
+
+    if (!isDbLoaded) return <AppSkeletonLoader />;
+
+    return (
+        <div className={`min-h-screen bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 pb-20 md:pb-0 ${state.theme}`}>
             
-            <button onClick={() => setCurrentPage('DASHBOARD')} className="flex flex-col items-center justify-center min-w-0 mx-2 text-center group">
-                <h1 className="text-lg font-bold leading-tight truncate max-w-[200px] drop-shadow-md transition-transform group-active:scale-95">{state.profile?.name || 'Business Manager'}</h1>
-                <div className="text-[10px] font-medium flex items-center gap-1 mt-0.5">
-                    {state.googleUser ? (
-                    <>
-                        <span className="opacity-90 truncate max-w-[120px]">{state.googleUser.name}</span>
-                        <span className="opacity-50">•</span>
-                        {state.syncStatus === 'error' ? (
-                            <span className="text-red-200 flex items-center gap-0.5 animate-pulse font-bold">
-                            <CloudOff size={10} /> Sync Error
-                            </span>
-                        ) : state.syncStatus === 'syncing' ? (
-                            <span className="flex items-center gap-0.5 opacity-90">
-                            <RefreshCw size={10} className="animate-spin"/> Syncing...
-                            </span>
-                        ) : (
-                            <span className="opacity-75">
-                            {formatTime(state.lastSyncTime)}
-                            </span>
-                        )}
-                    </>
-                    ) : (
-                    <span className="opacity-70 italic">Local Mode (Not Backed Up)</span>
-                    )}
-                </div>
-            </button>
-
-            <div className="flex items-center gap-1">
-                <button onClick={() => setIsAskAIOpen(true)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95 group relative">
-                    <Sparkles className="w-6 h-6 text-yellow-300 fill-yellow-300/20 animate-pulse" />
-                </button>
-                
-                {/* Clickable Sync Indicator for Manual Sync or Re-Auth */}
-                <button 
-                    onClick={() => state.syncStatus === 'error' ? googleSignIn() : syncData()} 
-                    className='flex items-center justify-center w-8 h-8 rounded-full hover:bg-white/20 transition-all active:scale-95'
-                    title={state.syncStatus === 'error' ? "Session Expired - Click to Reconnect" : "Click to Sync"}
-                >
-                    <SyncIndicator status={state.syncStatus} user={state.googleUser} />
-                </button>
-                
-                {/* Hidden on mobile, visible on desktop */}
-                <div className="relative hidden md:block" ref={quickAddRef}>
-                    <button onClick={() => setIsQuickAddOpen(prev => !prev)} className={`p-2 rounded-full hover:bg-white/20 transition-all active:scale-95 bg-white/10 shadow-sm border border-white/10 ${isQuickAddOpen ? 'rotate-45' : ''}`}>
-                        <Plus className="w-6 h-6" strokeWidth={3} />
-                    </button>
-                    <QuickAddMenu isOpen={isQuickAddOpen} onNavigate={(page, action) => { dispatch({ type: 'SET_SELECTION', payload: { page, id: 'new' } }); setCurrentPage(page); setIsQuickAddOpen(false); }} />
-                </div>
-                <div className="relative" ref={notificationsRef}>
-                    <button onClick={() => setIsNotificationsOpen(prev => !prev)} className="p-2 rounded-full hover:bg-white/20 transition-all active:scale-95">
-                        <Bell className={`w-6 h-6 transition-transform ${state.notifications.some(n => !n.read) ? 'animate-swing' : ''}`} />
-                        {state.notifications.some(n => !n.read) && <span className="absolute top-2 right-2 h-2.5 w-2.5 rounded-full bg-red-50 border-2 border-white animate-bounce"></span>}
-                    </button>
-                    <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={(page) => { setCurrentPage(page); setIsNotificationsOpen(false); }} />
-                </div>
-            </div>
-        </header>
-
-        {installPromptEvent && isInstallBannerVisible && (
-            <div className="bg-primary text-white p-3 flex items-center justify-between gap-4 animate-fade-in-up shadow-lg mx-4 mt-4 rounded-xl">
-                <div className="flex items-center gap-3">
-                    <div className="bg-white/20 p-2 rounded-lg"><Download className="w-5 h-5" /></div>
-                    <p className="font-bold text-sm">Install App for Offline Access</p>
-                </div>
-                <div className="flex items-center gap-2">
-                    <button onClick={handleInstallClick} className="bg-white text-primary font-bold py-1.5 px-4 rounded-lg text-xs shadow-md hover:bg-gray-50 transition-colors">Install</button>
-                    <button onClick={() => setIsInstallBannerVisible(false)} className="p-1 hover:bg-white/20 rounded-full"><X className="w-5 h-5" /></button>
-                </div>
-            </div>
-        )}
-
-        {/* Main Content - Updated to handle full height for Invoice Designer */}
-        <main 
-            className={`flex-grow flex flex-col ${currentPage === 'INVOICE_DESIGNER' ? 'overflow-hidden p-0 sm:p-4 pb-0 sm:pb-0' : 'overflow-y-auto p-4 pb-24'}`} 
-            style={{ WebkitOverflowScrolling: 'touch' }}
-        >
-            <div key={currentPage} className={`animate-fade-in-up w-full ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'max-w-6xl mx-auto'}`}>
-                <Suspense fallback={<AppSkeletonLoader />}>
-                    <ErrorBoundary>
-                        {renderPage()}
-                    </ErrorBoundary>
-                </Suspense>
-            </div>
-        </main>
-
-        {/* Glassmorphism Bottom Nav - Hidden on Invoice Designer */}
-        {currentPage !== 'INVOICE_DESIGNER' && (
-        <nav className="fixed bottom-0 left-0 right-0 glass pb-[env(safe-area-inset-bottom)] z-50 border-t border-gray-200/50 dark:border-slate-700/50">
-            {/* Desktop View - unchanged */}
-            <div className="hidden md:flex justify-center gap-8 p-2">
-                {[...mainNavItems, ...moreNavItems].map(item => <NavItem key={item.page} page={item.page} label={item.label} icon={item.icon} onClick={() => setCurrentPage(item.page)} isActive={currentPage === item.page} />)}
-            </div>
-
-            {/* Mobile View - Custom Layout with Reordered Items and End FAB */}
-            <div className="flex md:hidden justify-between items-end px-1 pt-2 pb-2 mx-auto w-full max-w-md">
-                <NavItem page={'DASHBOARD'} label={'Home'} icon={Home} onClick={() => setCurrentPage('DASHBOARD')} isActive={currentPage === 'DASHBOARD' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
-                <NavItem page={'CUSTOMERS'} label={'Customers'} icon={Users} onClick={() => setCurrentPage('CUSTOMERS')} isActive={currentPage === 'CUSTOMERS' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
-                <NavItem page={'SALES'} label={'Sales'} icon={ShoppingCart} onClick={() => setCurrentPage('SALES')} isActive={currentPage === 'SALES' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
-                <NavItem page={'PURCHASES'} label={'Purchases'} icon={Package} onClick={() => setCurrentPage('PURCHASES')} isActive={currentPage === 'PURCHASES' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
-                
-                {/* More Menu */}
-                <div className="relative flex flex-col items-center justify-center w-full" ref={moreMenuRef}>
-                    <button
-                        onClick={() => { setIsMoreMenuOpen(prev => !prev); setIsMobileQuickAddOpen(false); }}
-                        className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
-                            isMoreBtnActive 
-                            ? 'text-primary transform -translate-y-1' 
-                            : 'text-gray-400 dark:text-gray-500'
-                        }`}
-                        >
-                        <div className={`p-1 rounded-full transition-all duration-300 ${isMoreBtnActive ? 'bg-primary/10 scale-110' : ''}`}>
-                            <Menu className={`w-6 h-6 transition-transform duration-300 ${isMoreBtnActive ? 'rotate-90' : ''}`} strokeWidth={isMoreBtnActive ? 2.5 : 2} />
+            {/* Header - Hidden on Invoice Designer to maximize space */}
+            {currentPage !== 'INVOICE_DESIGNER' && (
+                <header className="fixed top-0 left-0 right-0 h-16 bg-theme text-white shadow-lg z-40 px-4 flex items-center justify-between transition-all duration-300">
+                    <div className="flex items-center gap-3">
+                        <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                            <Menu size={24} />
+                        </button>
+                        <h1 className="text-xl font-bold tracking-tight truncate max-w-[200px]">
+                            {state.profile?.name || 'Business Manager'}
+                        </h1>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setIsSearchOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                            <Search size={20} />
+                        </button>
+                        <div className="relative" ref={notificationsRef}>
+                            <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="p-2 hover:bg-white/20 rounded-full transition-colors relative">
+                                <Bell size={20} />
+                                {state.notifications.some(n => !n.read) && (
+                                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
+                                )}
+                            </button>
+                            <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
                         </div>
-                        <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">More</span>
-                    </button>
+                        <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors hidden sm:block">
+                            <Sparkles size={20} />
+                        </button>
+                        <button onClick={() => setIsHelpOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                            <HelpCircle size={20} />
+                        </button>
+                    </div>
+                </header>
+            )}
 
-                    {isMoreMenuOpen && (
-                        <div className="absolute bottom-[calc(100%+16px)] right-0 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 z-50 animate-scale-in origin-bottom-right overflow-hidden ring-1 ring-black/5">
-                            <div className="p-1.5 grid gap-1">
-                                {mobileMoreItems.map(item => (
-                                    <button 
-                                        key={item.page} 
-                                        onClick={() => { setCurrentPage(item.page); setIsMoreMenuOpen(false); }} 
-                                        className={`w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-all group ${
-                                            currentPage === item.page 
-                                                ? 'bg-primary/10 text-primary font-bold' 
-                                                : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 text-gray-600 dark:text-gray-300'
-                                        }`}
+            {/* Main Content Area */}
+            <main className={`flex-grow h-screen overflow-y-auto custom-scrollbar ${currentPage !== 'INVOICE_DESIGNER' ? 'pt-16' : ''}`}>
+                <div className={`mx-auto ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'p-4 max-w-7xl'}`}>
+                    {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
+                    {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                    {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}
+                    {currentPage === 'PURCHASES' && <PurchasesPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                    {currentPage === 'PRODUCTS' && <ProductsPage setIsDirty={setIsDirty} />}
+                    {currentPage === 'REPORTS' && <ReportsPage setCurrentPage={handleNavigation} />}
+                    {currentPage === 'RETURNS' && <ReturnsPage setIsDirty={setIsDirty} />}
+                    {currentPage === 'INSIGHTS' && <InsightsPage setCurrentPage={handleNavigation} />}
+                    {currentPage === 'EXPENSES' && <ExpensesPage setIsDirty={setIsDirty} />}
+                    {currentPage === 'QUOTATIONS' && <QuotationsPage />}
+                    {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                    {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
+                </div>
+            </main>
+
+            {/* Modals & Overlays */}
+            <MenuPanel 
+                isOpen={isMenuOpen} 
+                onClose={() => setIsMenuOpen(false)} 
+                onProfileClick={() => setIsProfileModalOpen(true)}
+                onNavigate={handleNavigation}
+                onOpenDevTools={() => setIsDevToolsOpen(true)}
+            />
+            <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
+            <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
+            <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+            <DeveloperToolsModal isOpen={isDevToolsOpen} onClose={() => setIsDevToolsOpen(false)} onOpenCloudDebug={() => setIsCloudDebugOpen(true)} />
+            <CloudDebugModal isOpen={isCloudDebugOpen} onClose={() => setIsCloudDebugOpen(false)} />
+            <ProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
+            
+            {/* Floating Action Button (Mobile) - Hidden if Invoice Designer */}
+            {currentPage !== 'INVOICE_DESIGNER' && <FloatingActionButton onNavigate={handleNavigation} />}
+
+            {/* Bottom Navigation */}
+            {currentPage !== 'INVOICE_DESIGNER' && (
+            <nav className="fixed bottom-0 left-0 right-0 glass pb-[env(safe-area-inset-bottom)] z-50 border-t border-gray-200/50 dark:border-slate-700/50">
+                {/* Desktop View - Scrollable */}
+                <div className="hidden md:flex w-full overflow-x-auto custom-scrollbar">
+                    <div className="flex flex-nowrap mx-auto items-center gap-2 lg:gap-6 p-2 px-6 min-w-max">
+                        {[...mainNavItems, ...moreNavItems].map(item => (
+                            <div key={item.page} className="w-16 lg:w-20 flex-shrink-0">
+                                <NavItem 
+                                    page={item.page} 
+                                    label={item.label} 
+                                    icon={item.icon} 
+                                    onClick={() => handleNavigation(item.page as Page)} 
+                                    isActive={currentPage === item.page} 
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Mobile View - Custom Layout with Reordered Items and End FAB */}
+                <div className="flex md:hidden justify-between items-end px-1 pt-2 pb-2 mx-auto w-full max-w-md">
+                    <NavItem page={'DASHBOARD'} label={'Home'} icon={Home} onClick={() => handleNavigation('DASHBOARD')} isActive={currentPage === 'DASHBOARD' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
+                    <NavItem page={'CUSTOMERS'} label={'Customers'} icon={Users} onClick={() => handleNavigation('CUSTOMERS')} isActive={currentPage === 'CUSTOMERS' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
+                    <NavItem page={'SALES'} label={'Sales'} icon={ShoppingCart} onClick={() => handleNavigation('SALES')} isActive={currentPage === 'SALES' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
+                    <NavItem page={'PURCHASES'} label={'Purchases'} icon={Package} onClick={() => handleNavigation('PURCHASES')} isActive={currentPage === 'PURCHASES' && !isMoreMenuOpen && !isMobileQuickAddOpen} />
+                    
+                    {/* More Menu */}
+                    <div className="relative flex flex-col items-center justify-center w-full" ref={moreMenuRef}>
+                        <button
+                            onClick={() => { setIsMoreMenuOpen(prev => !prev); setIsMobileQuickAddOpen(false); }}
+                            className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
+                                isMoreBtnActive 
+                                ? 'text-primary transform -translate-y-1' 
+                                : 'text-gray-400 dark:text-gray-500'
+                            }`}
+                            >
+                            <div className={`p-1 rounded-full transition-all duration-300 ${isMoreBtnActive ? 'bg-primary/10 scale-110' : ''}`}>
+                                <Menu className={`w-6 h-6 transition-transform duration-300 ${isMoreBtnActive ? 'rotate-90' : ''}`} strokeWidth={isMoreBtnActive ? 2.5 : 2} />
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">More</span>
+                        </button>
+
+                        {isMoreMenuOpen && (
+                            <div className="absolute bottom-[calc(100%+16px)] right-0 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 z-50 animate-scale-in origin-bottom-right overflow-hidden ring-1 ring-black/5">
+                                <div className="p-1.5 grid gap-1">
+                                    {mobileMoreItems.map(item => (
+                                        <button 
+                                            key={item.page} 
+                                            onClick={() => { handleNavigation(item.page as Page); setIsMoreMenuOpen(false); }} 
+                                            className={`w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-all group ${
+                                                currentPage === item.page 
+                                                    ? 'bg-primary/10 text-primary font-bold' 
+                                                    : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 text-gray-600 dark:text-gray-300'
+                                            }`}
+                                        >
+                                            <item.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${currentPage === item.page ? 'scale-110' : ''}`} />
+                                            <span className="text-sm">{item.label}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Quick Add at the end */}
+                    <div className="relative flex flex-col items-center justify-center w-full" ref={mobileQuickAddRef}>
+                        <button 
+                            onClick={() => { setIsMobileQuickAddOpen(!isMobileQuickAddOpen); setIsMoreMenuOpen(false); }}
+                            className="flex flex-col items-center justify-center w-full pt-2 pb-2 group"
+                        >
+                            <div className={`w-10 h-10 rounded-full bg-theme text-white shadow-lg shadow-primary/25 flex items-center justify-center transition-all duration-300 ${isMobileQuickAddOpen ? 'rotate-45 scale-110' : 'group-active:scale-95'}`}>
+                                <Plus size={22} strokeWidth={3} />
+                            </div>
+                            <span className={`text-[9px] sm:text-[10px] font-bold mt-1 leading-tight ${isMobileQuickAddOpen ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`}>Quick Add</span>
+                        </button>
+                        {isMobileQuickAddOpen && (
+                            <div className="absolute bottom-[calc(100%+4px)] right-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 p-2 animate-scale-in origin-bottom-right z-50 ring-1 ring-black/5">
+                                {[
+                                    { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS' as Page, action: 'new' },
+                                    { icon: ShoppingCart, label: 'New Sale', page: 'SALES' as Page },
+                                    { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES' as Page, action: 'new' },
+                                    { icon: Receipt, label: 'Add Expense', page: 'EXPENSES' as Page },
+                                    { icon: Undo2, label: 'New Return', page: 'RETURNS' as Page },
+                                ].map((action, idx) => (
+                                    <button
+                                        key={idx}
+                                        onClick={() => { 
+                                            dispatch({ type: 'SET_SELECTION', payload: { page: action.page, id: action.action || 'new' } }); 
+                                            handleNavigation(action.page);
+                                            setIsMobileQuickAddOpen(false);
+                                        }}
+                                        className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left group/item"
                                     >
-                                        <item.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${currentPage === item.page ? 'scale-110' : ''}`} />
-                                        <span className="text-sm">{item.label}</span>
+                                        <div className="p-2 bg-gray-100 dark:bg-slate-700 group-hover/item:bg-white dark:group-hover/item:bg-slate-600 rounded-lg text-primary shadow-sm transition-transform group-hover/item:scale-110">
+                                            <action.icon size={18} />
+                                        </div>
+                                        <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{action.label}</span>
                                     </button>
                                 ))}
                             </div>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
-
-                {/* Quick Add at the end */}
-                <div className="relative flex flex-col items-center justify-center w-full" ref={mobileQuickAddRef}>
-                    <button 
-                        onClick={() => { setIsMobileQuickAddOpen(!isMobileQuickAddOpen); setIsMoreMenuOpen(false); }}
-                        className="flex flex-col items-center justify-center w-full pt-2 pb-2 group"
-                    >
-                        <div className={`w-10 h-10 rounded-full bg-theme text-white shadow-lg shadow-primary/25 flex items-center justify-center transition-all duration-300 ${isMobileQuickAddOpen ? 'rotate-45 scale-110' : 'group-active:scale-95'}`}>
-                            <Plus size={22} strokeWidth={3} />
-                        </div>
-                        <span className={`text-[9px] sm:text-[10px] font-bold mt-1 leading-tight ${isMobileQuickAddOpen ? 'text-primary' : 'text-gray-500 dark:text-gray-400'}`}>Quick Add</span>
-                    </button>
-                    {isMobileQuickAddOpen && (
-                        <div className="absolute bottom-[calc(100%+4px)] right-2 w-56 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 p-2 animate-scale-in origin-bottom-right z-50 ring-1 ring-black/5">
-                            {[
-                                { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS' as Page, action: 'new' },
-                                { icon: ShoppingCart, label: 'New Sale', page: 'SALES' as Page },
-                                { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES' as Page, action: 'new' },
-                                { icon: Receipt, label: 'Add Expense', page: 'EXPENSES' as Page },
-                                { icon: Undo2, label: 'New Return', page: 'RETURNS' as Page },
-                            ].map((action, idx) => (
-                                <button
-                                    key={idx}
-                                    onClick={() => { 
-                                        dispatch({ type: 'SET_SELECTION', payload: { page: action.page, id: action.action || 'new' } }); 
-                                        setCurrentPage(action.page);
-                                        setIsMobileQuickAddOpen(false);
-                                    }}
-                                    className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left group/item"
-                                >
-                                    <div className="p-2 bg-gray-100 dark:bg-slate-700 group-hover/item:bg-white dark:group-hover/item:bg-slate-600 rounded-lg text-primary shadow-sm transition-transform group-hover/item:scale-110">
-                                        <action.icon size={18} />
-                                    </div>
-                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{action.label}</span>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </div>
-        </nav>
-        )}
-    </div>
-    </>
-  );
+            </nav>
+            )}
+        </div>
+    );
 };
 
-const AppContent: React.FC = () => {
-    const { isDbLoaded } = useAppContext();
-    if (!isDbLoaded) return <AppSkeletonLoader />;
-    return <MainApp />;
+const App: React.FC = () => {
+    return (
+        <AppProvider>
+            <DialogProvider>
+                <AppContent />
+            </DialogProvider>
+        </AppProvider>
+    );
 };
-
-const App: React.FC = () => (
-    <AppProvider>
-        <DialogProvider>
-            <AppContent />
-        </DialogProvider>
-    </AppProvider>
-);
 
 export default App;

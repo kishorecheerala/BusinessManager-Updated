@@ -1,33 +1,18 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Purchase, Supplier, Product, PurchaseItem } from '../types';
-import { Plus, Search, QrCode, FileSpreadsheet, Download, Upload, CheckCircle, XCircle, Info, X, Calendar } from 'lucide-react';
+import { Plus, Info, X } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import DeleteButton from './DeleteButton';
 import DateInput from './DateInput';
 import Dropdown from './Dropdown';
-import AddSupplierModal from './AddSupplierModal';
-import QuantityInputModal from './QuantityInputModal';
-import { Html5Qrcode } from 'html5-qrcode';
+import QRScannerModal from './QRScannerModal';
 
-// Helper functions
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
-};
-
-// ... (Keep existing Modals: ProductSearchModal, QRScannerModal, NewProductModal) ...
-// [Assuming previous modal implementations are here]
-
-const QRScannerModal: React.FC<{
-    onClose: () => void;
-    onScanned: (decodedText: string) => void;
-}> = ({ onClose, onScanned }) => {
-    // ... (same as before)
-    return null; // Placeholder for brevity in diff
 };
 
 interface PurchaseFormProps {
@@ -58,16 +43,11 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   const [purchaseDate, setPurchaseDate] = useState(initialData ? getLocalDateString(new Date(initialData.date)) : getLocalDateString());
   const [supplierInvoiceId, setSupplierInvoiceId] = useState(initialData?.supplierInvoiceId || '');
   const [discount, setDiscount] = useState('0');
-  const [amountPaid, setAmountPaid] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'UPI' | 'CHEQUE'>('CASH');
-  const [paymentReference, setPaymentReference] = useState('');
   const [paymentDueDates, setPaymentDueDates] = useState<string[]>(initialData?.paymentDueDates || []);
   
-  // ... (Other state variables: scanning, modals, etc.) ...
   const [isAddingSupplier, setIsAddingSupplier] = useState(false);
   const isDirtyRef = useRef(false);
 
-  // ... (Effects and calculations) ...
   const calculations = useMemo(() => {
     const totalItemValue = items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
     const totalGst = items.reduce((sum, item) => {
@@ -82,7 +62,6 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
     return { subTotal, totalGst, grandTotal };
   }, [items, discount]);
 
-  // ... (Handlers) ...
   const handleItemUpdate = (productId: string, field: keyof PurchaseItem, value: string | number) => {
     setItems(items.map(item => item.productId === productId ? { ...item, [field]: value } : item));
   };
@@ -91,9 +70,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
     setItems(items.filter(item => item.productId !== productId));
   };
 
-  // ... (Submit logic) ...
   const handleSubmit = () => {
-      // ... (Same logic)
       onSubmit({
           id: initialData?.id || `PUR-${Date.now()}`,
           supplierId,
@@ -106,12 +83,10 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
       });
   };
 
-  // ... (Render) ...
   return (
     <div className="space-y-4">
       <Button onClick={onBack}>&larr; Back</Button>
       <Card title={mode === 'add' ? 'Create New Purchase' : `Edit Purchase`}>
-         {/* Supplier & Date Inputs (Same as before) */}
          <div className="space-y-4">
             <div>
                 <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Select Supplier</label>
@@ -130,7 +105,6 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
       </Card>
 
       <Card title="Items">
-        {/* Buttons for Add Product, Scan, Import (Same as before) */}
         <div className="space-y-4">
             <div className="space-y-2">
             {items.map(item => (
@@ -146,7 +120,6 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                     </div>
                     
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm p-2 border-b dark:border-slate-600">
-                        {/* Standard Inputs */}
                         <input type="number" value={item.quantity} onChange={e => handleItemUpdate(item.productId, 'quantity', parseFloat(e.target.value))} className="p-1 border rounded" placeholder="Qty" />
                         <input type="number" value={item.price} onChange={e => handleItemUpdate(item.productId, 'price', parseFloat(e.target.value))} className="p-1 border rounded" placeholder="Buy Price" />
                         <input type="number" value={item.saleValue} onChange={e => handleItemUpdate(item.productId, 'saleValue', parseFloat(e.target.value))} className="p-1 border rounded" placeholder="Sale Price" />
