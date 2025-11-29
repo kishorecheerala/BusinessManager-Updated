@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -30,6 +29,25 @@ const dataURLtoFile = (dataurl: string, filename: string) => {
         u8arr[n] = bstr.charCodeAt(n);
     }
     return new File([u8arr], filename, { type: mime });
+};
+
+// Helper to get API Key safely
+const getApiKey = (): string => {
+  if (typeof window !== 'undefined' && localStorage.getItem('gemini_api_key')) {
+      return localStorage.getItem('gemini_api_key')!;
+  }
+  let key = '';
+  try {
+    // @ts-ignore
+    if (import.meta.env) {
+        // @ts-ignore
+        key = import.meta.env.VITE_API_KEY || import.meta.env.API_KEY;
+    }
+  } catch (e) {}
+  if (!key && typeof process !== 'undefined' && process.env) {
+    key = process.env.API_KEY || '';
+  }
+  return key;
 };
 
 const QRScannerModal: React.FC<{
@@ -408,10 +426,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         
         setIsGeneratingDesc(true);
         try {
-            // Fix: Cast process.env to any to avoid type errors
-            const envKey = (process.env as any).API_KEY as string | undefined;
-            const apiKey = envKey || localStorage.getItem('gemini_api_key') || '';
-            
+            const apiKey = getApiKey();
             if (!apiKey) throw new Error("API Key not available");
             
             const ai = new GoogleGenAI({ apiKey });
@@ -444,10 +459,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
 
         setIsSuggestingPrice(true);
         try {
-            // Fix: Cast process.env to any to avoid type errors
-            const envKey = (process.env as any).API_KEY as string | undefined;
-            const apiKey = envKey || localStorage.getItem('gemini_api_key') || '';
-            
+            const apiKey = getApiKey();
             if (!apiKey) throw new Error("API Key not available");
 
             const ai = new GoogleGenAI({ apiKey });

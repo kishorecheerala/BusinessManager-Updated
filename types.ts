@@ -253,6 +253,7 @@ export interface InvoiceTemplateConfig {
     qrPosition?: 'header-right' | 'details-right' | 'footer-left' | 'footer-right';
     qrPosX?: number; // Absolute X position override
     qrPosY?: number; // Absolute Y position override
+    qrOverlaySize?: number; // New: Size override for QR code
     headerAlignment: 'left' | 'center' | 'right';
     headerStyle?: 'standard' | 'banner' | 'minimal'; // New: Header Style
     footerStyle?: 'standard' | 'banner'; // New: Footer Style

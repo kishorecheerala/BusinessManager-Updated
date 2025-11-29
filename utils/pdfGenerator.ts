@@ -57,10 +57,6 @@ export const getImageType = (dataUrl: string): string => {
     if (header.includes('image/webp')) return 'WEBP';
     
     // Fallback: Check magic bytes for base64 without prefix
-    // Common Base64 starts:
-    // /9j/ -> JPEG
-    // iVBORw0KGgo -> PNG
-    // UklGR -> WEBP
     if (dataUrl.startsWith('/9j/')) return 'JPEG';
     if (dataUrl.startsWith('iVBORw0KGgo')) return 'PNG';
     if (dataUrl.startsWith('UklGR')) return 'WEBP';
@@ -294,7 +290,7 @@ const _generateConfigurablePDF = async (
         const isBanner = layout.headerStyle === 'banner';
         if (isBanner) {
             doc.setFillColor(colors.bannerBg || colors.primary);
-            doc.rect(0, 0, pageWidth, 40 + (layout.logoSize/2), 'F');
+            doc.setRoundedRect(0, 0, pageWidth, 40 + (layout.logoSize/2), layout.borderRadius || 0, layout.borderRadius || 0, 'F');
             addY(5);
         }
 
@@ -390,7 +386,8 @@ const _generateConfigurablePDF = async (
             const qrImg = await getQrCodeBase64(data.qrString || data.id);
             if (qrImg) {
                 try {
-                    doc.addImage(qrImg, 'PNG', pageWidth - margin - 20, margin + 5, 20, 20);
+                    const size = layout.qrOverlaySize || 20;
+                    doc.addImage(qrImg, 'PNG', pageWidth - margin - size, margin + 5, size, size);
                 } catch(e) {}
             }
         }
@@ -438,7 +435,8 @@ const _generateConfigurablePDF = async (
             const qrImg = await getQrCodeBase64(data.qrString || data.id);
             if (qrImg) {
                 try {
-                    doc.addImage(qrImg, 'PNG', rightColX - 22, infoY + 2, 22, 22);
+                    const size = layout.qrOverlaySize || 22;
+                    doc.addImage(qrImg, 'PNG', rightColX - size, infoY + 2, size, size);
                 } catch(e) {}
             }
         }
@@ -469,13 +467,32 @@ const _generateConfigurablePDF = async (
         // Auto-adjust column widths for small paper (Receipts)
         const isSmallPaper = pageWidth < 100;
         
+        // When using 'bordered' mode, we need to pass styles to autoTable
+        const tableStyles: any = { 
+            font: fonts.bodyFont, 
+            fontSize: fonts.bodySize, 
+            cellPadding: layout.tableOptions?.compact ? 2 : 3, 
+            textColor: colors.text
+        };
+        
+        if (layout.tableOptions?.bordered) {
+            tableStyles.lineWidth = 0.1;
+            tableStyles.lineColor = colors.borderColor || '#ccc';
+        }
+
         autoTable(doc, {
             startY: currentY,
             head: [tableHead],
             body: tableBody,
             theme: layout.tableOptions?.stripedRows ? 'striped' : 'plain',
-            styles: { font: fonts.bodyFont, fontSize: fonts.bodySize, cellPadding: layout.tableOptions?.compact ? 2 : 3, textColor: colors.text },
-            headStyles: { fillColor: colors.tableHeaderBg, textColor: colors.tableHeaderText, fontStyle: 'bold', halign: (layout.tableHeaderAlign || 'left') },
+            styles: tableStyles,
+            headStyles: { 
+                fillColor: colors.tableHeaderBg, 
+                textColor: colors.tableHeaderText, 
+                fontStyle: 'bold', 
+                halign: (layout.tableHeaderAlign || 'left'),
+                ...(layout.borderRadius ? { minCellHeight: 8 } : {}) // Heuristic for rounded looks
+            },
             columnStyles: {
                 0: { cellWidth: isSmallPaper ? 6 : 10, halign: 'center' },
                 [tableHead.length - 1]: { halign: 'right', cellWidth: isSmallPaper ? 20 : (cw.amount || 35) }, 
@@ -629,7 +646,7 @@ const _generateConfigurablePDF = async (
         if (content.showQr && (layout.qrPosition === 'footer-left' || layout.qrPosition === 'footer-right') && layout.qrPosX === undefined) {
             const qrImg = await getQrCodeBase64(data.qrString || data.id);
             if (qrImg) {
-                const qrSize = 18;
+                const qrSize = layout.qrOverlaySize || 18;
                 const qrY = footerY - qrSize - 2;
                 const qrX = layout.qrPosition === 'footer-left' ? margin : pageWidth - margin - qrSize;
                 try {
@@ -680,7 +697,7 @@ const _generateConfigurablePDF = async (
             try {
                 // Determine page to print on (usually first page unless complex logic added)
                 doc.setPage(1); 
-                const size = 20; // Default size
+                const size = layout.qrOverlaySize || 20; 
                 doc.addImage(qrImg, 'PNG', layout.qrPosX, layout.qrPosY, size, size);
             } catch(e) {}
         }

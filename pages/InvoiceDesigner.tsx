@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw, MoveHorizontal, MoveVertical, ArrowRight as ArrowRightIcon } from 'lucide-react';
+import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw, MoveHorizontal, MoveVertical, ArrowRight as ArrowRightIcon, Circle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { InvoiceTemplateConfig, DocumentType, InvoiceLabels, CustomFont, ProfileData, Page } from '../types';
 import Button from '../components/Button';
@@ -224,13 +224,14 @@ const PDFCanvasPreview: React.FC<{
                 let scale = 1.0;
                 
                 if (docType === 'RECEIPT') {
-                    // Receipt Logic: It's narrow (80mm ~ 226pts).
-                    // We shouldn't fill the container width or it looks huge.
-                    // Instead, calculate a scale that makes it legible (approx 350-400px wide on screen)
-                    const targetDisplayWidth = Math.min(containerWidth - 40, 400); // Max 400px wide
-                    scale = targetDisplayWidth / baseViewport.width;
+                    // Receipt Logic: It's narrow (80mm). 
+                    // Calculate scale to fill about 40-50% of the screen width max, or fill mobile width.
+                    // 80mm is approx 227 points.
+                    const desiredPreviewWidth = Math.min(containerWidth - 40, 380); 
+                    scale = desiredPreviewWidth / baseViewport.width;
                 } else {
                     // Standard Documents (A4)
+                    // Scale to fit container with padding
                     scale = (containerWidth - 40) / baseViewport.width;
                 }
 
@@ -313,7 +314,6 @@ interface InvoiceDesignerProps {
 
 const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurrentPage }) => {
     const { state, dispatch, showToast } = useAppContext();
-    const { showConfirm } = useDialog();
     
     const [docType, setDocType] = useState<DocumentType>('INVOICE');
     const [activeTab, setActiveTab] = useState<'layout' | 'content' | 'branding' | 'fonts'>('layout');
@@ -404,7 +404,8 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                 borderRadius: srcLayout.borderRadius ?? 4,
                 uppercaseHeadings: srcLayout.uppercaseHeadings ?? true,
                 spacing: srcLayout.spacing ?? 1.0,
-                elementSpacing: srcLayout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
+                elementSpacing: srcLayout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 },
+                qrOverlaySize: srcLayout.qrOverlaySize || 20, // Default size
             }
         };
 
@@ -510,11 +511,20 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
     const applyPreset = (presetName: string) => {
         const preset = PRESETS[presetName];
         if (preset) {
+            let layoutUpdate = { ...preset.layout };
+            
+            // Smart Preset Logic for Receipts
+            if (docType === 'RECEIPT') {
+                layoutUpdate.margin = 2; // Narrow margins
+                layoutUpdate.logoSize = Math.min(layoutUpdate.logoSize, 18);
+                layoutUpdate.paperSize = undefined; // Force custom size calc
+            }
+
             const newConfig = {
                 ...localConfig,
                 colors: { ...localConfig.colors, ...preset.colors },
                 fonts: { ...localConfig.fonts, ...preset.fonts },
-                layout: { ...localConfig.layout, ...preset.layout },
+                layout: { ...localConfig.layout, ...layoutUpdate },
                 content: { ...localConfig.content, ...preset.content }
             };
             pushToHistory(newConfig);
@@ -894,6 +904,20 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         <span>Loose</span>
                                     </div>
                                 </div>
+                                
+                                {/* Border Radius Control */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">Border Radius (Roundness)</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.borderRadius || 0}mm</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0" max="20" step="1"
+                                        value={localConfig.layout.borderRadius || 0} 
+                                        onChange={e => handleConfigChange('layout', 'borderRadius', parseInt(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
                             </div>
 
                             {/* Detailed Element Spacing */}
@@ -983,10 +1007,10 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                 </div>
                             </div>
                             
-                            {/* QR Code Position */}
+                            {/* QR Code Position & Size */}
                             <div className="space-y-3 border-t dark:border-slate-800 pt-4">
                                 <label className="text-xs font-bold text-slate-500 uppercase block flex items-center gap-2">
-                                    <QrCode size={14} /> QR Code Position
+                                    <QrCode size={14} /> QR Code Settings
                                 </label>
                                 <select 
                                     value={localConfig.layout.qrPosition || 'details-right'} 
@@ -998,6 +1022,20 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                     <option value="footer-left">Footer Left</option>
                                     <option value="footer-right">Footer Right</option>
                                 </select>
+                                
+                                {/* NEW: QR Size Control */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">QR Size (mm)</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.qrOverlaySize || 20}mm</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="10" max="50" step="1"
+                                        value={localConfig.layout.qrOverlaySize || 20} 
+                                        onChange={e => handleConfigChange('layout', 'qrOverlaySize', parseInt(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
                                 
                                 <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded border dark:border-slate-700 mt-2">
                                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Absolute Adjustment (Overrides above)</p>
