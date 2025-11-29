@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -287,7 +286,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 try {
                     const file = files[i];
                     const base64 = await compressImage(file, 800, 0.8);
-                    newImages.push(base64);
+                    if (typeof base64 === 'string') {
+                        newImages.push(base64);
+                    }
                 } catch (err: any) {
                     console.error("Image upload failed", err);
                 }
