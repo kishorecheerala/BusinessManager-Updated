@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw, MoveHorizontal, MoveVertical } from 'lucide-react';
+import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw, MoveHorizontal, MoveVertical, ArrowRight as ArrowRightIcon } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { InvoiceTemplateConfig, DocumentType, InvoiceLabels, CustomFont, ProfileData, Page } from '../types';
 import Button from '../components/Button';
 import ColorPickerModal from '../components/ColorPickerModal';
-import { generateA4InvoicePdf, generateEstimatePDF, generateDebitNotePDF, generateThermalInvoicePDF, generateGenericReportPDF, generateReceiptPDF } from '../utils/pdfGenerator';
-import { extractDominantColor, compressImage } from '../utils/imageUtils';
+import { generateA4InvoicePdf, generateEstimatePDF, generateDebitNotePDF, generateReceiptPDF, generateGenericReportPDF } from '../utils/pdfGenerator';
+import { compressImage } from '../utils/imageUtils';
 import * as pdfjsLib from 'pdfjs-dist';
 import { useDialog } from '../context/DialogContext';
 
@@ -190,7 +190,6 @@ const PDFCanvasPreview: React.FC<{
                     case 'INVOICE': doc = await generateA4InvoicePdf(dummySale, dummyCustomer, profile, debouncedConfig, customFonts); break;
                     case 'ESTIMATE': doc = await generateEstimatePDF(dummySale as any, dummyCustomer, profile, debouncedConfig, customFonts); break;
                     case 'DEBIT_NOTE': doc = await generateDebitNotePDF(dummySale as any, dummyCustomer as any, profile, debouncedConfig, customFonts); break;
-                    // Generate Thermal PDF for Receipts
                     case 'RECEIPT': doc = await generateReceiptPDF(dummySale, dummyCustomer, profile, debouncedConfig, customFonts); break;
                     case 'REPORT': 
                         const scenario = REPORT_SCENARIOS[reportScenario];
@@ -222,17 +221,21 @@ const PDFCanvasPreview: React.FC<{
                 const containerWidth = containerRef.current.clientWidth;
                 const baseViewport = page.getViewport({ scale: 1 });
                 
-                // Smart Scaling: For narrow documents (receipts), don't fill width
-                // For Receipts (approx 226pts wide), scaling to full desktop width makes it blurry/huge
-                let fitScale = (containerWidth - 40) / baseViewport.width; 
+                let scale = 1.0;
                 
                 if (docType === 'RECEIPT') {
-                    // Cap scale for receipts to reasonable visual size
-                    fitScale = Math.min(fitScale, 1.5); 
+                    // Receipt Logic: It's narrow (80mm ~ 226pts).
+                    // We shouldn't fill the container width or it looks huge.
+                    // Instead, calculate a scale that makes it legible (approx 350-400px wide on screen)
+                    const targetDisplayWidth = Math.min(containerWidth - 40, 400); // Max 400px wide
+                    scale = targetDisplayWidth / baseViewport.width;
+                } else {
+                    // Standard Documents (A4)
+                    scale = (containerWidth - 40) / baseViewport.width;
                 }
 
-                // In Draft Mode, render at lower resolution (0.8 scale instead of full fit + zoom)
-                const finalScale = isDraftMode ? fitScale * 0.8 : fitScale * zoomLevel;
+                // In Draft Mode, render at lower resolution
+                const finalScale = isDraftMode ? scale * 0.8 : scale * zoomLevel;
                 const viewport = page.getViewport({ scale: finalScale });
 
                 const canvas = canvasRef.current;
@@ -263,7 +266,6 @@ const PDFCanvasPreview: React.FC<{
             }
         };
 
-        // Increased debounce for better typing performance
         const delay = isDraftMode ? 800 : 1200;
         timeoutId = setTimeout(render, delay);
         return () => {
@@ -292,7 +294,6 @@ const PDFCanvasPreview: React.FC<{
                 )}
             </div>
             
-            {/* Zoom Controls (Disabled in Draft Mode) */}
             {!isDraftMode && (
                 <div className="absolute bottom-6 right-6 flex gap-2 bg-white/90 dark:bg-slate-800/90 p-2 rounded-full shadow-lg backdrop-blur-sm border border-gray-200 dark:border-slate-700 z-50">
                     <button onClick={() => setZoomLevel(prev => Math.max(0.5, prev - 0.1))} className="p-2 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full"><ZoomOut size={18}/></button>
@@ -324,11 +325,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
     const fontInputRef = useRef<HTMLInputElement>(null);
     const templateInputRef = useRef<HTMLInputElement>(null);
     const [showLabels, setShowLabels] = useState(false);
-    
-    // Performance: Draft Mode by default to make mobile interactions snappy
     const [isDraftMode, setIsDraftMode] = useState(true);
-    
-    // Sidebar Resizing Logic
     const [sidebarWidth, setSidebarWidth] = useState(350);
     const sidebarRef = useRef<HTMLDivElement>(null);
     const isResizing = useRef(false);
@@ -380,12 +377,10 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
             default: baseConfig = state.invoiceTemplate; break;
         }
 
-        // Safety check if state hasn't loaded or is empty
         if (!baseConfig || !baseConfig.layout || Object.keys(baseConfig).length === 0) {
-             baseConfig = PRESETS['Modern']; // Safe fallback
+             baseConfig = PRESETS['Modern']; 
         }
 
-        // Define defaults for required layout fields to satisfy Typescript
         const defaults = {
             margin: 10,
             logoSize: 25,
@@ -396,11 +391,9 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
             tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false }
         };
 
-        // Fix: Explicitly cast to 'any' to allow accessing potentially missing properties
-        // This avoids Typescript errors when properties like sectionOrdering exist in runtime but not in inferred type
         const srcLayout = (baseConfig.layout || {}) as any;
 
-        return {
+        const config = {
             ...baseConfig,
             layout: {
                 ...defaults,
@@ -414,22 +407,25 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                 elementSpacing: srcLayout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
             }
         };
+
+        // Enforce smart defaults for receipts if they seem off (e.g. A4 margins on narrow paper)
+        if (type === 'RECEIPT') {
+            if (config.layout.margin > 5) config.layout.margin = 2;
+            if (config.layout.logoSize > 20) config.layout.logoSize = 15;
+        }
+
+        return config;
     };
 
-    // --- State & History Management ---
     const [localConfig, setLocalConfig] = useState<ExtendedLayoutConfig>(getInitialConfig('INVOICE'));
     const [initialConfigJson, setInitialConfigJson] = useState('');
-    
-    // History Stack
     const [history, setHistory] = useState<ExtendedLayoutConfig[]>([getInitialConfig('INVOICE')]);
     const [historyIndex, setHistoryIndex] = useState(0);
 
-    // Update localConfig when history changes
     useEffect(() => {
         setLocalConfig(history[historyIndex]);
     }, [historyIndex, history]);
 
-    // Initialize on mount or docType change
     useEffect(() => {
         const conf = getInitialConfig(docType);
         setHistory([conf]);
@@ -438,35 +434,26 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         setIsDirty(false);
     }, [docType]);
 
-    // Check dirty state
     useEffect(() => {
         if (!initialConfigJson) return;
         const isChanged = JSON.stringify(localConfig) !== initialConfigJson;
         setIsDirty(isChanged);
     }, [localConfig, initialConfigJson, setIsDirty]);
 
-    // --- Actions ---
-
     const pushToHistory = (newConfig: ExtendedLayoutConfig) => {
         const newHistory = history.slice(0, historyIndex + 1);
         newHistory.push(newConfig);
-        // Limit history size to 50
         if (newHistory.length > 50) newHistory.shift();
-        
         setHistory(newHistory);
         setHistoryIndex(newHistory.length - 1);
     };
 
     const handleUndo = () => {
-        if (historyIndex > 0) {
-            setHistoryIndex(historyIndex - 1);
-        }
+        if (historyIndex > 0) setHistoryIndex(historyIndex - 1);
     };
 
     const handleRedo = () => {
-        if (historyIndex < history.length - 1) {
-            setHistoryIndex(historyIndex + 1);
-        }
+        if (historyIndex < history.length - 1) setHistoryIndex(historyIndex + 1);
     };
 
     const handleConfigChange = (section: keyof ExtendedLayoutConfig, key: string, value: any) => {
@@ -504,15 +491,20 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         const newLayout = { ...localConfig.layout };
         if (axis === 'x') {
             newLayout.qrPosX = val;
-            // Initialize Y if undefined
             if (newLayout.qrPosY === undefined) newLayout.qrPosY = 20; 
         } else {
             newLayout.qrPosY = val;
-            // Initialize X if undefined
             if (newLayout.qrPosX === undefined) newLayout.qrPosX = 150;
         }
         handleConfigChange('layout', 'qrPosX', newLayout.qrPosX);
         handleConfigChange('layout', 'qrPosY', newLayout.qrPosY);
+    };
+
+    const nudgeQR = (dx: number, dy: number) => {
+        const currentX = localConfig.layout.qrPosX ?? 150;
+        const currentY = localConfig.layout.qrPosY ?? 20;
+        handleQRPosChange('x', currentX + dx);
+        handleQRPosChange('y', currentY + dy);
     };
 
     const applyPreset = (presetName: string) => {
@@ -546,7 +538,6 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                 case 'INVOICE': doc = await generateA4InvoicePdf(dummySale, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'ESTIMATE': doc = await generateEstimatePDF(dummySale as any, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'DEBIT_NOTE': doc = await generateDebitNotePDF(dummySale as any, dummyCustomer as any, state.profile, localConfig, state.customFonts); break;
-                // Generate Thermal PDF for Receipts
                 case 'RECEIPT': doc = await generateReceiptPDF(dummySale, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'REPORT': 
                     const scenario = REPORT_SCENARIOS[reportScenario];
@@ -721,7 +712,6 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                         </div>
                     </div>
                     <div className="flex gap-1 items-center">
-                        {/* Undo / Redo */}
                         <div className="flex bg-slate-200 dark:bg-slate-800 rounded-lg p-0.5 mr-2">
                             <button onClick={handleUndo} disabled={historyIndex === 0} className="p-1.5 rounded hover:bg-white dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 disabled:opacity-30 transition-all">
                                 <RotateCcw size={14} />
@@ -813,23 +803,25 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         </button>
                                     ))}
                                 </div>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-xs text-slate-600 dark:text-slate-400">Paper Size</span>
-                                    <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded">
-                                        <button 
-                                            onClick={() => handleConfigChange('layout', 'paperSize', 'a4')}
-                                            className={`px-3 py-1.5 rounded text-xs font-medium ${localConfig.layout.paperSize !== 'letter' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-400'}`}
-                                        >
-                                            A4
-                                        </button>
-                                        <button 
-                                            onClick={() => handleConfigChange('layout', 'paperSize', 'letter')}
-                                            className={`px-3 py-1.5 rounded text-xs font-medium ${localConfig.layout.paperSize === 'letter' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-400'}`}
-                                        >
-                                            Letter
-                                        </button>
+                                {docType !== 'RECEIPT' && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs text-slate-600 dark:text-slate-400">Paper Size</span>
+                                        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded">
+                                            <button 
+                                                onClick={() => handleConfigChange('layout', 'paperSize', 'a4')}
+                                                className={`px-3 py-1.5 rounded text-xs font-medium ${localConfig.layout.paperSize !== 'letter' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-400'}`}
+                                            >
+                                                A4
+                                            </button>
+                                            <button 
+                                                onClick={() => handleConfigChange('layout', 'paperSize', 'letter')}
+                                                className={`px-3 py-1.5 rounded text-xs font-medium ${localConfig.layout.paperSize === 'letter' ? 'bg-white dark:bg-slate-600 shadow-sm text-indigo-600 dark:text-white' : 'text-slate-400'}`}
+                                            >
+                                                Letter
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                )}
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs text-slate-600 dark:text-slate-400">Header Align</span>
                                     <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded">
@@ -1009,10 +1001,22 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                 
                                 <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded border dark:border-slate-700 mt-2">
                                     <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Absolute Adjustment (Overrides above)</p>
+                                    
+                                    {/* Nudge Controls */}
+                                    <div className="flex flex-col items-center gap-1 mb-3">
+                                        <button onClick={() => nudgeQR(0, -1)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowUp size={14} /></button>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => nudgeQR(-1, 0)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowLeft size={14} /></button>
+                                            <div className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">QR</div>
+                                            <button onClick={() => nudgeQR(1, 0)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowRightIcon size={14} /></button>
+                                        </div>
+                                        <button onClick={() => nudgeQR(0, 1)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowDown size={14} /></button>
+                                    </div>
+
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveHorizontal size={10} /> Horizontal (Left-Right)</span>
+                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveHorizontal size={10} /> Horizontal</span>
                                                 <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.qrPosX ?? 'Auto'}</span>
                                             </div>
                                             <input 
@@ -1024,7 +1028,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         </div>
                                         <div>
                                             <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveVertical size={10} /> Vertical (Top-Bottom)</span>
+                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveVertical size={10} /> Vertical</span>
                                                 <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.qrPosY ?? 'Auto'}</span>
                                             </div>
                                             <input 

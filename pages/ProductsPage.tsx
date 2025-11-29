@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -422,7 +423,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             });
             
             const text = response.text;
-            if (text && typeof text === 'string') {
+            if (text) {
                 setEditedProduct(prev => prev ? ({ ...prev, description: text }) : null);
                 showToast("Description generated!");
             }
@@ -460,7 +461,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             });
 
             const text = response.text;
-            const priceText = (text && typeof text === 'string') ? text.trim() : '';
+            const priceText = text ? text.trim() : '';
             const suggestedPrice = parseFloat(priceText.replace(/[^0-9.]/g, ''));
 
             if (!isNaN(suggestedPrice)) {
