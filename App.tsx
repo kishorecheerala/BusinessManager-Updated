@@ -109,7 +109,18 @@ const NavItem: React.FC<NavItemProps> = ({ page, label, icon: Icon, onClick, isA
 
 const AppContent: React.FC = () => {
     const { state, dispatch, isDbLoaded, syncData, googleSignIn } = useAppContext();
-    const [currentPage, setCurrentPage] = useState<Page>('DASHBOARD');
+    
+    // Initialize currentPage from localStorage or default to DASHBOARD
+    const [currentPage, setCurrentPage] = useState<Page>(() => {
+        try {
+            const saved = localStorage.getItem('business_manager_last_page');
+            if (saved && Object.keys(ICON_MAP).includes(saved)) {
+                return saved as Page;
+            }
+        } catch(e) {}
+        return 'DASHBOARD';
+    });
+
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -135,12 +146,17 @@ const AppContent: React.FC = () => {
     useHotkeys('k', () => setIsSearchOpen(true), { ctrl: true });
     useHotkeys('m', () => setIsMenuOpen(prev => !prev), { ctrl: true });
 
-    // Handle initial selection from context if any
+    // Handle initial selection from context if any (override localStorage)
     useEffect(() => {
         if (state.selection && state.selection.page) {
             setCurrentPage(state.selection.page);
         }
     }, [state.selection]);
+
+    // Persist current page navigation
+    useEffect(() => {
+        localStorage.setItem('business_manager_last_page', currentPage);
+    }, [currentPage]);
 
     // Apply Theme
     useEffect(() => {

@@ -229,12 +229,15 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0 && editedProduct) {
             const newImages: string[] = [];
-            for (let i = 0; i < e.target.files.length; i++) {
+            const files = e.target.files;
+            
+            for (let i = 0; i < files.length; i++) {
                 try {
-                    const base64 = await compressImage(e.target.files[i], 800, 0.8);
+                    const file = files[i];
+                    const base64 = await compressImage(file, 800, 0.8);
                     newImages.push(base64);
-                } catch (err) {
-                    console.error("Image upload failed", err as any);
+                } catch (err: any) {
+                    console.error("Image upload failed", err);
                 }
             }
             
@@ -245,10 +248,12 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 updatedProduct.image = newImages[0];
                 // Add rest to additional
                 if (newImages.length > 1) {
-                    updatedProduct.additionalImages = [...(updatedProduct.additionalImages || []), ...newImages.slice(1)];
+                    const currentAdditional: string[] = updatedProduct.additionalImages || [];
+                    updatedProduct.additionalImages = [...currentAdditional, ...newImages.slice(1)];
                 }
             } else {
-                updatedProduct.additionalImages = [...(updatedProduct.additionalImages || []), ...newImages];
+                const currentAdditional: string[] = updatedProduct.additionalImages || [];
+                updatedProduct.additionalImages = [...currentAdditional, ...newImages];
             }
             
             setEditedProduct(updatedProduct);
@@ -361,8 +366,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 contents: prompt
             });
             
-            if (response.text) {
-                setEditedProduct(prev => prev ? ({ ...prev, description: response.text }) : null);
+            const text = response.text;
+            if (text) {
+                setEditedProduct(prev => prev ? ({ ...prev, description: text }) : null);
                 showToast("Description generated!");
             }
         } catch (error) {
@@ -395,7 +401,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 contents: prompt
             });
 
-            const priceText = response.text?.trim() || '';
+            const text = response.text;
+            const priceText = text ? text.trim() : '';
             const suggestedPrice = parseFloat(priceText.replace(/[^0-9.]/g, ''));
 
             if (!isNaN(suggestedPrice)) {
@@ -713,7 +720,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             {isScannerOpen && (
                 <QRScannerModal 
                     onClose={() => setIsScannerOpen(false)} 
-                    onScanned={(code) => {
+                    onScanned={(code: string) => {
                         setIsScannerOpen(false);
                         const prod = state.products.find(p => p.id === code);
                         if (prod) {
