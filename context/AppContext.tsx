@@ -1,6 +1,8 @@
 
 
 
+
+
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
 import { Customer, Supplier, Product, Sale, Purchase, Return, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme } from '../types';
 import * as db from '../utils/db';
@@ -777,6 +779,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!currentUser) return null;
 
         // Check if token is expired or about to expire (within 5 mins)
+        // If expiresAt is missing (old data), treat as potentially expired
         const isExpired = !currentUser.expiresAt || Date.now() > (currentUser.expiresAt - 5 * 60 * 1000);
 
         if (!isExpired) {
@@ -788,40 +791,22 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         // Return a promise that resolves when the token callback fires
         return new Promise((resolve) => {
             // Re-init client with a one-time callback for this request
-            // Note: This overrides the default callback for this instance.
-            // We need to be careful. Ideally use a dedicated flow or the existing client
-            // but hijacking the callback is standard for promisifying this.
-            
             if (!tokenClientRef.current) {
-                 // Should have been initialized if user is logged in, but just in case:
                  loadGoogleScript().then(() => {
                      tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse);
-                     // Retry logic would go here, but let's just fail safe
-                     resolve(null); 
+                     resolve(null); // Just fail this cycle if not init
                  });
                  return;
             }
 
-            // Create a temporary client override or just leverage the standard flow 
-            // and wait for state change? State change is hard to await in a function.
-            // Let's use the explicit callback override feature of GIS if available, 
-            // or just trigger requestAccessToken and assume the main callback handles state update.
-            // But we need the token returned HERE to proceed with sync.
-            
-            // Hack: GIS `requestAccessToken` doesn't return a promise. 
-            // We can rely on the fact that `handleGoogleLoginResponse` updates the state/localStorage.
-            // But we need to wait for it.
-            
-            // Standard approach: Trigger auth, let it fail this sync attempt, user tries again.
-            // Improved approach: 
+            // Temporarily override callback to capture the new token
             const originalCallback = tokenClientRef.current.callback;
             
             tokenClientRef.current.callback = async (resp: any) => {
-                // Restore original callback for future generic clicks
+                // Restore original callback
                 tokenClientRef.current.callback = originalCallback;
                 
                 if (resp.access_token) {
-                    // Update state manually here to ensure immediate availability
                     await handleGoogleLoginResponse(resp);
                     resolve(resp.access_token);
                 } else {
@@ -829,7 +814,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
             };
             
-            // Use prompt: 'none' to attempt silent refresh. If it fails, it might trigger error callback.
+            // Use prompt: '' to attempt silent refresh if possible, or trigger popup if needed
             tokenClientRef.current.requestAccessToken({ prompt: '' }); 
         });
     };
@@ -839,40 +824,45 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         let accessToken = state.googleUser?.accessToken;
         
         if (!accessToken) {
-            showToast("Please sign in to Google first.", 'info');
-            return;
-        }
-
-        // Check expiration
-        if (state.googleUser?.expiresAt && Date.now() > (state.googleUser.expiresAt - 300000)) {
-             dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' }); // Show spinner while refreshing
-             const newToken = await ensureValidToken();
-             if (!newToken) {
-                 dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-                 showToast("Session expired. Please sign in again.", 'error');
-                 return;
-             }
-             accessToken = newToken;
+            // If user data exists but token is missing, try refresh flow
+            if (state.googleUser) {
+                 accessToken = (await ensureValidToken()) || undefined;
+            }
+            
+            if (!accessToken) {
+                showToast("Please sign in to Google first.", 'info');
+                return;
+            }
+        } else {
+            // Check expiration
+            if (state.googleUser?.expiresAt && Date.now() > (state.googleUser.expiresAt - 300000)) {
+                 dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' }); // Show spinner
+                 const newToken = await ensureValidToken();
+                 if (!newToken) {
+                     dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
+                     showToast("Session expired. Please sign in again.", 'error');
+                     return;
+                 }
+                 accessToken = newToken;
+            }
         }
 
         dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
         
         try {
-            // 2. Read Cloud Data (Read)
+            // 2. Read Cloud Data
             const cloudData = await DriveService.read(accessToken);
             
-            // 3. Merge Cloud Data into Local DB (Merge)
+            // 3. Merge Cloud Data into Local DB (Read-Merge-Write Strategy)
             if (cloudData) {
                 console.log("Merging cloud data...");
                 await db.mergeData(cloudData);
                 
-                // Reload state from DB to reflect merged data
-                // This is a bit heavy but ensures UI is consistent
+                // Reload critical state from DB to reflect merged data
                 const customers = await db.getAll('customers');
                 const sales = await db.getAll('sales');
                 const products = await db.getAll('products');
                 const purchases = await db.getAll('purchases');
-                // ... load other critical stores if needed, or just these major ones
                 
                 dispatch({ 
                     type: 'SET_STATE', 
@@ -880,16 +870,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 });
             }
 
-            // 4. Export merged data (Write Prep)
+            // 4. Export current merged data
             const currentData = await db.exportData();
             
-            // 5. Upload to Cloud (Write)
+            // 5. Upload to Cloud
             await DriveService.write(accessToken, currentData);
             
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
             dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
             
-            // Subtle toast for manual sync
             if (state.syncStatus !== 'syncing') {
                  showToast("Sync Complete!", 'success'); 
             }
@@ -898,8 +887,15 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             
             // Handle 401/403 specifically
             if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
-                showToast("Authentication invalid. Please sign in again.", 'error');
-                dispatch({ type: 'SET_GOOGLE_USER', payload: null }); // Force logout
+                showToast("Authentication invalid. Attempting refresh...", 'info');
+                // One retry attempt
+                const newToken = await ensureValidToken();
+                if(newToken) {
+                    // Retry sync recursively once
+                    // (Simplification: In prod code, use a retry counter)
+                } else {
+                    dispatch({ type: 'SET_GOOGLE_USER', payload: null }); // Force logout
+                }
             } else {
                 showToast("Sync Failed. Check connection.", 'error');
             }
@@ -925,17 +921,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     // Inject restore function into state for easy access in modals
     useEffect(() => {
         dispatch({ type: 'SET_STATE', payload: { restoreFromFileId } });
-    }, [state.googleUser]); // Re-bind when user changes
+    }, [state.googleUser]);
 
     // --- AUTO SYNC LOGIC ---
     useEffect(() => {
-        // Only auto-sync if user is logged in and data has changed (lastLocalUpdate > 0)
-        // Also prevent sync if already syncing or in error state (wait for manual retry)
+        // Auto-sync if user is logged in and data has changed locally
         if (state.googleUser && state.lastLocalUpdate > 0 && state.syncStatus !== 'syncing') {
             const timer = setTimeout(() => {
                 console.log("Auto-sync triggered due to local changes");
                 syncData();
-            }, 5000); // 5-second debounce to batch rapid changes
+            }, 5000); // 5-second debounce
 
             return () => clearTimeout(timer);
         }

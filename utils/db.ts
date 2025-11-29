@@ -122,10 +122,13 @@ export async function mergeData(cloudData: any): Promise<void> {
         for (const item of remoteItems) {
             if (item && item.id) {
                 const localItem = await store.get(item.id);
+                // SMART MERGE STRATEGY:
+                // If local item does NOT exist, add the cloud item.
+                // If local item DOES exist, we KEEP the local item (Local Wins).
+                // This ensures we never overwrite unsaved work on the current device.
                 if (!localItem) {
                     await store.put(item);
                 }
-                // If localItem exists, we keep local version (Priority: Local)
             }
         }
     }
