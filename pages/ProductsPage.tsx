@@ -355,7 +355,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         
         setIsGeneratingDesc(true);
         try {
-            const apiKey = process.env.API_KEY;
+            const apiKey = process.env.API_KEY as string;
             if (!apiKey) throw new Error("API Key not available");
             
             const ai = new GoogleGenAI({ apiKey });
@@ -388,7 +388,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
 
         setIsSuggestingPrice(true);
         try {
-            const apiKey = process.env.API_KEY;
+            const apiKey = process.env.API_KEY as string;
             if (!apiKey) throw new Error("API Key not available");
 
             const ai = new GoogleGenAI({ apiKey });
@@ -455,8 +455,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     )}
                 </div>
 
-                {/* Left Side (Image Gallery) */}
-                <div className="h-[40%] sm:h-[50%] md:h-full w-full md:w-1/2 bg-gray-100 dark:bg-slate-950 relative flex flex-col shrink-0 transition-all duration-300">
+                {/* Left Side (Image Gallery) - Increased Size */}
+                <div className="h-[50%] sm:h-[60%] md:h-full w-full md:w-[65%] bg-gray-100 dark:bg-slate-950 relative flex flex-col shrink-0 transition-all duration-300 shadow-xl z-10">
                     <div className="flex-1 relative w-full h-full flex items-center justify-center p-4 overflow-hidden">
                         {editedProduct.image ? (
                             <img 
@@ -510,7 +510,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     </div>
 
                     {/* Thumbnails */}
-                    <div className="h-20 sm:h-24 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm p-2 flex gap-2 overflow-x-auto border-t dark:border-slate-800 shrink-0 custom-scrollbar">
+                    <div className="h-20 sm:h-24 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md p-2 flex gap-2 overflow-x-auto border-t dark:border-slate-800 shrink-0 custom-scrollbar z-20">
                         {isEditing && (
                             <div 
                                 onClick={() => fileInputRef.current?.click()}
@@ -559,8 +559,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     </div>
                 </div>
 
-                {/* Right Side (Details) */}
-                <div className="flex-1 h-full w-full md:w-1/2 bg-white dark:bg-slate-800 flex flex-col border-l dark:border-slate-700 overflow-y-auto">
+                {/* Right Side (Details) - Adjusted Size */}
+                <div className="flex-1 h-full w-full md:w-[35%] bg-white dark:bg-slate-800 flex flex-col border-l dark:border-slate-700 overflow-y-auto">
                     <div className="p-6 space-y-6">
                         {isEditing ? (
                             <div className="space-y-4">
