@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, Sparkles, Clipboard } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -11,7 +11,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { logoBase64 } from '../utils/logo';
-import DatePill from '../components/DatePill';
+import { GoogleGenAI } from "@google/genai";
 
 
 const getLocalDateString = (date = new Date()) => {
@@ -190,6 +190,88 @@ const QRScannerModal: React.FC<{
     );
 };
 
+// --- Magic Paste Modal ---
+const MagicPasteModal: React.FC<{
+    onClose: () => void;
+    onParsed: (items: any[]) => void;
+    products: Product[];
+}> = ({ onClose, onParsed, products }) => {
+    const [text, setText] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const { showToast } = useAppContext();
+
+    const handleParse = async () => {
+        if (!text.trim()) return;
+        setIsLoading(true);
+
+        try {
+            const apiKey = localStorage.getItem('gemini_api_key') || process.env.API_KEY;
+            if (!apiKey) throw new Error("API Key missing");
+
+            const ai = new GoogleGenAI({ apiKey });
+            
+            // Create a small context of existing products to help matching
+            const productContext = products.map(p => `${p.name} (₹${p.salePrice})`).slice(0, 50).join(', ');
+
+            const prompt = `
+            Extract items from this text: "${text}".
+            Known products (optional hint): ${productContext}.
+            Return ONLY a valid JSON array.
+            Format: [{ "productName": string, "quantity": number, "price": number }].
+            If price is missing, estimate or use 0. If quantity missing, use 1.
+            `;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt,
+                config: { responseMimeType: 'application/json' }
+            });
+
+            const jsonStr = response.text;
+            if (jsonStr) {
+                const parsedItems = JSON.parse(jsonStr);
+                if (Array.isArray(parsedItems)) {
+                    onParsed(parsedItems);
+                    onClose();
+                    showToast("Order parsed successfully!", 'success');
+                } else {
+                    throw new Error("Invalid format");
+                }
+            }
+        } catch (e) {
+            console.error("Parsing failed", e);
+            showToast("Failed to parse text. Please check API Key or try again.", 'error');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-70 backdrop-blur-sm flex items-center justify-center z-[200] p-4 animate-fade-in-fast">
+            <Card title="Magic Paste Order" className="w-full max-w-lg relative animate-scale-in">
+                <button onClick={onClose} className="absolute top-4 right-4 p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
+                    <X size={20}/>
+                </button>
+                <div className="space-y-4">
+                    <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-lg flex gap-3 text-sm text-indigo-800 dark:text-indigo-200">
+                        <Sparkles className="shrink-0 mt-0.5" size={18} />
+                        <p>Paste an order message from WhatsApp or SMS. AI will extract items and prices automatically.</p>
+                    </div>
+                    <textarea 
+                        value={text} 
+                        onChange={(e) => setText(e.target.value)} 
+                        placeholder="Example: 2 silk sarees for 5000 and 1 cotton shirt"
+                        className="w-full p-3 border rounded-lg h-32 dark:bg-slate-800 dark:border-slate-700 dark:text-white resize-none focus:ring-2 focus:ring-indigo-500 outline-none"
+                    />
+                    <Button onClick={handleParse} className="w-full bg-gradient-to-r from-indigo-500 to-purple-500 border-none" disabled={isLoading || !text}>
+                        {isLoading ? 'Analyzing...' : 'Parse Order'}
+                    </Button>
+                </div>
+            </Card>
+        </div>
+    );
+};
+
 const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const { state, dispatch, showToast } = useAppContext();
     
@@ -210,6 +292,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const [isSelectingProduct, setIsSelectingProduct] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
+    const [isMagicPasteOpen, setIsMagicPasteOpen] = useState(false);
     
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
     const [newCustomer, setNewCustomer] = useState(newCustomerInitialState);
@@ -317,6 +400,23 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         }
     };
 
+    const handleMagicPasteParsed = (parsedItems: any[]) => {
+        const newItems: SaleItem[] = parsedItems.map(p => {
+            // Try to match existing product by name
+            const match = state.products.find(prod => prod.name.toLowerCase() === p.productName.toLowerCase());
+            
+            return {
+                productId: match ? match.id : `TEMP-${Date.now()}-${Math.random()}`,
+                productName: p.productName,
+                quantity: Number(p.quantity) || 1,
+                price: match ? match.salePrice : (Number(p.price) || 0)
+            };
+        });
+        
+        // Merge with existing items
+        setItems(prev => [...prev, ...newItems]);
+    };
+
     const handleItemChange = (productId: string, field: 'quantity' | 'price', value: string) => {
         const numValue = parseFloat(value);
         if (isNaN(numValue) && value !== '') return;
@@ -327,7 +427,8 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     const product = state.products.find(p => p.id === productId);
                     const originalQtyInSale = mode === 'edit' ? saleToEdit?.items.find(i => i.productId === productId)?.quantity || 0 : 0;
                     const availableStock = (Number(product?.quantity) || 0) + originalQtyInSale;
-                    if (numValue > availableStock) {
+                    // Only enforce stock limit if product exists in DB
+                    if (product && numValue > availableStock) {
                         alert(`Not enough stock for ${item.productName}. Only ${availableStock} available for this sale.`);
                         return { ...item, quantity: availableStock };
                     }
@@ -704,11 +805,15 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
+            {isMagicPasteOpen && 
+                <MagicPasteModal
+                    onClose={() => setIsMagicPasteOpen(false)}
+                    onParsed={handleMagicPasteParsed}
+                    products={state.products}
+                />
+            }
             
-            <div className="flex justify-between items-center">
-                <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
-                <DatePill />
-            </div>
+            <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
             
             <Card>
                 <div className="space-y-4">
@@ -807,14 +912,26 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
 
             <Card title="Sale Items">
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <Button onClick={() => setIsSelectingProduct(true)} className="w-full sm:w-auto flex-grow" disabled={!customerId}>
-                        <Search size={16} className="mr-2"/> Select Product
-                    </Button>
-                    <Button onClick={() => setIsScanning(true)} variant="secondary" className="w-full sm:w-auto flex-grow" disabled={!customerId}>
-                        <QrCode size={16} className="mr-2"/> Scan Product
-                    </Button>
+                <div className="flex flex-col gap-2">
+                    <div className="flex gap-2">
+                        <Button onClick={() => setIsSelectingProduct(true)} className="flex-grow" disabled={!customerId}>
+                            <Search size={16} className="mr-2"/> Select Product
+                        </Button>
+                        <Button onClick={() => setIsScanning(true)} variant="secondary" className="flex-grow" disabled={!customerId}>
+                            <QrCode size={16} className="mr-2"/> Scan Product
+                        </Button>
+                    </div>
+                    
+                    {/* Magic Paste Button */}
+                    <button
+                        onClick={() => setIsMagicPasteOpen(true)}
+                        className="w-full py-2 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-lg shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-2 font-medium"
+                        title="AI Order Parser"
+                    >
+                        <Sparkles size={16} /> Magic Paste Order (AI)
+                    </button>
                 </div>
+                
                 <div className="mt-4 space-y-2">
                     {items.map(item => (
                         <div key={item.productId} className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded animate-fade-in-fast border dark:border-slate-700">

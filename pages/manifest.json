@@ -15,5 +15,28 @@
   "display": "standalone",
   "theme_color": "#f8fafc",
   "background_color": "#f8fafc",
-  "description": "A comprehensive sales, purchase, and customer management application for a small business."
+  "description": "A comprehensive sales, purchase, and customer management application for a small business.",
+  "shortcuts": [
+    {
+      "name": "New Sale",
+      "short_name": "Sale",
+      "description": "Create a new sales invoice",
+      "url": "/?action=new_sale",
+      "icons": [{ "src": "/vite.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "New Customer",
+      "short_name": "Customer",
+      "description": "Add a new customer",
+      "url": "/?action=new_customer",
+      "icons": [{ "src": "/vite.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Dashboard",
+      "short_name": "Home",
+      "description": "View business overview",
+      "url": "/",
+      "icons": [{ "src": "/vite.svg", "sizes": "192x192" }]
+    }
+  ]
 }

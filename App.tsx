@@ -112,6 +112,12 @@ const AppContent: React.FC = () => {
     
     // Initialize currentPage from localStorage or default to DASHBOARD
     const [currentPage, setCurrentPage] = useState<Page>(() => {
+        // Check for PWA shortcuts in URL query params
+        const params = new URLSearchParams(window.location.search);
+        const action = params.get('action');
+        if (action === 'new_sale') return 'SALES';
+        if (action === 'new_customer') return 'CUSTOMERS';
+
         try {
             const saved = localStorage.getItem('business_manager_last_page');
             if (saved && Object.keys(ICON_MAP).includes(saved)) {
@@ -120,6 +126,17 @@ const AppContent: React.FC = () => {
         } catch(e) {}
         return 'DASHBOARD';
     });
+
+    // Handle PWA shortcut actions on mount (e.g., opening modals)
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const action = params.get('action');
+        if (action === 'new_customer') {
+            dispatch({ type: 'SET_SELECTION', payload: { page: 'CUSTOMERS', id: 'new' } });
+            // Clean URL
+            window.history.replaceState({}, '', '/');
+        }
+    }, [dispatch]);
 
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);

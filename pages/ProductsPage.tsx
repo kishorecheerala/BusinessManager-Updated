@@ -418,7 +418,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             });
             
             const text = response.text;
-            if (text) {
+            if (typeof text === 'string') {
                 setEditedProduct(prev => prev ? ({ ...prev, description: text }) : null);
                 showToast("Description generated!");
             }
@@ -453,7 +453,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             });
 
             const text = response.text;
-            const priceText = text ? text.trim() : '';
+            const priceText = typeof text === 'string' ? text.trim() : '';
             const suggestedPrice = parseFloat(priceText.replace(/[^0-9.]/g, ''));
 
             if (!isNaN(suggestedPrice)) {

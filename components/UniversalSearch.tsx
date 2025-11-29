@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Search, User, Package, Boxes, ShoppingCart, QrCode } from 'lucide-react';
+import { Search, User, Package, Boxes, ShoppingCart, QrCode, Mic } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Page } from '../types';
 import { Customer, Supplier, Product, Sale, Purchase } from '../types';
@@ -24,6 +25,7 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
     const [searchTerm, setSearchTerm] = useState('');
     const [results, setResults] = useState<SearchResults>({ customers: [], suppliers: [], products: [], sales: [], purchases: [] });
     const [isScanning, setIsScanning] = useState(false);
+    const [isListening, setIsListening] = useState(false);
 
     useEffect(() => {
         const handler = setTimeout(() => {
@@ -75,6 +77,7 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
         if (!isOpen) {
             setSearchTerm('');
             setIsScanning(false);
+            setIsListening(false);
         }
     }, [isOpen]);
     
@@ -106,6 +109,45 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
         showToast(`QR Code content "${scannedText}" not recognized.`, 'info');
     };
 
+    const handleVoiceSearch = () => {
+        if (!('webkitSpeechRecognition' in window)) {
+            showToast("Voice search not supported in this browser.", 'error');
+            return;
+        }
+
+        const recognition = new (window as any).webkitSpeechRecognition();
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.lang = 'en-US';
+
+        recognition.onstart = () => setIsListening(true);
+        
+        recognition.onresult = (event: any) => {
+            const transcript = event.results[0][0].transcript;
+            
+            // Simple Command Parsing
+            const lowerTranscript = transcript.toLowerCase();
+            if (lowerTranscript.includes("go to sales") || lowerTranscript.includes("open sales")) {
+                onNavigate('SALES', 'new'); // Using 'new' loosely, layout handles page switch
+            } else if (lowerTranscript.includes("new customer")) {
+                onNavigate('CUSTOMERS', 'new');
+            } else {
+                setSearchTerm(transcript);
+            }
+            setIsListening(false);
+        };
+
+        recognition.onerror = (event: any) => {
+            console.error("Speech recognition error", event.error);
+            setIsListening(false);
+            showToast("Voice input failed.", 'error');
+        };
+
+        recognition.onend = () => setIsListening(false);
+
+        recognition.start();
+    };
+
 
     const hasResults = useMemo(() => Object.values(results).some(arr => Array.isArray(arr) && arr.length > 0), [results]);
 
@@ -119,13 +161,20 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                      <input
                         type="text"
-                        placeholder="Search anything..."
+                        placeholder={isListening ? "Listening..." : "Search..."}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full p-3 pl-10 border rounded-full dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                        className={`w-full p-3 pl-10 border rounded-full dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-all ${isListening ? 'ring-2 ring-red-500 border-red-500' : ''}`}
                         autoFocus
                     />
                 </div>
+                <button 
+                    onClick={handleVoiceSearch} 
+                    className={`p-3 rounded-full transition-all ${isListening ? 'bg-red-100 text-red-600 animate-pulse' : 'text-primary hover:bg-primary/5 dark:hover:bg-slate-800'}`}
+                    aria-label="Voice Search"
+                >
+                    <Mic size={20} />
+                </button>
                  <button onClick={() => setIsScanning(true)} className="p-3 rounded-full text-primary hover:bg-primary/5 dark:hover:bg-slate-800" aria-label="Scan QR Code">
                     <QrCode size={20} />
                 </button>
