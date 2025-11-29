@@ -1,6 +1,4 @@
 
-
-
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, AppMetadata, AuditLogEntry, Expense, Quote, CustomFont, Snapshot } from '../types';
 import { AppState } from '../context/AppContext';
@@ -62,6 +60,25 @@ export async function saveCollection<T extends StoreName>(storeName: T, data: Bu
   }
 }
 
+export async function mergeCollection<T extends StoreName>(storeName: T, data: BusinessManagerDB[T]['value'][]) {
+  try {
+    const db = await getDb();
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    
+    for (const item of data) {
+        const existing = await store.get(item.id);
+        // Only add if it doesn't exist (Local Wins Conflict Strategy to protect unsaved work)
+        if (!existing) {
+            await store.put(item);
+        }
+    }
+    await tx.done;
+  } catch (error) {
+    console.error(`Failed to merge collection ${storeName}:`, error);
+  }
+}
+
 export async function getLastBackupDate(): Promise<string | null> {
     const db = await getDb();
     const result = await db.get('app_metadata', 'lastBackup');
@@ -87,6 +104,32 @@ export async function exportData(): Promise<Omit<AppState, 'toast' | 'selection'
         data[storeName] = await db.getAll(storeName);
     }
     return data;
+}
+
+export async function mergeData(cloudData: any): Promise<void> {
+    const db = await getDb();
+    const tx = db.transaction(STORE_NAMES, 'readwrite');
+    
+    for (const storeName of STORE_NAMES) {
+        if (storeName === 'notifications' || storeName === 'snapshots') continue;
+        
+        const remoteItems = cloudData[storeName];
+        // Basic validation
+        if (!remoteItems || !Array.isArray(remoteItems)) continue;
+        
+        const store = tx.objectStore(storeName);
+        
+        for (const item of remoteItems) {
+            if (item && item.id) {
+                const localItem = await store.get(item.id);
+                if (!localItem) {
+                    await store.put(item);
+                }
+                // If localItem exists, we keep local version (Priority: Local)
+            }
+        }
+    }
+    await tx.done;
 }
 
 export async function importData(data: any, merge: boolean = false): Promise<void> {

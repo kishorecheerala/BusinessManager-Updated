@@ -1,4 +1,5 @@
 
+
 import { ReactNode } from "react";
 
 export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS' | 'EXPENSES' | 'QUOTATIONS' | 'INVOICE_DESIGNER' | 'SYSTEM_OPTIMIZER';
@@ -8,7 +9,8 @@ export interface GoogleUser {
   name: string;
   email: string;
   picture: string;
-  accessToken?: string;
+  accessToken: string;
+  expiresAt?: number; // Timestamp when token expires
 }
 
 export interface AuditLogEntry {

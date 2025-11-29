@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -281,14 +283,18 @@ const AppContent: React.FC = () => {
                             onClick={() => { 
                                 if (!state.googleUser) {
                                     googleSignIn();
-                                } else if(state.syncStatus === 'error') {
-                                    setIsCloudDebugOpen(true); 
                                 } else {
+                                    // Always attempt to sync, even on error (Retry)
                                     syncData(); 
                                 }
                             }} 
+                            onContextMenu={(e) => {
+                                // Right click to open diagnostics
+                                e.preventDefault();
+                                setIsCloudDebugOpen(true);
+                            }}
                             className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
-                            title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Debug)' : state.syncStatus === 'syncing' ? 'Auto-Sync in progress...' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Not synced yet'}`}
+                            title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Retry)' : state.syncStatus === 'syncing' ? 'Auto-Sync in progress...' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Not synced yet'}`}
                         >
                             {state.syncStatus === 'syncing' ? (
                                 <RefreshCw size={20} className="animate-spin" />
