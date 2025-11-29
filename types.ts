@@ -1,3 +1,4 @@
+
 import { ReactNode } from "react";
 
 export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS' | 'EXPENSES' | 'QUOTATIONS' | 'INVOICE_DESIGNER' | 'SYSTEM_OPTIMIZER';
@@ -256,6 +257,13 @@ export interface InvoiceTemplateConfig {
     borderRadius?: number;
     uppercaseHeadings?: boolean;
     boldBorders?: boolean;
+    spacing?: number; // Vertical spacing scale (default 1.0)
+    elementSpacing?: { // New: Individual element spacing overrides
+        logoBottom?: number;
+        titleBottom?: number;
+        addressBottom?: number;
+        headerBottom?: number;
+    };
     tableOptions: {
         hideQty: boolean;
         hideRate: boolean;

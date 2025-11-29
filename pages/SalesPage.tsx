@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -16,16 +17,6 @@ const getLocalDateString = (date = new Date()) => {
   const day = date.getDate().toString().padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
-
-const fetchImageAsBase64 = (url: string): Promise<string> =>
-  fetch(url)
-    .then(response => response.blob())
-    .then(blob => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-    }));
 
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -159,14 +150,12 @@ const QRScannerModal: React.FC<{
         };
         const config = { fps: 10, qrbox: { width: 250, height: 250 } };
 
-        if (html5QrCodeRef.current) {
-            html5QrCodeRef.current.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, undefined)
-                .then(() => setScanStatus("Scanning for QR Code..."))
-                .catch(err => {
-                    setScanStatus(`Camera Permission Error. Please allow camera access for this site in your browser's settings.`);
-                    console.error("Camera start failed.", err);
-                });
-        }
+        html5QrCodeRef.current.start({ facingMode: "environment" }, config, qrCodeSuccessCallback, undefined)
+            .then(() => setScanStatus("Scanning for QR Code..."))
+            .catch(err => {
+                setScanStatus(`Camera Permission Error. Please allow camera access for this site in your browser's settings.`);
+                console.error("Camera start failed.", err);
+            });
             
         return () => {
             if (html5QrCodeRef.current?.isScanning) {

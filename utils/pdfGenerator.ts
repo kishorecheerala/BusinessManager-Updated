@@ -1,6 +1,4 @@
 
-
-
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { Sale, Customer, ProfileData, Purchase, Supplier, Return, Quote, InvoiceTemplateConfig, CustomFont, InvoiceLabels } from '../types';
@@ -54,10 +52,11 @@ const getImageType = (dataUrl: string): string => {
     if (dataUrl.startsWith('data:image/png')) return 'PNG';
     if (dataUrl.startsWith('data:image/jpeg')) return 'JPEG';
     if (dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+    if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
     // Fallback: If base64 string without prefix, assume PNG or try to detect based on first char
-    // /9j/ is JPEG, iVBORw0KGgo is PNG
     if (dataUrl.startsWith('/9j/')) return 'JPEG';
     if (dataUrl.startsWith('iVBORw0KGgo')) return 'PNG';
+    if (dataUrl.startsWith('UklGR')) return 'WEBP';
     return 'PNG';
 };
 
@@ -250,7 +249,14 @@ const _generateConfigurablePDF = async (
     const pageWidth = doc.internal.pageSize.getWidth(); 
     const pageHeight = doc.internal.pageSize.getHeight();
     const margin = layout.margin || 10;
+    const spacingScale = layout.spacing !== undefined ? layout.spacing : 1.0;
+    
     let currentY = margin;
+
+    // Helper for applying spacing
+    const addY = (amount: number) => {
+        currentY += amount * spacingScale;
+    };
 
     // --- Render Background Image (Stationery) ---
     if (layout.backgroundImage) {
@@ -265,7 +271,7 @@ const _generateConfigurablePDF = async (
 
     const renderHeader = async () => {
         if (content.showBusinessDetails === false) {
-            currentY += 5;
+            addY(5);
             return;
         }
 
@@ -273,7 +279,7 @@ const _generateConfigurablePDF = async (
         if (isBanner) {
             doc.setFillColor(colors.bannerBg || colors.primary);
             doc.rect(0, 0, pageWidth, 40 + (layout.logoSize/2), 'F');
-            currentY += 5;
+            addY(5);
         }
 
         const logoUrl = profile?.logo || logoBase64;
@@ -284,6 +290,12 @@ const _generateConfigurablePDF = async (
         let textX = margin;
         let logoX = margin;
         let logoY = currentY + (layout.logoOffsetY || 0);
+
+        // Individual Spacing Values
+        const logoBottomSpace = layout.elementSpacing?.logoBottom ?? 5;
+        const titleBottomSpace = layout.elementSpacing?.titleBottom ?? 2;
+        const addressBottomSpace = layout.elementSpacing?.addressBottom ?? 1;
+        const headerBottomSpace = layout.elementSpacing?.headerBottom ?? 5;
 
         if (hasLogo) {
             try {
@@ -299,7 +311,7 @@ const _generateConfigurablePDF = async (
                 try {
                     doc.addImage(logoUrl, getImageType(logoUrl), logoX + (layout.logoOffsetX || 0), logoY, layout.logoSize, renderedLogoHeight);
                 } catch(e) { console.warn("Failed to add centered logo", e); }
-                textY = logoY + renderedLogoHeight + 5;
+                textY = logoY + renderedLogoHeight + (logoBottomSpace * spacingScale);
             }
             textAlign = 'center';
             textX = pageWidth / 2;
@@ -312,7 +324,7 @@ const _generateConfigurablePDF = async (
             }
             textAlign = 'left';
             textX = margin;
-            textY += 5; 
+            textY += 5 * spacingScale; // Top adjustment
         } else { 
             logoX = margin;
             if (hasLogo) {
@@ -322,7 +334,7 @@ const _generateConfigurablePDF = async (
             }
             textAlign = 'right';
             textX = pageWidth - margin;
-            textY += 5;
+            textY += 5 * spacingScale; // Top adjustment
         }
 
         if (profile) {
@@ -331,26 +343,30 @@ const _generateConfigurablePDF = async (
             doc.setTextColor(isBanner ? (colors.bannerText || '#fff') : colors.primary);
             doc.text(profile.name, textX, textY, { align: textAlign });
             
-            textY += fonts.headerSize * 0.4 + 2;
+            textY += (fonts.headerSize * 0.4 + titleBottomSpace) * spacingScale;
+            
             doc.setFont(fonts.bodyFont, 'normal');
             doc.setFontSize(fonts.bodySize);
             doc.setTextColor(isBanner ? (colors.bannerText || '#fff') : colors.secondary);
             
             const addr = doc.splitTextToSize(profile.address, 90);
             doc.text(addr, textX, textY, { align: textAlign });
-            textY += (addr.length * 4) + 1;
+            textY += ((addr.length * 4) + addressBottomSpace) * spacingScale;
             
             const contact = [profile.phone && `Ph: ${profile.phone}`, profile.gstNumber && `GST: ${profile.gstNumber}`].filter(Boolean).join(' | ');
             doc.text(contact, textX, textY, { align: textAlign });
-            currentY = Math.max(textY + 5, hasLogo ? logoY + renderedLogoHeight + 5 : textY + 5);
+            
+            const contentEnd = textY + 5;
+            const logoEnd = hasLogo ? logoY + renderedLogoHeight + 5 : 0;
+            currentY = Math.max(contentEnd, logoEnd);
         } else {
-            currentY += 20;
+            addY(20);
         }
 
         if (!isBanner && layout.headerStyle !== 'minimal') {
             doc.setDrawColor(colors.borderColor || '#ccc');
             doc.line(margin, currentY, pageWidth - margin, currentY);
-            currentY += 5;
+            addY(headerBottomSpace);
         }
         
         if (content.showQr && layout.qrPosition === 'header-right') {
@@ -367,8 +383,8 @@ const _generateConfigurablePDF = async (
         doc.setFont(fonts.titleFont, 'bold');
         doc.setFontSize(16);
         doc.setTextColor(colors.text);
-        doc.text(content.titleText, pageWidth / 2, currentY + 5, { align: 'center' });
-        currentY += 15;
+        doc.text(content.titleText, pageWidth / 2, currentY + (5 * spacingScale), { align: 'center' });
+        addY(15);
     };
 
     const renderDetails = async () => {
@@ -389,13 +405,15 @@ const _generateConfigurablePDF = async (
         doc.setFontSize(fonts.bodySize);
         doc.setTextColor(colors.text);
 
-        doc.text(data.recipient.name, margin, gridY + 6);
-        const recipientAddr = doc.splitTextToSize(data.recipient.address, colWidth);
-        doc.text(recipientAddr, margin, gridY + 11);
+        const lineHeight = 5 * spacingScale;
 
-        let infoY = gridY + 6;
+        doc.text(data.recipient.name, margin, gridY + lineHeight + 1);
+        const recipientAddr = doc.splitTextToSize(data.recipient.address, colWidth);
+        doc.text(recipientAddr, margin, gridY + (lineHeight * 2) + 1);
+
+        let infoY = gridY + lineHeight + 1;
         doc.text(`${data.sender.idLabel} ${data.id}`, rightColX, infoY, { align: 'right' });
-        infoY += 5;
+        infoY += lineHeight;
         doc.text(`${labels.date}: ${formatDate(data.date, templateConfig.dateFormat)}`, rightColX, infoY, { align: 'right' });
 
         if (content.showQr && (!layout.qrPosition || layout.qrPosition === 'details-right')) {
@@ -407,7 +425,9 @@ const _generateConfigurablePDF = async (
             }
         }
 
-        currentY = Math.max(gridY + 11 + (recipientAddr.length * 5), infoY + 25) + 5;
+        const recipientHeight = (lineHeight * 2) + (recipientAddr.length * lineHeight);
+        const infoHeight = (lineHeight * 4); // Approximate
+        currentY = Math.max(gridY + recipientHeight, gridY + infoHeight) + (5 * spacingScale);
     };
 
     const renderTable = () => {
@@ -442,7 +462,7 @@ const _generateConfigurablePDF = async (
             },
             margin: { left: margin, right: margin }
         });
-        currentY = (doc as any).lastAutoTable.finalY + 5;
+        currentY = (doc as any).lastAutoTable.finalY + (5 * spacingScale);
     };
 
     const renderTotals = () => {
@@ -464,9 +484,9 @@ const _generateConfigurablePDF = async (
             doc.setTextColor(t.color || colors.text);
             doc.text(t.label, totalsX - 40, currentY, { align: 'right' });
             doc.text(t.value, totalsX, currentY, { align: 'right' });
-            currentY += (t.size ? t.size * 0.5 : 6);
+            addY((t.size ? t.size * 0.5 : 6));
         });
-        currentY += 5;
+        addY(5);
     };
 
     const renderWords = () => {
@@ -484,13 +504,13 @@ const _generateConfigurablePDF = async (
             doc.setFontSize(fonts.bodySize - 1);
             doc.setTextColor(colors.secondary);
             doc.text("Amount in words:", margin, currentY);
-            currentY += 5;
+            addY(5);
             doc.setFont(fonts.bodyFont, 'bold');
             doc.setTextColor(colors.text);
             const words = numberToWords(data.grandTotalNumeric);
             const splitWords = doc.splitTextToSize(words, pageWidth - (margin * 2));
             doc.text(splitWords, margin, currentY);
-            currentY += (splitWords.length * 5) + 5;
+            addY((splitWords.length * 5) + 5);
         }
     };
 
@@ -509,12 +529,12 @@ const _generateConfigurablePDF = async (
             doc.setFontSize(fonts.bodySize);
             doc.setTextColor(colors.primary);
             doc.text("Bank Details:", margin, currentY);
-            currentY += 5;
+            addY(5);
             doc.setFont(fonts.bodyFont, 'normal');
             doc.setTextColor(colors.text);
             const bankLines = doc.splitTextToSize(content.bankDetails, 100);
             doc.text(bankLines, margin, currentY);
-            currentY += (bankLines.length * 5) + 5;
+            addY((bankLines.length * 5) + 5);
         }
     };
 
@@ -533,11 +553,11 @@ const _generateConfigurablePDF = async (
             doc.setFontSize(fonts.bodySize - 2);
             doc.setTextColor(colors.secondary);
             doc.text("Terms & Conditions:", margin, currentY);
-            currentY += 4;
+            addY(4);
             doc.setFont(fonts.bodyFont, 'normal');
             const terms = doc.splitTextToSize(content.termsText, pageWidth - (margin * 2));
             doc.text(terms, margin, currentY);
-            currentY += (terms.length * 3.5) + 5;
+            addY((terms.length * 3.5) + 5);
         }
     };
 
@@ -653,7 +673,7 @@ export const generateA4InvoicePdf = async (sale: Sale, customer: Customer, profi
         id: 'default', currencySymbol: 'Rs.', dateFormat: 'DD/MM/YYYY',
         colors: { primary: '#0d9488', secondary: '#333333', text: '#000000', tableHeaderBg: '#0d9488', tableHeaderText: '#ffffff', bannerBg: '#0d9488', bannerText: '#ffffff', footerBg: '#f3f4f6', footerText: '#374151', borderColor: '#e5e7eb', alternateRowBg: '#f9fafb' },
         fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
-        layout: { margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', footerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1, qrPosition: 'details-right', tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false } },
+        layout: { margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', footerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1, qrPosition: 'details-right', tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false }, elementSpacing: { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 } },
         content: { titleText: 'TAX INVOICE', labels: defaultLabels, showQr: true, showTerms: true, showSignature: true, termsText: '', footerText: '', showBusinessDetails: true, showCustomerDetails: true, signatureText: '', showAmountInWords: false, showStatusStamp: false, showTaxBreakdown: false, showGst: true, qrType: 'INVOICE_ID', bankDetails: '' }
     };
     const config = templateConfig || defaultConfig;
@@ -735,17 +755,23 @@ export const generateGenericReportPDF = async (title: string, subtitle: string, 
     const { colors, fonts, layout, content } = templateConfig;
     const pageWidth = doc.internal.pageSize.getWidth();
     const margin = layout.margin || 10;
+    const spacingScale = layout.spacing !== undefined ? layout.spacing : 1.0;
     let y = margin;
+
+    // helper
+    const addY = (amount: number) => {
+        y += amount * spacingScale;
+    };
 
     doc.setFont(fonts.titleFont, 'bold');
     doc.setFontSize(16);
     doc.setTextColor(colors.primary);
     doc.text(title, pageWidth / 2, y, { align: 'center' });
-    y += 7;
+    addY(7);
     doc.setFontSize(10);
     doc.setTextColor(colors.secondary);
     doc.text(subtitle, pageWidth / 2, y, { align: 'center' });
-    y += 10;
+    addY(10);
 
     autoTable(doc, {
         startY: y,
@@ -758,12 +784,12 @@ export const generateGenericReportPDF = async (title: string, subtitle: string, 
     });
 
     if (summary && summary.length) {
-        y = (doc as any).lastAutoTable.finalY + 10;
+        y = (doc as any).lastAutoTable.finalY + (10 * spacingScale);
         summary.forEach(s => {
             doc.setFont(fonts.bodyFont, 'bold');
             doc.setTextColor(s.color || colors.text);
             doc.text(`${s.label}: ${s.value}`, pageWidth - margin, y, { align: 'right' });
-            y += 6;
+            addY(6);
         });
     }
     return doc;

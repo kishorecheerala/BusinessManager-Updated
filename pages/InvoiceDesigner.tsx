@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -101,7 +102,9 @@ const PRESETS: Record<string, any> = {
             uppercaseHeadings: true,
             columnWidths: { qty: 15, rate: 20, amount: 35 },
             tablePadding: 3,
-            borderRadius: 4
+            borderRadius: 4,
+            spacing: 1.0,
+            elementSpacing: { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
         } as any
     },
     'Corporate': {
@@ -114,7 +117,9 @@ const PRESETS: Record<string, any> = {
             uppercaseHeadings: true,
             columnWidths: { qty: 15, rate: 20, amount: 35 },
             tablePadding: 4,
-            borderRadius: 0
+            borderRadius: 0,
+            spacing: 1.1,
+            elementSpacing: { logoBottom: 8, titleBottom: 4, addressBottom: 2, headerBottom: 8 }
         } as any,
         content: { showAmountInWords: true }
     },
@@ -128,7 +133,9 @@ const PRESETS: Record<string, any> = {
             uppercaseHeadings: false,
             columnWidths: { qty: 10, rate: 20, amount: 35 },
             tablePadding: 2,
-            borderRadius: 0
+            borderRadius: 0,
+            spacing: 0.9,
+            elementSpacing: { logoBottom: 3, titleBottom: 1, addressBottom: 1, headerBottom: 3 }
         } as any
     },
     'Bold': {
@@ -141,7 +148,9 @@ const PRESETS: Record<string, any> = {
             uppercaseHeadings: true,
             columnWidths: { qty: 15, rate: 20, amount: 35 },
             tablePadding: 4,
-            borderRadius: 8
+            borderRadius: 8,
+            spacing: 1.0,
+            elementSpacing: { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
         } as any,
         content: { showStatusStamp: true }
     }
@@ -390,7 +399,9 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                 columnWidths: srcLayout.columnWidths || { qty: 15, rate: 20, amount: 35 },
                 tablePadding: srcLayout.tablePadding || 3,
                 borderRadius: srcLayout.borderRadius ?? 4,
-                uppercaseHeadings: srcLayout.uppercaseHeadings ?? true
+                uppercaseHeadings: srcLayout.uppercaseHeadings ?? true,
+                spacing: srcLayout.spacing ?? 1.0,
+                elementSpacing: srcLayout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
             }
         };
     };
@@ -471,6 +482,12 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
             }
         };
         pushToHistory(newConfig);
+    };
+
+    const handleElementSpacingChange = (key: string, value: number) => {
+        const currentSpacing = localConfig.layout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 };
+        const newSpacing = { ...currentSpacing, [key]: value };
+        handleConfigChange('layout', 'elementSpacing', newSpacing);
     };
 
     const applyPreset = (presetName: string) => {
@@ -820,6 +837,101 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                             </div>
                                         </div>
                                     ))}
+                                </div>
+                            </div>
+
+                            {/* Spacing & Margins */}
+                            <div className="space-y-3 border-t dark:border-slate-800 pt-4">
+                                <label className="text-xs font-bold text-slate-500 uppercase block">Global Spacing</label>
+                                
+                                {/* Margin Control */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">Page Margin</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.margin}mm</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0" max="30" step="1"
+                                        value={localConfig.layout.margin} 
+                                        onChange={e => handleConfigChange('layout', 'margin', parseInt(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
+
+                                {/* Vertical Spacing Control */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">Layout Density</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.spacing?.toFixed(1) || '1.0'}x</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="5" max="15" 
+                                        value={(localConfig.layout.spacing || 1.0) * 10} 
+                                        onChange={e => handleConfigChange('layout', 'spacing', parseInt(e.target.value) / 10)} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                    <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+                                        <span>Tight</span>
+                                        <span>Normal</span>
+                                        <span>Loose</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Detailed Element Spacing */}
+                            <div className="space-y-3 border-t dark:border-slate-800 pt-4">
+                                <label className="text-xs font-bold text-slate-500 uppercase block">Detailed Spacing (mm)</label>
+                                
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">Logo Bottom Space</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.logoBottom ?? 5}mm</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0" max="20" step="1"
+                                        value={localConfig.layout.elementSpacing?.logoBottom ?? 5} 
+                                        onChange={e => handleElementSpacingChange('logoBottom', parseInt(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">Business Name Bottom</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.titleBottom ?? 2}mm</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0" max="20" step="1"
+                                        value={localConfig.layout.elementSpacing?.titleBottom ?? 2} 
+                                        onChange={e => handleElementSpacingChange('titleBottom', parseInt(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">Address Bottom</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.addressBottom ?? 1}mm</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0" max="20" step="1"
+                                        value={localConfig.layout.elementSpacing?.addressBottom ?? 1} 
+                                        onChange={e => handleElementSpacingChange('addressBottom', parseInt(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                </div>
+
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] text-slate-500">Header Bottom (Section)</span>
+                                        <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.headerBottom ?? 5}mm</span>
+                                    </div>
+                                    <input 
+                                        type="range" min="0" max="30" step="1"
+                                        value={localConfig.layout.elementSpacing?.headerBottom ?? 5} 
+                                        onChange={e => handleElementSpacingChange('headerBottom', parseInt(e.target.value))} 
+                                        className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
                                 </div>
                             </div>
 
