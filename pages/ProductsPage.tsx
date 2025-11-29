@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -53,7 +53,7 @@ const ProductImage: React.FC<{ src?: string; alt: string; className?: string; si
         <img 
             src={src} 
             alt={alt} 
-            className={`${sizeClasses[size]} object-cover rounded-lg border border-gray-100 dark:border-slate-600 ${className}`} 
+            className={`${sizeClasses[size]} object-contain bg-white dark:bg-slate-800 rounded-lg border border-gray-100 dark:border-slate-600 ${className}`} 
             loading="lazy"
         />
     );
@@ -201,49 +201,44 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         const selectedProducts = filteredProducts.filter(p => selectedIds.has(p.id));
         if (selectedProducts.length === 0) return;
 
-        // 1. Construct Text
-        const textParts = selectedProducts.map(p =>
-            `*${p.name}*\nPrice: ₹${p.salePrice.toLocaleString('en-IN')}${p.description ? '\n' + p.description : ''}`
-        );
-        const combinedText = `*Product Catalog*\n\n` + textParts.join('\n\n----------------\n\n');
-
-        // 2. Construct Files
-        const files: File[] = [];
+        // 1. Try Native Share with Images (Mobile WhatsApp support)
         if (navigator.canShare && navigator.share) {
+            const files: File[] = [];
             for (const p of selectedProducts) {
                 if (p.image) {
                     try {
-                        const file = dataURLtoFile(p.image, `product_${p.id}.jpg`);
+                        const file = dataURLtoFile(p.image, `${p.name.replace(/[^a-z0-9]/gi, '_')}.jpg`);
                         files.push(file);
                     } catch (e) { console.error(e); }
                 }
             }
+
+            const text = `*Product Catalog*\n\n` + selectedProducts.map(p => `*${p.name}* - ₹${p.salePrice}`).join('\n');
+
+            try {
+                // Check if we can share files
+                if (files.length > 0 && navigator.canShare({ files })) {
+                     await navigator.share({
+                        files: files,
+                        // Note: Some platforms ignore text when sharing multiple files
+                        // But we send it anyway
+                        text: text, 
+                        title: 'Catalog'
+                    });
+                    return; // Success
+                }
+            } catch (e) {
+                console.warn("Share with files failed, trying text fallback", e);
+            }
         }
 
-        // 3. Share
-        try {
-            if (files.length > 0 && navigator.canShare({ files })) {
-                 await navigator.share({
-                    title: 'Product Catalog',
-                    text: combinedText,
-                    files: files
-                });
-            } else if (navigator.share) {
-                await navigator.share({
-                    title: 'Product Catalog',
-                    text: combinedText
-                });
-            } else {
-                // Fallback to WhatsApp Link
-                const url = `https://wa.me/?text=${encodeURIComponent(combinedText)}`;
-                window.open(url, '_blank');
-            }
-        } catch (e) {
-            console.error("Share failed", e);
-            // Fallback
-            const url = `https://wa.me/?text=${encodeURIComponent(combinedText)}`;
-            window.open(url, '_blank');
-        }
+        // 2. Fallback: WhatsApp Text Link
+        const combinedText = `*Product Catalog*\n\n` + selectedProducts.map(p =>
+            `*${p.name}*\nPrice: ₹${p.salePrice.toLocaleString('en-IN')}${p.description ? '\n' + p.description : ''}`
+        ).join('\n\n----------------\n\n');
+
+        const url = `https://wa.me/?text=${encodeURIComponent(combinedText)}`;
+        window.open(url, '_blank');
     };
 
     const handleSaveProduct = () => {
@@ -480,10 +475,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                         {!isEditing && (
                             <div className="absolute bottom-4 right-4 flex gap-2">
                                 <button onClick={() => handleWhatsAppShare(editedProduct)} className="p-3 bg-green-500 text-white rounded-full shadow-lg hover:scale-110 transition-transform" title="Share Text on WhatsApp">
-                                    <Share2 size={20} />
+                                    <MessageCircle size={20} />
                                 </button>
                                 <button onClick={() => handleShareProduct(editedProduct)} className="p-3 bg-blue-600 text-white rounded-full shadow-lg hover:scale-110 transition-transform" title="Share Image & Text">
-                                    <ImageIcon size={20} />
+                                    <Share2 size={20} />
                                 </button>
                             </div>
                         )}
@@ -750,10 +745,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             <button 
                                 onClick={handleBulkShare}
                                 disabled={selectedIds.size === 0}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded disabled:opacity-50"
-                                title="Share Selected"
+                                className="p-2 text-green-600 hover:bg-green-50 rounded disabled:opacity-50"
+                                title="Share on WhatsApp (Images)"
                             >
-                                <Share2 size={18} />
+                                <MessageCircle size={18} />
                             </button>
                             <button 
                                 onClick={handleBulkBarcode}
@@ -806,12 +801,12 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 </div>
                             )}
 
-                            {/* Image */}
-                            <div className={`flex-shrink-0 ${viewMode === 'list' ? 'w-16 h-16' : 'w-full aspect-square'} bg-gray-100 dark:bg-slate-700 overflow-hidden`}>
+                            {/* Image - Updated to contain + white bg */}
+                            <div className={`flex-shrink-0 ${viewMode === 'list' ? 'w-16 h-16' : 'w-full aspect-square'} bg-white dark:bg-slate-800 overflow-hidden flex items-center justify-center p-1`}>
                                 {product.image ? (
-                                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" loading="lazy" />
+                                    <img src={product.image} alt={product.name} className="max-w-full max-h-full object-contain" loading="lazy" />
                                 ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                    <div className="w-full h-full flex items-center justify-center text-gray-400 bg-gray-100 dark:bg-slate-700 rounded-lg">
                                         <Package size={24} />
                                     </div>
                                 )}
@@ -846,6 +841,13 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             {/* Quick Actions (List View Only) */}
                             {viewMode === 'list' && !isSelectionMode && (
                                 <div className="flex gap-2 pl-2 border-l dark:border-slate-700 ml-2">
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); handleWhatsAppShare(product); }}
+                                        className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-green-500"
+                                        title="Share on WhatsApp"
+                                    >
+                                        <MessageCircle size={18} />
+                                    </button>
                                     <button 
                                         onClick={(e) => { e.stopPropagation(); handleShareProduct(product); }}
                                         className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-blue-500"
