@@ -1,8 +1,6 @@
 
-
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw } from 'lucide-react';
+import { Save, RotateCcw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, RotateCw, MoveHorizontal, MoveVertical } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { InvoiceTemplateConfig, DocumentType, InvoiceLabels, CustomFont, ProfileData, Page } from '../types';
 import Button from '../components/Button';
@@ -192,7 +190,7 @@ const PDFCanvasPreview: React.FC<{
                     case 'INVOICE': doc = await generateA4InvoicePdf(dummySale, dummyCustomer, profile, debouncedConfig, customFonts); break;
                     case 'ESTIMATE': doc = await generateEstimatePDF(dummySale as any, dummyCustomer, profile, debouncedConfig, customFonts); break;
                     case 'DEBIT_NOTE': doc = await generateDebitNotePDF(dummySale as any, dummyCustomer as any, profile, debouncedConfig, customFonts); break;
-                    // Use new Configurable Receipt Generator for preview so design changes apply
+                    // Generate Thermal PDF for Receipts
                     case 'RECEIPT': doc = await generateReceiptPDF(dummySale, dummyCustomer, profile, debouncedConfig, customFonts); break;
                     case 'REPORT': 
                         const scenario = REPORT_SCENARIOS[reportScenario];
@@ -223,7 +221,16 @@ const PDFCanvasPreview: React.FC<{
 
                 const containerWidth = containerRef.current.clientWidth;
                 const baseViewport = page.getViewport({ scale: 1 });
-                const fitScale = (containerWidth - 40) / baseViewport.width; 
+                
+                // Smart Scaling: For narrow documents (receipts), don't fill width
+                // For Receipts (approx 226pts wide), scaling to full desktop width makes it blurry/huge
+                let fitScale = (containerWidth - 40) / baseViewport.width; 
+                
+                if (docType === 'RECEIPT') {
+                    // Cap scale for receipts to reasonable visual size
+                    fitScale = Math.min(fitScale, 1.5); 
+                }
+
                 // In Draft Mode, render at lower resolution (0.8 scale instead of full fit + zoom)
                 const finalScale = isDraftMode ? fitScale * 0.8 : fitScale * zoomLevel;
                 const viewport = page.getViewport({ scale: finalScale });
@@ -493,6 +500,21 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         handleConfigChange('layout', 'elementSpacing', newSpacing);
     };
 
+    const handleQRPosChange = (axis: 'x' | 'y', val: number) => {
+        const newLayout = { ...localConfig.layout };
+        if (axis === 'x') {
+            newLayout.qrPosX = val;
+            // Initialize Y if undefined
+            if (newLayout.qrPosY === undefined) newLayout.qrPosY = 20; 
+        } else {
+            newLayout.qrPosY = val;
+            // Initialize X if undefined
+            if (newLayout.qrPosX === undefined) newLayout.qrPosX = 150;
+        }
+        handleConfigChange('layout', 'qrPosX', newLayout.qrPosX);
+        handleConfigChange('layout', 'qrPosY', newLayout.qrPosY);
+    };
+
     const applyPreset = (presetName: string) => {
         const preset = PRESETS[presetName];
         if (preset) {
@@ -525,7 +547,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                 case 'ESTIMATE': doc = await generateEstimatePDF(dummySale as any, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'DEBIT_NOTE': doc = await generateDebitNotePDF(dummySale as any, dummyCustomer as any, state.profile, localConfig, state.customFonts); break;
                 // Generate Thermal PDF for Receipts
-                case 'RECEIPT': doc = await generateThermalInvoicePDF(dummySale, dummyCustomer, state.profile, localConfig, state.customFonts); break;
+                case 'RECEIPT': doc = await generateReceiptPDF(dummySale, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'REPORT': 
                     const scenario = REPORT_SCENARIOS[reportScenario];
                     doc = await generateGenericReportPDF(
@@ -550,7 +572,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                 case 'INVOICE': doc = await generateA4InvoicePdf(dummySale, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'ESTIMATE': doc = await generateEstimatePDF(dummySale as any, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'DEBIT_NOTE': doc = await generateDebitNotePDF(dummySale as any, dummyCustomer as any, state.profile, localConfig, state.customFonts); break;
-                case 'RECEIPT': doc = await generateThermalInvoicePDF(dummySale, dummyCustomer, state.profile, localConfig, state.customFonts); break;
+                case 'RECEIPT': doc = await generateReceiptPDF(dummySale, dummyCustomer, state.profile, localConfig, state.customFonts); break;
                 case 'REPORT': 
                     const scenario = REPORT_SCENARIOS[reportScenario];
                     doc = await generateGenericReportPDF(
@@ -990,25 +1012,25 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] text-slate-500">X Position</span>
+                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveHorizontal size={10} /> Horizontal (Left-Right)</span>
                                                 <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.qrPosX ?? 'Auto'}</span>
                                             </div>
                                             <input 
                                                 type="range" min="0" max="200" step="1"
                                                 value={localConfig.layout.qrPosX ?? 0} 
-                                                onChange={e => handleConfigChange('layout', 'qrPosX', parseInt(e.target.value))} 
+                                                onChange={e => handleQRPosChange('x', parseInt(e.target.value))} 
                                                 className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                             />
                                         </div>
                                         <div>
                                             <div className="flex justify-between items-center mb-1">
-                                                <span className="text-[10px] text-slate-500">Y Position</span>
+                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveVertical size={10} /> Vertical (Top-Bottom)</span>
                                                 <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.qrPosY ?? 'Auto'}</span>
                                             </div>
                                             <input 
                                                 type="range" min="0" max="300" step="1"
                                                 value={localConfig.layout.qrPosY ?? 0} 
-                                                onChange={e => handleConfigChange('layout', 'qrPosY', parseInt(e.target.value))} 
+                                                onChange={e => handleQRPosChange('y', parseInt(e.target.value))} 
                                                 className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
                                             />
                                         </div>

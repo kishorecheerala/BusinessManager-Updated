@@ -239,7 +239,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     try {
                         const file = dataURLtoFile(p.image, `${p.name.replace(/[^a-z0-9]/gi, '_')}.jpg`);
                         files.push(file);
-                    } catch (e) { console.error(e); }
+                    } catch (e: any) { console.error(e); }
                 }
             }
 
@@ -255,7 +255,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     });
                     return; // Success
                 }
-            } catch (e) {
+            } catch (e: any) {
                 console.warn("Share with files failed, trying text fallback", e);
             }
         }
@@ -383,7 +383,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 // Exit select mode on success
                 setIsShareSelectMode(false);
                 setSelectedShareImages(new Set());
-            } catch (e) {
+            } catch (e: any) {
                 console.warn("Share failed or cancelled", e);
             }
         } else {
