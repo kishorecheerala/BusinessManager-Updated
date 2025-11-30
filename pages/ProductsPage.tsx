@@ -447,9 +447,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             });
             
             const text = response.text;
-            if (text) {
-                setEditedProduct(prev => prev ? ({ ...prev, description: text }) : null);
-                showToast("Description generated!");
+            if (text && typeof text === 'string') {
+                const desc = text;
+                setEditedProduct(prev => prev ? ({ ...prev, description: desc }) : null);
+                showToast("Description generated!", 'success');
             }
         } catch (error: any) {
             console.error("AI Gen Error", error);
@@ -482,7 +483,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             });
 
             const text = response.text;
-            const priceText = text ? text.trim() : '';
+            const priceText = (text && typeof text === 'string') ? text.trim() : '';
             const suggestedPrice = parseFloat(priceText.replace(/[^0-9.]/g, ''));
 
             if (!isNaN(suggestedPrice)) {

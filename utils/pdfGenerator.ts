@@ -295,13 +295,24 @@ const _generateConfigurablePDF = async (
         }
 
         const logoUrl = profile?.logo || logoBase64;
+        const isAbsoluteLogo = layout.logoPosX !== undefined && layout.logoPosY !== undefined;
+        // Keep hasLogo true so we can render it, but use different placement logic if absolute.
         const hasLogo = !!logoUrl && layout.logoSize > 5;
+        
         let textY = currentY;
         let textAlign: 'left' | 'center' | 'right' = 'left';
         let renderedLogoHeight = 0;
         let textX = margin;
+        
+        // Default standard positions
         let logoX = margin;
         let logoY = currentY + (layout.logoOffsetY || 0);
+
+        // Override if absolute
+        if (isAbsoluteLogo) {
+             logoX = layout.logoPosX!;
+             logoY = layout.logoPosY!;
+        }
 
         // Individual Spacing Values
         const logoBottomSpace = layout.elementSpacing?.logoBottom ?? 5;
@@ -317,38 +328,43 @@ const _generateConfigurablePDF = async (
             } catch (e) { renderedLogoHeight = layout.logoSize; }
         }
 
-        if (layout.logoPosition === 'center') {
-            logoX = (pageWidth - layout.logoSize) / 2;
-            if (hasLogo) {
-                try {
-                    doc.addImage(logoUrl, getImageType(logoUrl), logoX + (layout.logoOffsetX || 0), logoY, layout.logoSize, renderedLogoHeight);
-                } catch(e) { console.warn("Failed to add centered logo", e); }
-                textY = logoY + renderedLogoHeight + (logoBottomSpace * spacingScale);
+        // Determine Text Alignment and Position based on layout config
+        if (!isAbsoluteLogo) {
+            if (layout.logoPosition === 'center') {
+                logoX = (pageWidth - layout.logoSize) / 2;
+                if (hasLogo) textY = logoY + renderedLogoHeight + (logoBottomSpace * spacingScale);
+                textAlign = 'center';
+                textX = pageWidth / 2;
+            } else if (layout.logoPosition === 'right') {
+                logoX = pageWidth - margin - layout.logoSize;
+                textAlign = 'left';
+                textX = margin;
+                textY += 5 * spacingScale;
+            } else { 
+                logoX = margin;
+                textAlign = 'right';
+                textX = pageWidth - margin;
+                textY += 5 * spacingScale;
             }
-            textAlign = 'center';
-            textX = pageWidth / 2;
-        } else if (layout.logoPosition === 'right') {
-            logoX = pageWidth - margin - layout.logoSize;
-            if (hasLogo) {
-                try {
-                    doc.addImage(logoUrl, getImageType(logoUrl), logoX + (layout.logoOffsetX || 0), logoY, layout.logoSize, renderedLogoHeight);
-                } catch(e) { console.warn("Failed to add right logo", e); }
+        } else {
+            // Absolute logo: respect headerAlignment setting for text
+            if (layout.headerAlignment === 'center') {
+                textAlign = 'center'; textX = pageWidth / 2;
+            } else if (layout.headerAlignment === 'right') {
+                textAlign = 'right'; textX = pageWidth - margin;
+            } else {
+                textAlign = 'left'; textX = margin;
             }
-            textAlign = 'left';
-            textX = margin;
-            textY += 5 * spacingScale; // Top adjustment
-        } else { 
-            logoX = margin;
-            if (hasLogo) {
-                try {
-                    doc.addImage(logoUrl, getImageType(logoUrl), logoX + (layout.logoOffsetX || 0), logoY, layout.logoSize, renderedLogoHeight);
-                } catch(e) { console.warn("Failed to add left logo", e); }
-            }
-            textAlign = 'right';
-            textX = pageWidth - margin;
-            textY += 5 * spacingScale; // Top adjustment
         }
 
+        // Render Logo
+        if (hasLogo) {
+            try {
+                doc.addImage(logoUrl, getImageType(logoUrl), logoX, logoY, layout.logoSize, renderedLogoHeight);
+            } catch(e) { console.warn("Failed to add logo", e); }
+        }
+
+        // Render Text
         if (profile) {
             doc.setFont(fonts.titleFont, 'bold');
             doc.setFontSize(fonts.headerSize);
@@ -369,10 +385,11 @@ const _generateConfigurablePDF = async (
             doc.text(contact, textX, textY, { align: textAlign });
             
             const contentEnd = textY + 5;
-            const logoEnd = hasLogo ? logoY + renderedLogoHeight + 5 : 0;
+            // If absolute logo, don't let it push the flow
+            const logoEnd = (hasLogo && !isAbsoluteLogo) ? logoY + renderedLogoHeight + 5 : 0;
             currentY = Math.max(contentEnd, logoEnd);
         } else {
-            addY(20);
+            if (!isAbsoluteLogo) addY(20);
         }
 
         if (!isBanner && layout.headerStyle !== 'minimal') {
@@ -381,7 +398,7 @@ const _generateConfigurablePDF = async (
             addY(headerBottomSpace);
         }
         
-        // Auto QR placement if no absolute position
+        // Auto QR placement (Only if no absolute position set for QR)
         if (content.showQr && layout.qrPosition === 'header-right' && layout.qrPosX === undefined) {
             const qrImg = await getQrCodeBase64(data.qrString || data.id);
             if (qrImg) {

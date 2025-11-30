@@ -468,6 +468,17 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         pushToHistory(newConfig);
     };
 
+    const handleBatchLayoutChange = (updates: Partial<ExtendedLayoutConfig['layout']>) => {
+        const newConfig = {
+            ...localConfig,
+            layout: {
+                ...localConfig.layout,
+                ...updates
+            }
+        };
+        pushToHistory(newConfig);
+    };
+
     const handleLabelsChange = (key: string, value: string) => {
         const newConfig = {
             ...localConfig,
@@ -489,23 +500,45 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
     };
 
     const handleQRPosChange = (axis: 'x' | 'y', val: number) => {
-        const newLayout = { ...localConfig.layout };
+        const updates: any = {};
         if (axis === 'x') {
-            newLayout.qrPosX = val;
-            if (newLayout.qrPosY === undefined) newLayout.qrPosY = 20; 
+            updates.qrPosX = val;
+            if (localConfig.layout.qrPosY === undefined) updates.qrPosY = 20; 
         } else {
-            newLayout.qrPosY = val;
-            if (newLayout.qrPosX === undefined) newLayout.qrPosX = 150;
+            updates.qrPosY = val;
+            if (localConfig.layout.qrPosX === undefined) updates.qrPosX = 150;
         }
-        handleConfigChange('layout', 'qrPosX', newLayout.qrPosX);
-        handleConfigChange('layout', 'qrPosY', newLayout.qrPosY);
+        handleBatchLayoutChange(updates);
     };
 
     const nudgeQR = (dx: number, dy: number) => {
         const currentX = localConfig.layout.qrPosX ?? 150;
         const currentY = localConfig.layout.qrPosY ?? 20;
-        handleQRPosChange('x', currentX + dx);
-        handleQRPosChange('y', currentY + dy);
+        handleBatchLayoutChange({
+            qrPosX: currentX + dx,
+            qrPosY: currentY + dy
+        });
+    };
+
+    const handleLogoPosChange = (axis: 'x' | 'y', val: number) => {
+        const updates: any = {};
+        if (axis === 'x') {
+            updates.logoPosX = val;
+            if (localConfig.layout.logoPosY === undefined) updates.logoPosY = 20;
+        } else {
+            updates.logoPosY = val;
+            if (localConfig.layout.logoPosX === undefined) updates.logoPosX = 20;
+        }
+        handleBatchLayoutChange(updates);
+    };
+
+    const nudgeLogo = (dx: number, dy: number) => {
+        const currentX = localConfig.layout.logoPosX ?? 20;
+        const currentY = localConfig.layout.logoPosY ?? 20;
+        handleBatchLayoutChange({
+            logoPosX: currentX + dx,
+            logoPosY: currentY + dy
+        });
     };
 
     const applyPreset = (presetName: string) => {
@@ -1005,6 +1038,56 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         </div>
                                     </div>
                                 </div>
+
+                                <div className="p-3 bg-gray-50 dark:bg-slate-800 rounded border dark:border-slate-700 mt-2">
+                                    <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Absolute Position (Overrides above)</p>
+                                    
+                                    {/* Logo Nudge Controls */}
+                                    <div className="flex flex-col items-center gap-1 mb-3">
+                                        <button onClick={() => nudgeLogo(0, -1)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowUp size={14} /></button>
+                                        <div className="flex gap-2">
+                                            <button onClick={() => nudgeLogo(-1, 0)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowLeft size={14} /></button>
+                                            <div className="w-6 h-6 rounded bg-slate-200 flex items-center justify-center text-[8px] font-bold text-slate-500">Logo</div>
+                                            <button onClick={() => nudgeLogo(1, 0)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowRightIcon size={14} /></button>
+                                        </div>
+                                        <button onClick={() => nudgeLogo(0, 1)} className="p-1 bg-white border rounded shadow hover:bg-gray-100"><ArrowDown size={14} /></button>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveHorizontal size={10} /> Horizontal</span>
+                                                <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.logoPosX ?? 'Auto'}</span>
+                                            </div>
+                                            <input 
+                                                type="range" min="0" max="200" step="1"
+                                                value={localConfig.layout.logoPosX ?? 0} 
+                                                onChange={e => handleLogoPosChange('x', parseInt(e.target.value))} 
+                                                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                            />
+                                        </div>
+                                        <div>
+                                            <div className="flex justify-between items-center mb-1">
+                                                <span className="text-[10px] text-slate-500 flex items-center gap-1"><MoveVertical size={10} /> Vertical</span>
+                                                <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.logoPosY ?? 'Auto'}</span>
+                                            </div>
+                                            <input 
+                                                type="range" min="0" max="300" step="1"
+                                                value={localConfig.layout.logoPosY ?? 0} 
+                                                onChange={e => handleLogoPosChange('y', parseInt(e.target.value))} 
+                                                className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                            />
+                                        </div>
+                                    </div>
+                                    <button 
+                                        onClick={() => {
+                                            handleBatchLayoutChange({ logoPosX: undefined, logoPosY: undefined });
+                                        }}
+                                        className="text-[10px] text-red-500 mt-2 hover:underline"
+                                    >
+                                        Reset Position
+                                    </button>
+                                </div>
                             </div>
                             
                             {/* QR Code Position & Size */}
@@ -1079,8 +1162,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                     </div>
                                     <button 
                                         onClick={() => {
-                                            handleConfigChange('layout', 'qrPosX', undefined);
-                                            handleConfigChange('layout', 'qrPosY', undefined);
+                                            handleBatchLayoutChange({ qrPosX: undefined, qrPosY: undefined });
                                         }}
                                         className="text-[10px] text-red-500 mt-2 hover:underline"
                                     >

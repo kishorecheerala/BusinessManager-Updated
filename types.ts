@@ -250,6 +250,8 @@ export interface InvoiceTemplateConfig {
     logoPosition: 'left' | 'center' | 'right';
     logoOffsetX?: number; // mm
     logoOffsetY?: number; // mm
+    logoPosX?: number; // Absolute X position override for Logo
+    logoPosY?: number; // Absolute Y position override for Logo
     qrPosition?: 'header-right' | 'details-right' | 'footer-left' | 'footer-right';
     qrPosX?: number; // Absolute X position override
     qrPosY?: number; // Absolute Y position override
