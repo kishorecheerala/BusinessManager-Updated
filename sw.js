@@ -1,14 +1,12 @@
 
-const CACHE_NAME = 'business-manager-cache-v12';
+const CACHE_NAME = 'business-manager-cache-v13';
 
 // The essential files that make up the app's shell.
-// Using relative paths to support subdirectories.
 const APP_SHELL_URLS = [
   './',
   'index.html',
   'vite.svg',
   'manifest.json',
-  // '?source=pwa' ensures the start_url is cached
   './?source=pwa'
 ];
 
