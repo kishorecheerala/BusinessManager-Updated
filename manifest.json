@@ -1,9 +1,9 @@
 {
   "name": "Business Manager Pro",
   "short_name": "Business Mgr",
-  "id": "business-manager-pro",
+  "id": "/?source=pwa",
   "start_url": "./index.html",
-  "scope": "./",
+  "scope": ".",
   "background_color": "#f8fafc",
   "display": "standalone",
   "orientation": "portrait",

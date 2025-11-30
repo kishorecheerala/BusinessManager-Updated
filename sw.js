@@ -1,83 +1,69 @@
-const CACHE_NAME = 'business-manager-v4'; // Bump version to trigger new install
-const STATIC_ASSETS = [
+const CACHE_NAME = 'business-manager-cache-v7'; // Bump version to force update
+const URLS_TO_CACHE = [
   './index.html',
-  './manifest.json', // Must be correct path
+  './manifest.json',
   './vite.svg'
-  // The root './' is implicitly handled by the fetch handler for navigation.
 ];
 
 // On install, cache the app shell
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      console.log('SW: Caching app shell');
-      return cache.addAll(STATIC_ASSETS);
-    })
+    caches.open(CACHE_NAME)
+      .then((cache) => {
+        console.log('SW: Caching app shell');
+        return cache.addAll(URLS_TO_CACHE);
+      })
+      .then(() => self.skipWaiting()) // Activate new SW immediately
   );
 });
 
-// On activate, clean up old caches
+// On activate, clean up old caches to save space
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map((name) => {
-          if (name !== CACHE_NAME) {
-            console.log('SW: Deleting old cache', name);
-            return caches.delete(name);
-          }
-        })
+        cacheNames
+          .filter(name => name !== CACHE_NAME)
+          .map(name => caches.delete(name))
       );
-    }).then(() => {
-      console.log('SW: Claiming clients');
-      return self.clients.claim();
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// On fetch, serve from cache or network
+// On fetch, use a robust cache-first strategy
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  
-  // Serve the app shell (index.html) with a Cache First, then Network strategy.
-  // This is critical for PWA installability and offline functionality.
-  // This handles direct navigation to the app's root.
+
+  // For navigation requests (loading the app), always serve index.html from cache first.
+  // This is the most important part for the installability check.
   if (request.mode === 'navigate') {
     event.respondWith(
-      caches.match('./index.html').then(cachedResponse => {
-        // Return from cache if available.
-        if (cachedResponse) {
-          // In the background, fetch a fresh version to update the cache for next time
-          fetch('./index.html').then(networkResponse => {
-            if (networkResponse.ok) {
-              caches.open(CACHE_NAME).then(cache => {
-                cache.put('./index.html', networkResponse);
-              });
-            }
-          });
-          return cachedResponse;
-        }
-        // If not in cache, fetch from network.
-        return fetch('./index.html');
-      })
+      caches.open(CACHE_NAME)
+        .then(cache => cache.match('./index.html'))
+        .then(response => response || fetch('./index.html')) // Fallback to network
     );
     return;
   }
-
-  // For other requests (JS from CDN, fonts, etc.), use a Stale-While-Revalidate strategy.
+  
+  // For other requests (CDN scripts, fonts, etc.), try cache then network.
+  // This ensures that even if the CDN is down, the app might still work if assets are cached.
   event.respondWith(
-    caches.open(CACHE_NAME).then(cache => {
-      return cache.match(request).then(cachedResponse => {
-        const fetchPromise = fetch(request).then(networkResponse => {
-          if (networkResponse && networkResponse.status === 200) {
-            cache.put(request, networkResponse.clone());
-          }
-          return networkResponse;
-        });
-
-        // Return from cache if available, otherwise wait for the network.
-        return cachedResponse || fetchPromise;
+    caches.match(request).then(cachedResponse => {
+      // If we have it in cache, return it
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+      
+      // Otherwise, go to network and cache the response for next time
+      return fetch(request).then(networkResponse => {
+        // Check if we received a valid response and it's from a safe source (to avoid caching errors)
+        if (networkResponse && networkResponse.status === 200 && request.method === 'GET' && (request.url.startsWith(self.location.origin) || request.url.includes('aistudiocdn.com'))) {
+          const responseToCache = networkResponse.clone();
+          caches.open(CACHE_NAME).then(cache => {
+            cache.put(request, responseToCache);
+          });
+        }
+        return networkResponse;
       });
     })
   );
