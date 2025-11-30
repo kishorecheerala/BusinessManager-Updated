@@ -985,7 +985,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.logoBottom ?? 5}mm</span>
                                     </div>
                                     <input 
-                                        type="range" min="0" max="20" step="1"
+                                        type="range" min="-20" max="20" step="1"
                                         value={localConfig.layout.elementSpacing?.logoBottom ?? 5} 
                                         onChange={e => handleElementSpacingChange('logoBottom', parseInt(e.target.value))} 
                                         className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
@@ -998,7 +998,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.titleBottom ?? 2}mm</span>
                                     </div>
                                     <input 
-                                        type="range" min="0" max="20" step="1"
+                                        type="range" min="-20" max="20" step="1"
                                         value={localConfig.layout.elementSpacing?.titleBottom ?? 2} 
                                         onChange={e => handleElementSpacingChange('titleBottom', parseInt(e.target.value))} 
                                         className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
@@ -1011,7 +1011,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.addressBottom ?? 1}mm</span>
                                     </div>
                                     <input 
-                                        type="range" min="0" max="20" step="1"
+                                        type="range" min="-20" max="20" step="1"
                                         value={localConfig.layout.elementSpacing?.addressBottom ?? 1} 
                                         onChange={e => handleElementSpacingChange('addressBottom', parseInt(e.target.value))} 
                                         className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
@@ -1024,7 +1024,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                         <span className="text-[10px] font-mono text-indigo-600">{localConfig.layout.elementSpacing?.headerBottom ?? 5}mm</span>
                                     </div>
                                     <input 
-                                        type="range" min="0" max="30" step="1"
+                                        type="range" min="-20" max="30" step="1"
                                         value={localConfig.layout.elementSpacing?.headerBottom ?? 5} 
                                         onChange={e => handleElementSpacingChange('headerBottom', parseInt(e.target.value))} 
                                         className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"

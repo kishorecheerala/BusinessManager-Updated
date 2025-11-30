@@ -55,9 +55,16 @@ const formatDate = (dateStr: string, format: string = 'DD/MM/YYYY'): string => {
 };
 
 const formatCurrency = (amount: number, symbol: string = 'Rs.', fontName: string = 'helvetica'): string => {
-    // Only use symbol if font supports it (standard fonts might not support ₹ symbol directly if not encoded properly in PDF)
-    // For simplicity, we use the symbol string provided
-    return `${symbol} ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+    // Standard PDF fonts (Helvetica, Times, Courier) usually don't support the Indian Rupee symbol (₹).
+    // If the symbol is '₹' and a standard font is used, fallback to 'Rs.'.
+    const standardFonts = ['helvetica', 'times', 'courier'];
+    let displaySymbol = symbol;
+    
+    if (symbol === '₹' && standardFonts.includes(fontName.toLowerCase())) {
+        displaySymbol = 'Rs.';
+    }
+    
+    return `${displaySymbol} ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
 };
 
 const getQrCodeBase64 = async (data: string): Promise<string> => {
@@ -103,8 +110,9 @@ const numberToWords = (n: number): string => {
 // UPDATED: Now supports 4-inch (112mm) width with Tight Spacing
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, templateConfig?: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
     const labels = { ...defaultLabels, ...templateConfig?.content.labels };
-    const currencySymbol = templateConfig?.currencySymbol || 'Rs.';
-    const currency = customFonts?.length ? currencySymbol : 'Rs.';
+    
+    // Force 'Rs.' for this specific generator as it uses Helvetica primarily
+    const currency = 'Rs.';
     
     // Dimensions for 4-inch (112mm) roll
     const margin = 2;
