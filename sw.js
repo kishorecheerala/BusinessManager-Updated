@@ -1,4 +1,5 @@
-const CACHE_NAME = 'business-manager-v3';
+
+const CACHE_NAME = 'business-manager-v4';
 const urlsToCache = [
   './',
   './index.html',
@@ -36,6 +37,19 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  const url = new URL(event.request.url);
+
+  // Strategy: Network first for navigation (HTML), Cache first for assets
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .catch(() => {
+          return caches.match('./index.html') || caches.match('./');
+        })
+    );
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request).then(response => {
       if (response) {
@@ -48,7 +62,7 @@ self.addEventListener('fetch', event => {
         }
 
         // Cache successful GET requests for same-origin resources
-        if (event.request.url.startsWith(self.location.origin)) {
+        if (url.origin === self.location.origin) {
             const responseToCache = response.clone();
             caches.open(CACHE_NAME).then(cache => {
               cache.put(event.request, responseToCache);
@@ -57,11 +71,6 @@ self.addEventListener('fetch', event => {
 
         return response;
       });
-    }).catch(() => {
-      // If offline and request is for navigation, return index.html
-      if (event.request.mode === 'navigate') {
-          return caches.match('./index.html') || caches.match('./');
-      }
     })
   );
 });

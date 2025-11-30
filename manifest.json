@@ -1,15 +1,20 @@
 {
   "name": "Business Manager Pro",
   "short_name": "Business Mgr",
-  "id": "/?source=pwa",
+  "id": "./",
   "start_url": "./index.html",
   "scope": "./",
-  "background_color": "#f8fafc",
   "display": "standalone",
   "orientation": "portrait",
+  "background_color": "#f8fafc",
   "theme_color": "#0d9488",
   "description": "A comprehensive sales, purchase, and customer management application.",
-  "categories": ["business", "finance", "productivity"],
+  "prefer_related_applications": false,
+  "categories": [
+    "business",
+    "finance",
+    "productivity"
+  ],
   "icons": [
     {
       "src": "./vite.svg",
