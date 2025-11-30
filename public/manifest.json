@@ -1,12 +1,16 @@
 {
   "name": "Business Manager Pro",
   "short_name": "Business Mgr",
-  "description": "Sales & inventory management",
+  "id": "business-manager-pro-v1",
+  "start_url": "./index.html",
   "display": "standalone",
-  "scope": "./",
-  "start_url": "./",
+  "display_override": ["window-controls-overlay", "minimal-ui"],
+  "background_color": "#f8fafc",
   "theme_color": "#0d9488",
-  "background_color": "#ffffff",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "description": "A comprehensive sales, purchase, and customer management application.",
+  "categories": ["business", "finance", "productivity"],
   "icons": [
     {
       "src": "./vite.svg",
@@ -19,6 +23,12 @@
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "./vite.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     },
     {
       "src": "./vite.svg",
