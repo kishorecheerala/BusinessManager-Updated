@@ -173,15 +173,6 @@ export interface CustomFont {
   data: string; // Base64 encoded TTF data
 }
 
-export interface BeforeInstallPromptEvent extends Event {
-  readonly platforms: string[];
-  readonly userChoice: Promise<{
-    outcome: 'accepted' | 'dismissed';
-    platform: string;
-  }>;
-  prompt(): Promise<void>;
-}
-
 export interface Notification {
   id: string;
   title: string;

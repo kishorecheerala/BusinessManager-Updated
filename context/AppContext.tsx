@@ -1,6 +1,6 @@
 
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, BeforeInstallPromptEvent, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
@@ -37,7 +37,6 @@ export interface AppState {
 
   toast: ToastState;
   selection: { page: Page; id: string; action?: 'edit' | 'new'; data?: any } | null;
-  installPromptEvent: BeforeInstallPromptEvent | null;
   pin: string | null;
   theme: Theme;
   themeColor: string;
@@ -89,7 +88,6 @@ type Action =
   | { type: 'CLEAR_SELECTION' }
   | { type: 'SHOW_TOAST'; payload: { message: string; type?: 'success' | 'info' | 'error' } }
   | { type: 'HIDE_TOAST' }
-  | { type: 'SET_INSTALL_PROMPT_EVENT'; payload: BeforeInstallPromptEvent | null }
   | { type: 'SET_GOOGLE_USER'; payload: GoogleUser | null }
   | { type: 'SET_SYNC_STATUS'; payload: SyncStatus }
   | { type: 'SET_LAST_SYNC_TIME'; payload: number }
@@ -154,7 +152,6 @@ const initialState: AppState = {
     uiPreferences: DEFAULT_UI_PREFS,
     toast: { message: '', show: false, type: 'info' },
     selection: null,
-    installPromptEvent: null,
     pin: null,
     theme: 'light',
     themeColor: '#0d9488',
@@ -536,9 +533,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return { ...state, toast: { message: action.payload.message, show: true, type: action.payload.type || 'info' } };
     case 'HIDE_TOAST':
         return { ...state, toast: { ...state.toast, show: false } };
-
-    case 'SET_INSTALL_PROMPT_EVENT':
-        return { ...state, installPromptEvent: action.payload };
 
     case 'SET_GOOGLE_USER':
         if (action.payload) {

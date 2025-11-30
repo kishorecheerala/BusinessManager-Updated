@@ -145,19 +145,6 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
         onOpenDevTools();
     };
 
-    const handleInstallApp = () => {
-        const promptEvent = state.installPromptEvent;
-        if (promptEvent) {
-            promptEvent.prompt();
-            promptEvent.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    console.log('User accepted the install prompt');
-                }
-                dispatch({ type: 'SET_INSTALL_PROMPT_EVENT', payload: null });
-            });
-        }
-    };
-
     if (!isOpen && !isAuditOpen && !isCloudDebugOpen && !isColorPickerOpen && !isGradientPickerOpen && !isPinModalOpen && !isInvoiceSettingsOpen && !isAPIConfigOpen && !isUISettingsOpen) return null;
 
     return (
@@ -249,19 +236,6 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                         </div>
                     </div>
                 </div>
-
-                {/* 1.5 Install App Button (Visible if prompt available) */}
-                {state.installPromptEvent && (
-                    <div className="px-3 pb-2">
-                        <button
-                            onClick={handleInstallApp}
-                            className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all"
-                        >
-                            <Download size={18} />
-                            Install App
-                        </button>
-                    </div>
-                )}
 
                 {/* 2. Main Navigation & Actions */}
                 <div className="p-2 space-y-1 border-b border-gray-100 dark:border-slate-700 pb-3">

@@ -3,7 +3,6 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import ErrorBoundary from './components/ErrorBoundary';
-import { BeforeInstallPromptEvent } from './types';
 
 // Service Worker Registration Logic
 const registerServiceWorker = async () => {
@@ -41,33 +40,12 @@ const registerServiceWorker = async () => {
   }
 };
 
-// PWA Capability Registration
-const registerPWACapability = () => {
-  window.addEventListener('beforeinstallprompt', (e) => {
-    e.preventDefault(); // Prevent default mini-infobar
-    console.log('✅ Install prompt available');
-    
-    // Store event for App.tsx usage (using property expected by App.tsx)
-    (window as any).deferredInstallPrompt = e as BeforeInstallPromptEvent;
-    
-    // Dispatch event to notify React components
-    window.dispatchEvent(new Event('pwa-install-available'));
-  });
-
-  window.addEventListener('appinstalled', () => {
-    console.log('✅ PWA installed');
-    (window as any).deferredInstallPrompt = null;
-  });
-};
-
 // Check if the page is already loaded before attaching listener
 if (document.readyState === 'complete') {
   registerServiceWorker();
-  registerPWACapability();
 } else {
   window.addEventListener('load', () => {
     registerServiceWorker();
-    registerPWACapability();
   });
 }
 

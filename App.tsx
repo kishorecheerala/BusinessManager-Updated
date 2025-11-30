@@ -8,7 +8,7 @@ import {
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
-import { Page, BeforeInstallPromptEvent } from './types';
+import { Page } from './types';
 
 // Pages
 import Dashboard from './pages/Dashboard';
@@ -129,34 +129,6 @@ const AppContent: React.FC = () => {
         } catch(e) {}
         return 'DASHBOARD';
     });
-
-    // PWA Install Prompt Capture & Install Feedback
-    useEffect(() => {
-        const handleInstallAvailable = () => {
-            if ((window as any).deferredInstallPrompt) {
-                dispatch({ type: 'SET_INSTALL_PROMPT_EVENT', payload: (window as any).deferredInstallPrompt });
-            }
-        };
-
-        const handleAppInstalled = () => {
-            dispatch({ type: 'SET_INSTALL_PROMPT_EVENT', payload: null });
-            showToast('App installed successfully!', 'success');
-            console.log('PWA was installed');
-        };
-
-        window.addEventListener('pwa-install-available', handleInstallAvailable);
-        window.addEventListener('appinstalled', handleAppInstalled);
-
-        // Check immediately on mount if the event was already stashed
-        if ((window as any).deferredInstallPrompt) {
-            dispatch({ type: 'SET_INSTALL_PROMPT_EVENT', payload: (window as any).deferredInstallPrompt });
-        }
-
-        return () => {
-            window.removeEventListener('pwa-install-available', handleInstallAvailable);
-            window.removeEventListener('appinstalled', handleAppInstalled);
-        };
-    }, [dispatch, showToast]);
 
     // Handle PWA shortcut actions on mount (e.g., opening modals)
     useEffect(() => {
@@ -303,18 +275,6 @@ const AppContent: React.FC = () => {
         }
     };
 
-    const handleInstallApp = () => {
-        if (state.installPromptEvent) {
-            state.installPromptEvent.prompt();
-            state.installPromptEvent.userChoice.then((choiceResult) => {
-                if (choiceResult.outcome === 'accepted') {
-                    console.log('User accepted the install prompt');
-                }
-                dispatch({ type: 'SET_INSTALL_PROMPT_EVENT', payload: null });
-            });
-        }
-    };
-
     // Calculate Navigation Layout based on user preference order
     const { mainNavItems, pinnedItems, mobileMoreItems } = useMemo(() => {
         const order = state.navOrder || [];
@@ -361,7 +321,7 @@ const AppContent: React.FC = () => {
     // Standard Pages: Native body scrolling (min-h-screen).
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
-        : `min-h-screen ${state.installPromptEvent ? 'pt-32' : 'pt-16'}`;
+        : `min-h-screen pt-16`;
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
@@ -460,35 +420,6 @@ const AppContent: React.FC = () => {
                         </button>
                     </div>
                 </header>
-            )}
-
-            {/* Install App Banner - Visible when install prompt is available */}
-            {state.installPromptEvent && currentPage !== 'INVOICE_DESIGNER' && (
-                <div className="fixed top-16 left-0 right-0 z-30 bg-white dark:bg-slate-800 px-4 py-3 shadow-md flex justify-between items-center animate-slide-down-fade border-b border-gray-200 dark:border-slate-700">
-                    <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-full text-primary">
-                            <Download size={20} />
-                        </div>
-                        <div className="flex flex-col">
-                            <span className="font-bold text-sm text-gray-800 dark:text-white">Install App</span>
-                            <span className="text-[10px] text-gray-500 dark:text-gray-400">Add to Home Screen for easier access</span>
-                        </div>
-                    </div>
-                    <div className="flex gap-3 items-center">
-                        <button 
-                            onClick={() => dispatch({ type: 'SET_INSTALL_PROMPT_EVENT', payload: null })} 
-                            className="p-1 hover:bg-gray-100 dark:hover:bg-slate-700 rounded-full transition-colors text-gray-500"
-                        >
-                            <X size={20} />
-                        </button>
-                        <button 
-                            onClick={handleInstallApp} 
-                            className="px-4 py-1.5 bg-primary text-white font-bold text-xs rounded-full shadow-lg hover:scale-105 transition-transform"
-                        >
-                            Install
-                        </button>
-                    </div>
-                </div>
             )}
 
             {/* Main Content Area */}
