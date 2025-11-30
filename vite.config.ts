@@ -9,22 +9,31 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: null, // Disable auto injection; we handle it manually in index.tsx
+      filename: 'manifest.json', // Explicitly name the generated manifest
       manifest: {
-        name: 'Business Manager',
+        name: 'Business Manager - Sales & Purchase Tracker',
         short_name: 'Business Manager',
+        description: 'Offline-first PWA for managing sales, purchases, and customer dues',
         theme_color: '#2563eb',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'portrait-primary',
+        id: '/', // Consistent ID for the app
+        start_url: '/',
+        scope: '/',
         icons: [
           {src: '/icon-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any'},
           {src: '/icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any'},
           {src: '/icon-maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable'},
           {src: '/icon-maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable'},
+          {src: '/vite.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any'}
         ],
       },
       workbox: {
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // Increase limit to 5MB
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}'],
+        navigateFallback: '/index.html', // Essential for SPA offline navigation (WebAPK requirement)
+        navigateFallbackDenylist: [/^\/api/], // Don't fallback for API routes
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.googleapis\.com/,
