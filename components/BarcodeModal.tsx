@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import jsPDF from 'jspdf';
 import JsBarcode from 'jsbarcode';
@@ -322,3 +323,5 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ isOpen, product, onC
     </div>
   );
 };
+
+export default BarcodeModal;

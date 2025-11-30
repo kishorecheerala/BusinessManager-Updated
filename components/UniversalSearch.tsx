@@ -140,7 +140,14 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
         recognition.onerror = (event: any) => {
             console.error("Speech recognition error", event.error);
             setIsListening(false);
-            showToast("Voice input failed.", 'error');
+            if (event.error === 'not-allowed') {
+                // Show more helpful error for permission issues
+                showToast("Microphone denied. Check browser permission settings.", 'error');
+            } else if (event.error === 'no-speech') {
+                // Ignore no-speech errors (common if user didn't say anything)
+            } else {
+                showToast("Voice input failed. Try again.", 'error');
+            }
         };
 
         recognition.onend = () => setIsListening(false);

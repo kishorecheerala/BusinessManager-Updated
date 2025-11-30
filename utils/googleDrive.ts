@@ -10,8 +10,9 @@ export const getClientId = () => {
     return localStorage.getItem('google_client_id') || DEFAULT_CLIENT_ID;
 };
 
-// Updated Scopes: Includes Drive File access, User Profile, Calendar, AND SPREADSHEETS
-const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/spreadsheets';
+// Updated Scopes: Includes Drive File access, User Profile, Full Calendar, AND SPREADSHEETS
+// switched calendar.events to calendar for broader compatibility if needed
+const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/calendar https://www.googleapis.com/auth/spreadsheets';
 
 // Folder name in Google Drive
 const APP_FOLDER_NAME = 'BusinessManager_AppData';

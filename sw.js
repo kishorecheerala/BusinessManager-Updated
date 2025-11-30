@@ -1,13 +1,15 @@
 
-const CACHE_NAME = 'business-manager-cache-v9';
+const CACHE_NAME = 'business-manager-cache-v11';
 
 // The essential files that make up the app's shell.
+// Using relative paths to support subdirectories.
 const APP_SHELL_URLS = [
-  '/',
-  '/index.html',
-  '/vite.svg',
-  '/manifest.json',
-  // '/index.tsx', // Removed source file preventing valid SW registration in build
+  './',
+  'index.html',
+  'vite.svg',
+  'manifest.json',
+  // '?source=pwa' ensures the start_url is cached
+  './?source=pwa'
 ];
 
 // On install, cache the app shell
@@ -55,7 +57,6 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   // CRITICAL: Do not cache Google API requests.
-  // Caching these causes stale Drive file listings and prevents syncing.
   if (url.hostname.includes('googleapis.com') || 
       url.hostname.includes('googleusercontent.com') || 
       url.hostname.includes('accounts.google.com')) {
@@ -93,7 +94,6 @@ self.addEventListener('fetch', event => {
           return networkResponse;
         }).catch(error => {
           console.error('Service Worker: Fetch failed; user is likely offline.', event.request.url, error);
-          // You could return a fallback offline page or image here if you had one.
         });
       })
   );
