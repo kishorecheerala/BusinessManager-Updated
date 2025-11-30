@@ -1,26 +1,49 @@
 {
   "name": "Business Manager Pro",
   "short_name": "Business Mgr",
-  "id": "/",
-  "start_url": "./index.html",
+  "id": "/?source=pwa",
+  "start_url": "../index.html",
+  "scope": "..",
   "background_color": "#f8fafc",
   "display": "standalone",
   "orientation": "portrait",
-  "theme_color": "#f8fafc",
+  "theme_color": "#0d9488",
   "description": "A comprehensive sales, purchase, and customer management application.",
   "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "./vite.svg",
+      "src": "../vite.svg",
       "type": "image/svg+xml",
-      "sizes": "192x192 512x512",
-      "purpose": "any"
+      "sizes": "any",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Sale",
+      "short_name": "New Sale",
+      "description": "Record a new sale transaction",
+      "url": "../index.html?action=new_sale",
+      "icons": [
+        {
+          "src": "../vite.svg",
+          "type": "image/svg+xml",
+          "sizes": "192x192"
+        }
+      ]
     },
     {
-      "src": "./vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192 512x512",
-      "purpose": "maskable"
+      "name": "New Customer",
+      "short_name": "New Customer",
+      "description": "Add a new customer to your records",
+      "url": "../index.html?action=new_customer",
+      "icons": [
+        {
+          "src": "../vite.svg",
+          "type": "image/svg+xml",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }
