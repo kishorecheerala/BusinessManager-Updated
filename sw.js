@@ -1,12 +1,12 @@
 
-const CACHE_NAME = 'business-manager-cache-v18';
+const CACHE_NAME = 'business-manager-cache-v19';
 
-// Absolute paths for root domain hosting
+// Relative paths to ensure compatibility with subdirectories or root hosting
 const APP_SHELL_URLS = [
-  '/',
-  '/index.html',
-  '/vite.svg',
-  '/manifest.json'
+  './',
+  './index.html',
+  './vite.svg',
+  './manifest.json'
 ];
 
 self.addEventListener('install', event => {
@@ -36,6 +36,7 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // Only handle GET requests
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
@@ -47,20 +48,26 @@ self.addEventListener('fetch', event => {
       return; 
   }
 
-  // SPA Navigation Strategy: Network -> Cache (/index.html)
-  // This ensures the PWA start_url check passes even if offline
+  // Navigation Strategy: Network -> Cache -> Index.html Fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request)
         .catch(() => {
-          return caches.match('/index.html')
-            .then(response => response || caches.match('/')); // Fallback
+          return caches.match(event.request)
+            .then(response => {
+              // If exact page match (e.g. /?mode=pwa) exists, return it
+              if (response) return response;
+              // Otherwise return the SPA root
+              return caches.match('./index.html');
+            });
         })
     );
     return;
   }
 
-  // Asset Strategy: Cache First -> Network
+  // Asset Strategy: Stale-While-Revalidate (good for icons/manifest)
+  // or Cache First (good for immutable assets). 
+  // Using Cache First falling back to Network here for stability.
   event.respondWith(
     caches.match(event.request)
       .then(cachedResponse => {
@@ -68,9 +75,11 @@ self.addEventListener('fetch', event => {
           return cachedResponse;
         }
         return fetch(event.request).then(networkResponse => {
+          // Check if we received a valid response
           if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
             return networkResponse;
           }
+          // Clone the response
           const responseToCache = networkResponse.clone();
           caches.open(CACHE_NAME)
             .then(cache => {

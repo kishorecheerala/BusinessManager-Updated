@@ -1,39 +1,21 @@
 {
   "short_name": "Business Mgr",
   "name": "Business Manager Pro",
-  "id": "/",
-  "start_url": "/",
+  "id": "business-manager-pro",
+  "start_url": "./?mode=pwa",
   "background_color": "#f8fafc",
   "display": "standalone",
-  "scope": "/",
+  "scope": "./",
   "theme_color": "#f8fafc",
-  "orientation": "portrait-primary",
-  "description": "A comprehensive sales, purchase, and customer management application for a small business.",
+  "orientation": "portrait",
+  "description": "A comprehensive sales, purchase, and customer management application.",
   "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "/vite.svg",
+      "src": "./vite.svg",
       "type": "image/svg+xml",
-      "sizes": "192x192",
-      "purpose": "any"
-    },
-    {
-      "src": "/vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "512x512",
-      "purpose": "any"
-    },
-    {
-      "src": "/vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192",
-      "purpose": "maskable"
-    },
-    {
-      "src": "/vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "512x512",
-      "purpose": "maskable"
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
     }
   ],
   "shortcuts": [
@@ -41,15 +23,8 @@
       "name": "New Sale",
       "short_name": "Sale",
       "description": "Create a new sales invoice",
-      "url": "/?action=new_sale",
-      "icons": [{ "src": "/vite.svg", "sizes": "192x192", "type": "image/svg+xml" }]
-    },
-    {
-      "name": "New Customer",
-      "short_name": "Customer",
-      "description": "Add a new customer",
-      "url": "/?action=new_customer",
-      "icons": [{ "src": "/vite.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+      "url": "./?action=new_sale",
+      "icons": [{ "src": "./vite.svg", "sizes": "192x192", "type": "image/svg+xml" }]
     }
   ]
 }
