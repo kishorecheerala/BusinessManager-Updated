@@ -13,6 +13,7 @@ import PinModal from '../components/PinModal';
 import DatePill from '../components/DatePill';
 import CheckpointsModal from '../components/CheckpointsModal';
 import { GoogleGenAI } from "@google/genai";
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface DashboardProps {
     setCurrentPage: (page: Page) => void;
@@ -55,6 +56,9 @@ const MetricCard: React.FC<{
         </div>
     </div>
 );
+
+// ... (SmartAnalystCard, BackupStatusAlert, OverdueDuesCard, UpcomingPurchaseDuesCard, LowStockCard - Keep content same, just omitting for brevity in diff)
+// ... Keep all other components ...
 
 const SmartAnalystCard: React.FC<{ 
     sales: Sale[], 
@@ -586,6 +590,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     const { state, dispatch, showToast } = useAppContext();
     const { customers, sales, purchases, products, app_metadata, suppliers, returns, profile, expenses } = state;
     const { showConfirm, showAlert } = useDialog();
+    const { isInstallable, install } = usePWAInstall();
     
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
@@ -804,6 +809,27 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     <DatePill />
                 </div>
             </div>
+
+            {/* Install Prompt Banner - If Installable */}
+            {isInstallable && (
+                <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-down-fade mb-4">
+                    <div className="flex items-center gap-3">
+                        <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                            <Download size={24} />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-base">Install App for Offline Use</h3>
+                            <p className="text-xs opacity-90">Get the best experience with full screen & faster loading.</p>
+                        </div>
+                    </div>
+                    <button 
+                        onClick={install} 
+                        className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-gray-100 transition-colors whitespace-nowrap w-full sm:w-auto"
+                    >
+                        Install Now
+                    </button>
+                </div>
+            )}
             
             <SmartAnalystCard 
                 sales={sales} 

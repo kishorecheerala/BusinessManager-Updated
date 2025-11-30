@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles } from 'lucide-react';
+import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone } from 'lucide-react';
 import { Page } from '../types';
 import { useAppContext } from '../context/AppContext';
 import AuditLogPanel from './AuditLogPanel';
@@ -11,6 +11,7 @@ import PinModal from './PinModal';
 import InvoiceSettingsModal from './InvoiceSettingsModal';
 import APIConfigModal from './APIConfigModal';
 import UISettingsModal from './UISettingsModal';
+import { usePWAInstall } from '../hooks/usePWAInstall';
 
 interface MenuPanelProps {
   isOpen: boolean;
@@ -98,6 +99,8 @@ const getContrastColor = (hexColor: string) => {
 
 const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, onNavigate, onOpenDevTools, onLockApp, onOpenChangeLog }) => {
     const { state, dispatch, googleSignIn, googleSignOut, syncData } = useAppContext();
+    const { isInstallable, install } = usePWAInstall();
+    
     const [isAuditOpen, setIsAuditOpen] = useState(false);
     const [isCloudDebugOpen, setIsCloudDebugOpen] = useState(false);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
@@ -236,6 +239,27 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                         </div>
                     </div>
                 </div>
+
+                {/* 1.5 INSTALL PWA BUTTON */}
+                {isInstallable && (
+                    <div className="px-3 mb-2 animate-fade-in-up">
+                        <button 
+                            onClick={install} 
+                            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 text-white p-3 rounded-xl shadow-lg flex items-center justify-between group transform hover:scale-[1.02] transition-all"
+                        >
+                            <div className="flex items-center gap-3">
+                                <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                                    <Download size={20} className="text-white" />
+                                </div>
+                                <div className="text-left">
+                                    <p className="font-bold text-sm">Download App</p>
+                                    <p className="text-[10px] opacity-90 font-medium">Install for offline use & fullscreen</p>
+                                </div>
+                            </div>
+                            <ChevronRight className="opacity-70 group-hover:translate-x-1 transition-transform" />
+                        </button>
+                    </div>
+                )}
 
                 {/* 2. Main Navigation & Actions */}
                 <div className="p-2 space-y-1 border-b border-gray-100 dark:border-slate-700 pb-3">
