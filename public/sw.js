@@ -1,71 +1,140 @@
+const CACHE_VERSION = 'v1';
+const CACHE_NAME = `business-manager-${CACHE_VERSION}`;
 
-const CACHE_NAME = 'business-manager-cache-v7'; // Bump version to force update
-const URLS_TO_CACHE = [
-  './index.html',
-  './manifest.json',
-  './vite.svg'
-];
-
-// On install, cache the app shell
+// ==============================================================
+// INSTALL - Cache critical files
+// ==============================================================
 self.addEventListener('install', (event) => {
+  console.log('[SW] Installing Service Worker');
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('SW: Caching app shell');
-        return cache.addAll(URLS_TO_CACHE);
+        console.log('[SW] Opened cache:', CACHE_NAME);
+        // Only cache the homepage - that's all we need
+        return cache.addAll(['/'])
+          .catch((error) => {
+            console.warn('[SW] Cache addAll error (may be normal):', error);
+            // Don't fail install if caching fails - still activate
+          });
       })
-      .then(() => self.skipWaiting()) // Activate new SW immediately
+      .catch((error) => {
+        console.error('[SW] Cache open error:', error);
+      })
   );
+  
+  // Activate immediately, don't wait for clients
+  self.skipWaiting();
 });
 
-// On activate, clean up old caches to save space
+// ==============================================================
+// ACTIVATE - Clean old caches
+// ==============================================================
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating Service Worker');
+  
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter(name => name !== CACHE_NAME)
-          .map(name => caches.delete(name))
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((cacheName) => cacheName !== CACHE_NAME)
+            .map((cacheName) => {
+              console.log('[SW] Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            })
+        );
+      })
+      .catch((error) => {
+        console.error('[SW] Activate error:', error);
+      })
   );
+  
+  self.clients.claim();
 });
 
-// On fetch, use a robust cache-first strategy
+// ==============================================================
+// FETCH - Serve from cache, fallback to network
+// ==============================================================
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-
-  // For navigation requests (loading the app), always serve index.html from cache first.
-  // This is the most important part for the installability check.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      caches.open(CACHE_NAME)
-        .then(cache => cache.match('./index.html'))
-        .then(response => response || fetch('./index.html')) // Fallback to network
-    );
+  
+  // Only handle GET requests
+  if (request.method !== 'GET') {
     return;
   }
   
-  // For other requests (CDN scripts, fonts, etc.), try cache then network.
-  // This ensures that even if the CDN is down, the app might still work if assets are cached.
+  // Check if request is from same origin
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+  
+  // Strategy: Try cache first, then network
   event.respondWith(
-    caches.match(request).then(cachedResponse => {
-      // If we have it in cache, return it
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      
-      // Otherwise, go to network and cache the response for next time
-      return fetch(request).then(networkResponse => {
-        // Check if we received a valid response and it's from a safe source (to avoid caching errors)
-        if (networkResponse && networkResponse.status === 200 && request.method === 'GET' && (request.url.startsWith(self.location.origin) || request.url.includes('aistudiocdn.com'))) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseToCache);
-          });
+    caches.match(request)
+      .then((cachedResponse) => {
+        // If found in cache, return it
+        if (cachedResponse) {
+          console.log('[SW] Cache hit:', request.url);
+          return cachedResponse;
         }
-        return networkResponse;
-      });
-    })
+        
+        // Otherwise fetch from network
+        return fetch(request)
+          .then((response) => {
+            // Check if response is valid
+            if (!response || response.status !== 200 || response.type === 'error') {
+              console.warn('[SW] Invalid response:', response?.status);
+              return response;
+            }
+            
+            // Clone the response for caching
+            const responseToCache = response.clone();
+            
+            // Cache it for next time
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(request, responseToCache)
+                  .catch((error) => {
+                    console.warn('[SW] Cache put error:', error);
+                  });
+              })
+              .catch((error) => {
+                console.warn('[SW] Cache open error:', error);
+              });
+            
+            return response;
+          })
+          .catch((error) => {
+            console.error('[SW] Fetch error:', error);
+            
+            // If offline, try to return cached version
+            return caches.match(request)
+              .then((cachedResponse) => {
+                if (cachedResponse) {
+                  console.log('[SW] Returning cached fallback for offline');
+                  return cachedResponse;
+                }
+                
+                // Last resort: return homepage
+                return caches.match('/');
+              })
+              .catch((cacheError) => {
+                console.error('[SW] Fallback error:', cacheError);
+                // Return a basic response so app doesn't crash
+                return new Response('Offline - no cached content available', {
+                  status: 503,
+                  statusText: 'Service Unavailable'
+                });
+              });
+          });
+      })
+      .catch((error) => {
+        console.error('[SW] Match error:', error);
+        return new Response('Error', { status: 500 });
+      })
   );
 });
+
+console.log('[SW] Service Worker loaded successfully');

@@ -1,70 +1,133 @@
-const CACHE_NAME = 'business-manager-cache-v7'; // Bump version to force update
-const URLS_TO_CACHE = [
-  './index.html',
-  './manifest.json',
-  './vite.svg'
-];
 
-// On install, cache the app shell
+const CACHE_VERSION = 'v1';
+const CACHE_NAME = `business-manager-${CACHE_VERSION}`;
+
+// ==============================================================
+// INSTALL - Cache critical files
+// ==============================================================
 self.addEventListener('install', (event) => {
+  console.log('[SW] Installing Service Worker');
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('SW: Caching app shell');
-        return cache.addAll(URLS_TO_CACHE);
+        console.log('[SW] Opened cache:', CACHE_NAME);
+        // Only cache the homepage to start - keeps it lightweight and less prone to failure
+        // The rest will be cached as they are fetched (runtime caching)
+        return cache.addAll(['./', './index.html'])
+          .catch((error) => {
+            console.warn('[SW] Cache addAll error (non-critical):', error);
+          });
       })
-      .then(() => self.skipWaiting()) // Activate new SW immediately
+      .catch((error) => {
+        console.error('[SW] Cache open error:', error);
+      })
   );
+  
+  // Activate immediately, don't wait for clients
+  self.skipWaiting();
 });
 
-// On activate, clean up old caches to save space
+// ==============================================================
+// ACTIVATE - Clean old caches
+// ==============================================================
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activating Service Worker');
+  
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter(name => name !== CACHE_NAME)
-          .map(name => caches.delete(name))
-      );
-    }).then(() => self.clients.claim())
+    caches.keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((cacheName) => cacheName !== CACHE_NAME)
+            .map((cacheName) => {
+              console.log('[SW] Deleting old cache:', cacheName);
+              return caches.delete(cacheName);
+            })
+        );
+      })
+      .catch((error) => {
+        console.error('[SW] Activate error:', error);
+      })
   );
+  
+  self.clients.claim();
 });
 
-// On fetch, use a robust cache-first strategy
+// ==============================================================
+// FETCH - Serve from cache, fallback to network
+// ==============================================================
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-
-  // For navigation requests (loading the app), always serve index.html from cache first.
-  // This is the most important part for the installability check.
-  if (request.mode === 'navigate') {
-    event.respondWith(
-      caches.open(CACHE_NAME)
-        .then(cache => cache.match('./index.html'))
-        .then(response => response || fetch('./index.html')) // Fallback to network
-    );
+  
+  // Only handle GET requests
+  if (request.method !== 'GET') {
     return;
   }
   
-  // For other requests (CDN scripts, fonts, etc.), try cache then network.
-  // This ensures that even if the CDN is down, the app might still work if assets are cached.
+  // Skip cross-origin requests (like Google Fonts, APIs) to prevent opaque response issues
+  // or handle them with a network-first strategy if needed.
+  // For now, we focus on app assets.
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) {
+    return; 
+  }
+  
+  // Strategy: Try cache first, then network
   event.respondWith(
-    caches.match(request).then(cachedResponse => {
-      // If we have it in cache, return it
-      if (cachedResponse) {
-        return cachedResponse;
-      }
-      
-      // Otherwise, go to network and cache the response for next time
-      return fetch(request).then(networkResponse => {
-        // Check if we received a valid response and it's from a safe source (to avoid caching errors)
-        if (networkResponse && networkResponse.status === 200 && request.method === 'GET' && (request.url.startsWith(self.location.origin) || request.url.includes('aistudiocdn.com'))) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(request, responseToCache);
-          });
+    caches.match(request)
+      .then((cachedResponse) => {
+        // If found in cache, return it
+        if (cachedResponse) {
+          return cachedResponse;
         }
-        return networkResponse;
-      });
-    })
+        
+        // Otherwise fetch from network
+        return fetch(request)
+          .then((response) => {
+            // Check if response is valid
+            if (!response || response.status !== 200 || response.type === 'error') {
+              return response;
+            }
+            
+            // Clone the response for caching
+            const responseToCache = response.clone();
+            
+            // Cache it for next time
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(request, responseToCache)
+                  .catch((error) => {
+                    // Quota exceeded or other error - just ignore, app still works
+                    console.warn('[SW] Cache put error:', error);
+                  });
+              })
+              .catch((err) => {
+                 console.warn('[SW] Cache open failed during fetch:', err);
+              });
+            
+            return response;
+          })
+          .catch((error) => {
+            console.error('[SW] Fetch error:', error);
+            
+            // If offline, try to return cached index.html for navigation requests
+            if (request.mode === 'navigate') {
+                return caches.match('./index.html');
+            }
+            
+            // Return a simple offline text or error
+            return new Response('Offline - Content not available', {
+              status: 503,
+              statusText: 'Service Unavailable'
+            });
+          });
+      })
+      .catch((error) => {
+        console.error('[SW] Match error:', error);
+        return new Response('Error', { status: 500 });
+      })
   );
 });
+
+console.log('[SW] Service Worker loaded successfully');
