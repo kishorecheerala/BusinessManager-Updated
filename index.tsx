@@ -9,28 +9,32 @@ if (!rootElement) {
 }
 
 // Service Worker Registration
-if ('serviceWorker' in navigator && 'caches' in window) {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Construct absolute URL using the current window location to ensure origin matching.
-    // This fixes the "origin mismatch" error in preview environments (like AI Studio)
-    // where relative paths might resolve to the editor's domain instead of the preview frame.
-    const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/') + 1);
-    const swUrl = new URL('sw.js', window.location.origin + basePath).href;
-
-    navigator.serviceWorker
-      .register(swUrl, { scope: './' })
-      .then((registration) => {
-        console.log('✅ SW registered at scope:', registration.scope);
-        
-        // Check for updates every 10 minutes
-        setInterval(() => {
-          registration.update();
-        }, 600000);
-      })
-      .catch((err) => {
-        // Log gracefully; offline mode might be unavailable in some previews
-        console.warn('SW registration warning:', err.message);
-      });
+    // First, unregister ALL old service workers to ensure clean state
+    // We catch errors here to prevent "The document is in an invalid state" from crashing the app
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (let registration of registrations) {
+        console.log('[App] Unregistering old SW:', registration.scope);
+        registration.unregister();
+      }
+      
+      // Wait a moment, then register the new one
+      setTimeout(() => {
+        navigator.serviceWorker
+          .register('/sw.js', { scope: '/' })
+          .then((registration) => {
+            console.log('✅ New SW registered successfully');
+            console.log('   Scope:', registration.scope);
+          })
+          .catch((err) => {
+            console.error('❌ New SW registration failed:', err.message);
+          });
+      }, 500);
+    }).catch((err) => {
+        // This catch block handles "Failed to get ServiceWorkerRegistration objects: The document is in an invalid state."
+        console.warn('Service Worker registration skipped/failed (likely due to page unload):', err);
+    });
   });
 }
 
