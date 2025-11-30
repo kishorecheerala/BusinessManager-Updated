@@ -1,104 +1,12 @@
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { Sale, Customer, ProfileData, Purchase, Supplier, Return, Quote, InvoiceTemplateConfig, CustomFont, InvoiceLabels } from '../types';
+import { Sale, Customer, ProfileData, InvoiceTemplateConfig, CustomFont, Quote, Return, Supplier } from '../types';
 import { logoBase64 } from './logo';
 
-// --- Number to Words (Indian Currency - Robust Recursive) ---
-const numberToWords = (n: number): string => {
-    const num = Math.floor(n);
-    const paise = Math.round((n - num) * 100);
-    
-    if (num === 0) return "Zero";
+// --- Constants & Helpers ---
 
-    const units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-    const tens = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
-
-    const convert = (n: number): string => {
-        if (n < 20) return units[n];
-        if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + units[n % 10] : "");
-        if (n < 1000) return units[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " and " + convert(n % 100) : "");
-        if (n < 100000) return convert(Math.floor(n / 1000)) + " Thousand" + (n % 1000 !== 0 ? " " + convert(n % 1000) : "");
-        if (n < 10000000) return convert(Math.floor(n / 100000)) + " Lakh" + (n % 100000 !== 0 ? " " + convert(n % 100000) : "");
-        return convert(Math.floor(n / 10000000)) + " Crore" + (n % 10000000 !== 0 ? " " + convert(n % 10000000) : "");
-    };
-
-    let str = convert(num) + " Rupees";
-    if (paise > 0) {
-        str += " and " + convert(paise) + " Paise";
-    }
-    
-    return str + " Only";
-};
-
-// --- Helper: Fetch QR Code ---
-export const getQrCodeBase64 = async (data: string): Promise<string> => {
-    try {
-        const response = await fetch(`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(data)}&size=200x200&margin=0`);
-        const blob = await response.blob();
-        return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-        });
-    } catch (e) {
-        return '';
-    }
-};
-
-// --- Helper: Detect Image Type ---
-export const getImageType = (dataUrl: string): string => {
-    if (!dataUrl) return 'PNG';
-    // Robust Case Insensitive Checks for Common Types
-    const header = dataUrl.substring(0, 30).toLowerCase();
-    
-    if (header.includes('image/png')) return 'PNG';
-    if (header.includes('image/jpeg') || header.includes('image/jpg')) return 'JPEG';
-    if (header.includes('image/webp')) return 'WEBP';
-    
-    // Fallback: Check magic bytes for base64 without prefix
-    if (dataUrl.startsWith('/9j/')) return 'JPEG';
-    if (dataUrl.startsWith('iVBORw0KGgo')) return 'PNG';
-    if (dataUrl.startsWith('UklGR')) return 'WEBP';
-    
-    return 'PNG'; // Default
-};
-
-// --- Helper: Register Custom Fonts ---
-const registerCustomFonts = (doc: jsPDF, fonts: CustomFont[]) => {
-    if (!fonts || fonts.length === 0) return;
-    fonts.forEach(font => {
-        try {
-            let cleanData = font.data;
-            if (cleanData.includes(',')) cleanData = cleanData.split(',')[1];
-            const filename = `${font.name}.ttf`;
-            doc.addFileToVFS(filename, cleanData);
-            doc.addFont(filename, font.name, 'normal');
-            doc.addFont(filename, font.name, 'bold');
-            doc.addFont(filename, font.name, 'italic');
-        } catch (e) { console.error(`Failed to register font ${font.name}`, e); }
-    });
-};
-
-const formatDate = (dateString: string, format: string) => {
-    const d = new Date(dateString);
-    if (isNaN(d.getTime())) return dateString;
-    const day = d.getDate().toString().padStart(2, '0');
-    const month = (d.getMonth() + 1).toString().padStart(2, '0');
-    const year = d.getFullYear();
-    if (format === 'MM/DD/YYYY') return `${month}/${day}/${year}`;
-    if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`;
-    return `${day}/${month}/${year}`;
-};
-
-const formatCurrency = (amount: number, symbol: string, fontName: string): string => {
-    // Some basic fonts don't support the Rupee symbol
-    const isStandardFont = ['helvetica', 'times', 'courier'].includes(fontName.toLowerCase());
-    const safeSymbol = (isStandardFont && symbol === '₹') ? 'Rs.' : symbol;
-    return `${safeSymbol} ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-};
-
-export const defaultLabels: InvoiceLabels = {
+const defaultLabels: any = {
     billedTo: "Billed To",
     invoiceNo: "Invoice No",
     date: "Date",
@@ -114,15 +22,95 @@ export const defaultLabels: InvoiceLabels = {
     balance: "Balance"
 };
 
+const registerCustomFonts = (doc: jsPDF, fonts: CustomFont[]) => {
+    fonts.forEach(font => {
+        try {
+            // Assuming font.data is base64
+            const fontData = font.data.split(',')[1] || font.data;
+            doc.addFileToVFS(`${font.name}.ttf`, fontData);
+            doc.addFont(`${font.name}.ttf`, font.name, 'normal');
+            doc.addFont(`${font.name}.ttf`, font.name, 'bold'); // Fallback
+        } catch(e) {
+            console.warn(`Failed to register font ${font.name}`, e);
+        }
+    });
+};
+
+const getImageType = (dataUrl: string): string => {
+    if (dataUrl.startsWith('data:image/png')) return 'PNG';
+    if (dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+    if (dataUrl.startsWith('data:image/webp')) return 'WEBP';
+    return 'JPEG'; // Fallback
+};
+
+const formatDate = (dateStr: string, format: string = 'DD/MM/YYYY'): string => {
+    const d = new Date(dateStr);
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    
+    if (format === 'MM/DD/YYYY') return `${month}/${day}/${year}`;
+    if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`;
+    return `${day}/${month}/${year}`;
+};
+
+const formatCurrency = (amount: number, symbol: string = 'Rs.', fontName: string = 'helvetica'): string => {
+    // Only use symbol if font supports it (standard fonts might not support ₹ symbol directly if not encoded properly in PDF)
+    // For simplicity, we use the symbol string provided
+    return `${symbol} ${amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
+};
+
+const getQrCodeBase64 = async (data: string): Promise<string> => {
+    try {
+        const url = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(data)}&size=200x200&margin=0`;
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.warn("QR Gen failed", e);
+        return '';
+    }
+};
+
+const numberToWords = (n: number): string => {
+    const num = Math.round(n);
+    if (num === 0) return "Zero";
+    
+    const a = ['','One ','Two ','Three ','Four ','Five ','Six ','Seven ','Eight ','Nine ','Ten ','Eleven ','Twelve ','Thirteen ','Fourteen ','Fifteen ','Sixteen ','Seventeen ','Eighteen ','Nineteen '];
+    const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
+
+    const inWords = (num: number): string => {
+        if ((num = num.toString() as any).length > 9) return 'overflow';
+        const n: any = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if (!n) return ""; 
+        let str = '';
+        str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
+        str += (n[2] != 0) ? (a[Number(n[2])] || b[n[2][0]] + ' ' + a[n[2][1]]) + 'Lakh ' : '';
+        str += (n[3] != 0) ? (a[Number(n[3])] || b[n[3][0]] + ' ' + a[n[3][1]]) + 'Thousand ' : '';
+        str += (n[4] != 0) ? (a[Number(n[4])] || b[n[4][0]] + ' ' + a[n[4][1]]) + 'Hundred ' : '';
+        str += (n[5] != 0) ? ((str != '') ? 'and ' : '') + (a[Number(n[5])] || b[n[5][0]] + ' ' + a[n[5][1]]) : '';
+        return str;
+    };
+    return inWords(num) + " Only";
+};
+
 // --- Thermal Receipt Generator (Fixed / Legacy Mode) ---
+// UPDATED: Now supports 4-inch (112mm) width with Tight Spacing
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, templateConfig?: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
-    // If we have template config, try to use it as much as possible for fonts/logos, but layout is fixed for thermal paper
     const labels = { ...defaultLabels, ...templateConfig?.content.labels };
     const currencySymbol = templateConfig?.currencySymbol || 'Rs.';
     const currency = customFonts?.length ? currencySymbol : 'Rs.';
+    
+    // Dimensions for 4-inch (112mm) roll
     const margin = 2;
-    const pageWidth = 72; 
-    const centerX = 40; 
+    const widthFull = 112; 
+    const pageWidth = widthFull - (margin * 2);
+    const centerX = widthFull / 2;
 
     const renderContent = (doc: jsPDF) => {
         let y = 5;
@@ -130,21 +118,21 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
 
         if (profile?.logo) {
             try {
-                const logoWidth = 18;
-                let logoHeight = 18;
+                const logoWidth = 20; // Slightly larger logo for 4 inch
+                let logoHeight = 20;
                 const props = doc.getImageProperties(profile.logo);
                 logoHeight = logoWidth / (props.width / props.height);
                 doc.addImage(profile.logo, getImageType(profile.logo), centerX - (logoWidth/2), y, logoWidth, logoHeight);
-                y += logoHeight + 3;
+                y += logoHeight + 2; // Tight spacing
             } catch(e) {}
         }
 
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(11);
+        doc.setFontSize(12);
         doc.text(doc.splitTextToSize(profile?.name || 'Business Name', pageWidth), centerX, y, { align: 'center' });
-        y += 5;
+        y += 4.5;
 
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
         if (profile?.address) {
             const addr = doc.splitTextToSize(profile.address, pageWidth);
@@ -156,48 +144,48 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
             y += 4;
         }
 
-        doc.line(margin, y, 80 - margin, y); y += 4;
-        doc.setFontSize(9);
+        doc.line(margin, y, widthFull - margin, y); y += 3;
+        doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text(templateConfig?.content.titleText || 'TAX INVOICE', centerX, y, { align: 'center' });
-        y += 5;
+        y += 4;
 
-        doc.setFontSize(8);
+        doc.setFontSize(9);
         doc.setFont('helvetica', 'normal');
-        doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y); y += 4;
-        doc.text(`${labels.date}: ${formatDate(sale.date, 'DD/MM/YYYY')}`, margin, y); y += 4;
-        doc.text(`${labels.billedTo}: ${customer.name}`, margin, y); y += 5;
+        doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y); y += 3.5;
+        doc.text(`${labels.date}: ${formatDate(sale.date, 'DD/MM/YYYY')}`, margin, y); y += 3.5;
+        doc.text(`${labels.billedTo}: ${customer.name}`, margin, y); y += 4;
 
-        doc.line(margin, y, 80 - margin, y); y += 4;
+        doc.line(margin, y, widthFull - margin, y); y += 3;
         doc.setFont('helvetica', 'bold');
         doc.text(labels.item, margin, y);
-        doc.text(labels.amount, 80 - margin, y, { align: 'right' });
+        doc.text(labels.amount, widthFull - margin, y, { align: 'right' });
         y += 2;
-        doc.line(margin, y, 80 - margin, y); y += 4;
+        doc.line(margin, y, widthFull - margin, y); y += 3;
 
         doc.setFont('helvetica', 'normal');
         sale.items.forEach(item => {
             const itemTotal = Number(item.price) * Number(item.quantity);
-            const name = doc.splitTextToSize(item.productName, 50);
+            const name = doc.splitTextToSize(item.productName, 85); // Wider text area
             doc.text(name, margin, y);
-            doc.text(itemTotal.toLocaleString('en-IN'), 80 - margin, y, { align: 'right' });
+            doc.text(itemTotal.toLocaleString('en-IN'), widthFull - margin, y, { align: 'right' });
             y += (name.length * 3.5);
-            doc.setFontSize(7);
-            doc.text(`${item.quantity} x ${Number(item.price).toLocaleString('en-IN')}`, margin, y);
             doc.setFontSize(8);
-            y += 4;
+            doc.text(`${item.quantity} x ${Number(item.price).toLocaleString('en-IN')}`, margin, y);
+            doc.setFontSize(9);
+            y += 3.5;
         });
 
-        doc.line(margin, y, 80 - margin, y); y += 4;
+        doc.line(margin, y, widthFull - margin, y); y += 3;
         
         const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
         const paid = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
         
         const addRow = (l: string, v: string, b = false) => {
             doc.setFont('helvetica', b ? 'bold' : 'normal');
-            doc.text(l, 45, y, { align: 'right' });
-            doc.text(v, 80 - margin, y, { align: 'right' });
-            y += 4;
+            doc.text(l, 60, y, { align: 'right' });
+            doc.text(v, widthFull - margin, y, { align: 'right' });
+            y += 3.5;
         }
 
         addRow(labels.subtotal, subTotal.toLocaleString('en-IN'));
@@ -207,16 +195,16 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
             addRow(labels.balance, `${currency} ${(Number(sale.totalAmount) - paid).toLocaleString('en-IN')}`, true);
         }
 
-        y += 5;
+        y += 4;
         doc.setFont('helvetica', 'italic');
         const footerLines = doc.splitTextToSize(templateConfig?.content.footerText || 'Thank You!', pageWidth);
         doc.text(footerLines, centerX, y, { align: 'center' });
         return y + (footerLines.length * 4) + 5;
     };
 
-    const dummy = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, 2000] });
+    const dummy = new jsPDF({ orientation: 'p', unit: 'mm', format: [112, 2000] });
     const h = renderContent(dummy);
-    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [80, h] });
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [112, h] });
     renderContent(doc);
     return doc;
 };
@@ -244,7 +232,7 @@ const _generateConfigurablePDF = async (
     customPaperSize?: [number, number] // Optional override for receipt width
 ): Promise<jsPDF> => {
     
-    // Support custom paper size array (e.g. [80, 200] for receipt preview)
+    // Support custom paper size array (e.g. [112, 200] for receipt preview)
     let doc: jsPDF;
     if (customPaperSize) {
         doc = new jsPDF({ orientation: 'p', unit: 'mm', format: customPaperSize });
@@ -423,11 +411,11 @@ const _generateConfigurablePDF = async (
             return;
         }
         
-        const isSmallPaper = pageWidth < 100;
+        const isReceiptFormat = pageWidth < 120; // 112mm or smaller
         const gridY = currentY;
         const lineHeight = 5 * spacingScale;
 
-        if (isSmallPaper) {
+        if (isReceiptFormat) {
             // Stacked Layout for Receipts
             doc.setFont(fonts.bodyFont, 'bold');
             doc.setFontSize(11);
@@ -533,7 +521,7 @@ const _generateConfigurablePDF = async (
         const cw = layout.columnWidths || {};
         
         // Auto-adjust column widths for small paper (Receipts)
-        const isSmallPaper = pageWidth < 100;
+        const isReceiptFormat = pageWidth < 120;
         
         // When using 'bordered' mode, we need to pass styles to autoTable
         const tableStyles: any = { 
@@ -562,8 +550,8 @@ const _generateConfigurablePDF = async (
                 ...(layout.borderRadius ? { minCellHeight: 8 } : {}) // Heuristic for rounded looks
             },
             columnStyles: {
-                0: { cellWidth: isSmallPaper ? 6 : 10, halign: 'center' },
-                [tableHead.length - 1]: { halign: 'right', cellWidth: isSmallPaper ? 20 : (cw.amount || 35) }, 
+                0: { cellWidth: isReceiptFormat ? 6 : 10, halign: 'center' },
+                [tableHead.length - 1]: { halign: 'right', cellWidth: isReceiptFormat ? 25 : (cw.amount || 35) }, 
                 [tableHead.length - 2]: { halign: 'right', cellWidth: hideRate ? (cw.qty || 15) : (cw.rate || 20) }, 
                 [tableHead.length - 3]: { halign: 'right', cellWidth: cw.qty || 15 }, 
             },
@@ -837,7 +825,7 @@ export const generateA4InvoicePdf = async (sale: Sale, customer: Customer, profi
 
 // Configurable Receipt Generation
 export const generateReceiptPDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, templateConfig: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
-    // Re-use the A4 logic but pass custom paper size
+    // UPDATED: Use custom 4-inch paper (112mm) width, variable height
     const config = templateConfig;
     const labels = { ...defaultLabels, ...config.content.labels };
     const currency = config.currencySymbol || 'Rs.';
@@ -859,8 +847,8 @@ export const generateReceiptPDF = async (sale: Sale, customer: Customer, profile
         totals, qrString: sale.id, grandTotalNumeric: Number(sale.totalAmount), balanceDue: dueAmount
     };
     
-    // Receipt dimensions: 80mm width, auto height approximated by long page
-    return _generateConfigurablePDF(data, profile, config, customFonts, [80, 297]); 
+    // Receipt dimensions: 112mm width, auto height approximated by long page
+    return _generateConfigurablePDF(data, profile, config, customFonts, [112, 297]); 
 };
 
 export const generateEstimatePDF = async (quote: Quote, customer: Customer, profile: ProfileData | null, templateConfig: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
