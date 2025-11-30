@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'business-manager-cache-v14';
+const CACHE_NAME = 'business-manager-cache-v15';
 
 // The essential files that make up the app's shell.
 const APP_SHELL_URLS = [

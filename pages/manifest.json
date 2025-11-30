@@ -1,35 +1,8 @@
-
 {
   "short_name": "Business Mgr",
   "name": "Business Manager Pro",
-  "id": "?source=pwa",
-  "icons": [
-    {
-      "src": "./vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192",
-      "purpose": "any"
-    },
-    {
-      "src": "./vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "192x192",
-      "purpose": "maskable"
-    },
-    {
-      "src": "./vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "512x512",
-      "purpose": "any"
-    },
-    {
-      "src": "./vite.svg",
-      "type": "image/svg+xml",
-      "sizes": "512x512",
-      "purpose": "maskable"
-    }
-  ],
-  "start_url": "/?source=pwa",
+  "id": "/",
+  "start_url": "/",
   "background_color": "#f8fafc",
   "display": "standalone",
   "scope": "/",
@@ -37,7 +10,32 @@
   "orientation": "portrait-primary",
   "description": "A comprehensive sales, purchase, and customer management application for a small business.",
   "categories": ["business", "finance", "productivity"],
-  "display_override": ["window-controls-overlay", "standalone"],
+  "icons": [
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
   "shortcuts": [
     {
       "name": "New Sale",
