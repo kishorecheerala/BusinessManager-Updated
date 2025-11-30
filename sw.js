@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'business-manager-cache-v19';
+const CACHE_NAME = 'business-manager-cache-v20';
 
 // Relative paths to ensure compatibility with subdirectories or root hosting
 const APP_SHELL_URLS = [
