@@ -1,12 +1,13 @@
 
-const CACHE_NAME = 'business-manager-cache-v16';
+const CACHE_NAME = 'business-manager-cache-v17';
 
 // The essential files that make up the app's shell.
+// Using relative paths ./ to match manifest.json exactly
 const APP_SHELL_URLS = [
   './',
-  'index.html',
-  'vite.svg',
-  'manifest.json',
+  './index.html',
+  './vite.svg',
+  './manifest.json',
   './?source=pwa'
 ];
 
