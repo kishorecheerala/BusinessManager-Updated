@@ -793,7 +793,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                     )}
 
-                    {/* Receipt Format Selection */}
+                    {/* Receipt Format Selection - Moved to Bottom */}
                     <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border dark:border-slate-600">
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Receipt Format (Share/Download)</label>
                         <div className="flex gap-4">

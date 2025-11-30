@@ -95,9 +95,8 @@ const numberToWords = (n: number): string => {
     const b = ['', '', 'Twenty','Thirty','Forty','Fifty','Sixty','Seventy','Eighty','Ninety'];
 
     const inWords = (num: number): string => {
-        const s = num.toString();
-        if (s.length > 9) return 'overflow';
-        const n: any = ('000000000' + s).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
+        if ((num = num.toString() as any).length > 9) return 'overflow';
+        const n: any = ('000000000' + num).substr(-9).match(/^(\d{2})(\d{2})(\d{2})(\d{1})(\d{2})$/);
         if (!n) return ""; 
         let str = '';
         str += (n[1] != 0) ? (a[Number(n[1])] || b[n[1][0]] + ' ' + a[n[1][1]]) + 'Crore ' : '';
@@ -113,16 +112,12 @@ const numberToWords = (n: number): string => {
 // --- Thermal Receipt Generator (80mm Standard) ---
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, templateConfig?: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
     const currency = 'Rs.';
-    
-    // Standard 3-inch thermal roll width is ~80mm. 
     const widthFull = 80; 
-    const margin = 3;
+    const margin = 4;
     const pageWidth = widthFull - (margin * 2);
     const centerX = widthFull / 2;
 
-    // Helper for generating QR
     let qrCodeBase64: string | null = null;
-    // Default to true if templateConfig is missing
     const showQr = templateConfig?.content.showQr ?? true;
     const showWords = templateConfig?.content.showAmountInWords ?? true;
 
@@ -131,34 +126,40 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     }
 
     const renderContent = (doc: jsPDF) => {
-        let y = 8;
+        let y = 10;
         if (customFonts) registerCustomFonts(doc, customFonts);
 
         // 1. Header (Business Name)
         doc.setFont('times', 'bold');
-        doc.setFontSize(16);
-        doc.setTextColor('#0d9488'); // Teal color similar to screenshot
+        doc.setFontSize(18);
+        doc.setTextColor('#0d9488'); // Teal color from screenshot
         doc.text(profile?.name || 'Business Name', centerX, y, { align: 'center' });
-        y += 5;
+        y += 6;
 
         doc.setTextColor('#000000');
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(9);
 
         // 2. Invoice Meta & QR Code Layout
+        const startMetaY = y;
         const qrSize = 18;
-        const qrX = widthFull - margin - qrSize;
-
-        doc.text(`Invoice: ${sale.id}`, margin, y + 4);
-        doc.text(`Date: ${formatDate(sale.date)}`, margin, y + 9);
         
+        // Invoice Details on Left
+        doc.text(`Invoice: ${sale.id}`, margin, y);
+        y += 5;
+        doc.text(`Date: ${formatDate(sale.date)}`, margin, y);
+        y += 5;
+
+        // QR Code on Right
         if (qrCodeBase64) {
+            // Align top of QR with top of Invoice text
             try {
-                doc.addImage(qrCodeBase64, 'PNG', qrX, y, qrSize, qrSize);
+                doc.addImage(qrCodeBase64, 'PNG', widthFull - margin - qrSize, startMetaY - 4, qrSize, qrSize);
             } catch(e) {}
         }
         
-        y += Math.max(14, qrSize + 2);
+        // Ensure Y is below both text and QR
+        y = Math.max(y, startMetaY + qrSize - 2) + 4;
 
         // 3. Billed To
         doc.setFont('helvetica', 'bold');
@@ -168,6 +169,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         doc.text(customer.name, margin, y);
         y += 4;
         
+        // Wrap address nicely
         const addressLines = doc.splitTextToSize(customer.address, pageWidth);
         doc.text(addressLines, margin, y);
         y += (addressLines.length * 4) + 2;
@@ -181,20 +183,27 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         doc.text('Purchase Details', centerX, y, { align: 'center' });
         y += 3;
         doc.line(margin, y, widthFull - margin, y);
+        y += 5;
+
+        // 5. Items Header (Simplified)
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.text('Item', margin, y);
+        doc.text('Total', widthFull - margin, y, { align: 'right' });
+        y += 2;
+        doc.setDrawColor('#cccccc');
+        doc.line(margin, y, widthFull - margin, y);
         y += 4;
 
-        // Removed Table Headers (Item / Total) as requested ("Rather than full details")
-
-        // 5. Items Loop
+        // 6. Items Loop
         doc.setFont('helvetica', 'normal');
         sale.items.forEach(item => {
             const itemTotal = Number(item.price) * Number(item.quantity);
             
-            // Item Name & Total on same line (wrapped if needed)
+            // Name on Line 1
             doc.setFontSize(9);
             doc.setTextColor('#000000');
             
-            // Calculate width for name to avoid overlap with total
             const totalStr = formatCurrency(itemTotal, currency);
             const totalWidth = doc.getTextWidth(totalStr) + 2;
             const nameWidth = pageWidth - totalWidth - 2;
@@ -202,17 +211,17 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
             const nameLines = doc.splitTextToSize(item.productName, nameWidth);
             doc.text(nameLines, margin, y);
             
-            // Align total with the first line of the name
+            // Total aligned with first line of Name
             doc.text(totalStr, widthFull - margin, y, { align: 'right' });
             
             y += (nameLines.length * 4);
             
-            // Detail line (Quantity @ Price) - indented
+            // Details (Qty @ Rate) on Line 2 (Indented)
             doc.setFontSize(8);
             doc.setTextColor('#555555');
-            doc.text(`(x${item.quantity} @ ${formatCurrency(Number(item.price), currency)})`, margin + 2, y - 1); 
+            doc.text(`(x${item.quantity} @ ${formatCurrency(Number(item.price), currency)})`, margin + 2, y); 
             
-            y += 4;
+            y += 5;
         });
         
         doc.setTextColor('#000000');
@@ -220,7 +229,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         doc.line(margin, y, widthFull - margin, y);
         y += 5;
 
-        // 6. Totals
+        // 7. Totals
         const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
         const paid = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
         const due = Number(sale.totalAmount) - paid;
@@ -230,7 +239,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
             doc.setFontSize(fontSize);
             doc.text(label, widthFull - margin - 25, y, { align: 'right' }); 
             doc.text(value, widthFull - margin, y, { align: 'right' });
-            y += 4.5;
+            y += 5;
         };
 
         if (sale.discount > 0 || sale.gstAmount > 0) {
@@ -243,28 +252,24 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         addTotalRow('Total', formatCurrency(Number(sale.totalAmount), currency), true, 11);
         
         // Amount In Words
-        if (showWords) {
-            y += 1;
-            doc.setFont('helvetica', 'italic');
-            doc.setFontSize(8);
-            doc.setTextColor('#333333');
-            const words = numberToWords(Number(sale.totalAmount));
-            const wordLines = doc.splitTextToSize(words, pageWidth);
-            doc.text(wordLines, widthFull - margin, y, { align: 'right' });
-            y += (wordLines.length * 3.5) + 2;
-            doc.setTextColor('#000000');
-        } else {
-            y += 2;
-        }
+        y += 2;
+        doc.setFont('helvetica', 'italic');
+        doc.setFontSize(8);
+        doc.setTextColor('#333333');
+        const words = numberToWords(Number(sale.totalAmount));
+        const wordLines = doc.splitTextToSize(words, pageWidth);
+        doc.text(wordLines, widthFull - margin, y, { align: 'right' });
+        y += (wordLines.length * 3.5) + 3;
+        doc.setTextColor('#000000');
 
         if (paid > 0) addTotalRow('Paid', formatCurrency(paid, currency));
         if (due > 0) addTotalRow('Due', formatCurrency(due, currency), true, 10);
 
-        // 7. Footer
+        // 8. Footer
         y += 5;
         doc.setFont('helvetica', 'italic');
         doc.setFontSize(8);
-        const footerText = templateConfig?.content.footerText || 'Thank You! Visit Again.';
+        const footerText = templateConfig?.content.footerText || 'Thank You!';
         const footerLines = doc.splitTextToSize(footerText, pageWidth);
         doc.text(footerLines, centerX, y, { align: 'center' });
         y += (footerLines.length * 4);
