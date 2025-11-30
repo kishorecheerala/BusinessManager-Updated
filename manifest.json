@@ -1,3 +1,4 @@
+
 {
   "short_name": "Business Mgr",
   "name": "Business Manager Pro",
@@ -6,8 +7,26 @@
     {
       "src": "/vite.svg",
       "type": "image/svg+xml",
-      "sizes": "192x192 512x512",
-      "purpose": "any maskable"
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/vite.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "maskable"
     }
   ],
   "start_url": "/?source=pwa",
