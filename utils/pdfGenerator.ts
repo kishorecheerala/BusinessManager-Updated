@@ -48,10 +48,13 @@ const formatDate = (dateStr: string, format: string = 'DD/MM/YYYY'): string => {
     const day = String(d.getDate()).padStart(2, '0');
     const month = String(d.getMonth() + 1).padStart(2, '0');
     const year = d.getFullYear();
+    const hours = String(d.getHours()).padStart(2, '0');
+    const minutes = String(d.getMinutes()).padStart(2, '0');
     
     if (format === 'MM/DD/YYYY') return `${month}/${day}/${year}`;
     if (format === 'YYYY-MM-DD') return `${year}-${month}-${day}`;
-    return `${day}/${month}/${year}`;
+    // Default to DD/MM/YYYY with time for receipts
+    return `${day}/${month}/${year}, ${hours}:${minutes}`;
 };
 
 const formatCurrency = (amount: number, symbol: string = 'Rs.', fontName: string = 'helvetica'): string => {
@@ -106,116 +109,168 @@ const numberToWords = (n: number): string => {
     return inWords(num) + " Only";
 };
 
-// --- Thermal Receipt Generator (Fixed / Legacy Mode) ---
-// UPDATED: Now supports 4-inch (112mm) width with Tight Spacing
+// --- Thermal Receipt Generator (80mm Standard) ---
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, templateConfig?: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
-    const labels = { ...defaultLabels, ...templateConfig?.content.labels };
-    
-    // Force 'Rs.' for this specific generator as it uses Helvetica primarily
     const currency = 'Rs.';
     
-    // Dimensions for 4-inch (112mm) roll
-    const margin = 2;
-    const widthFull = 112; 
+    // Standard 3-inch thermal roll width is ~80mm. 
+    const widthFull = 80; 
+    const margin = 4;
     const pageWidth = widthFull - (margin * 2);
     const centerX = widthFull / 2;
 
+    // Helper for generating QR
+    let qrCodeBase64: string | null = null;
+    if (templateConfig?.content.showQr !== false) {
+         qrCodeBase64 = await getQrCodeBase64(sale.id);
+    }
+
     const renderContent = (doc: jsPDF) => {
-        let y = 5;
+        let y = 10;
         if (customFonts) registerCustomFonts(doc, customFonts);
 
-        if (profile?.logo) {
+        // 1. Header (Business Name)
+        doc.setFont('times', 'bold');
+        doc.setFontSize(18);
+        doc.setTextColor('#0d9488'); // Teal color similar to screenshot
+        doc.text(profile?.name || 'Business Name', centerX, y, { align: 'center' });
+        y += 6;
+
+        doc.setTextColor('#000000');
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+
+        // 2. Invoice Meta & QR Code Layout
+        // Left side: Invoice #, Date
+        // Right side: QR Code
+        const qrSize = 18;
+        const qrX = widthFull - margin - qrSize;
+        const metaYStart = y;
+
+        doc.text(`Invoice: ${sale.id}`, margin, y + 4);
+        doc.text(`Date: ${formatDate(sale.date)}`, margin, y + 9);
+        
+        if (qrCodeBase64) {
             try {
-                const logoWidth = 20; // Slightly larger logo for 4 inch
-                let logoHeight = 20;
-                const props = doc.getImageProperties(profile.logo);
-                logoHeight = logoWidth / (props.width / props.height);
-                doc.addImage(profile.logo, getImageType(profile.logo), centerX - (logoWidth/2), y, logoWidth, logoHeight);
-                y += logoHeight + 2; // Tight spacing
+                // Position QR code on the right, aligned roughly with the text
+                doc.addImage(qrCodeBase64, 'PNG', qrX, y, qrSize, qrSize);
             } catch(e) {}
         }
+        
+        // Move Y down past the QR code or text, whichever is taller
+        y += Math.max(14, qrSize + 2);
 
+        // 3. Billed To
         doc.setFont('helvetica', 'bold');
-        doc.setFontSize(12);
-        doc.text(doc.splitTextToSize(profile?.name || 'Business Name', pageWidth), centerX, y, { align: 'center' });
-        y += 4.5;
-
-        doc.setFontSize(9);
+        doc.text('Billed To:', margin, y);
+        y += 4;
         doc.setFont('helvetica', 'normal');
-        if (profile?.address) {
-            const addr = doc.splitTextToSize(profile.address, pageWidth);
-            doc.text(addr, centerX, y, { align: 'center' });
-            y += (addr.length * 3.5) + 1;
-        }
-        if (profile?.phone) {
-            doc.text(`Ph: ${profile.phone}`, centerX, y, { align: 'center' });
-            y += 4;
-        }
+        doc.text(customer.name, margin, y);
+        y += 4;
+        
+        // Wrap address
+        const addressLines = doc.splitTextToSize(customer.address, pageWidth);
+        doc.text(addressLines, margin, y);
+        y += (addressLines.length * 4) + 2;
 
-        doc.line(margin, y, widthFull - margin, y); y += 3;
-        doc.setFontSize(10);
+        // 4. Divider & Section Header
+        doc.setLineWidth(0.5);
+        doc.line(margin, y, widthFull - margin, y);
+        y += 5;
         doc.setFont('helvetica', 'bold');
-        doc.text(templateConfig?.content.titleText || 'TAX INVOICE', centerX, y, { align: 'center' });
+        doc.text('Purchase Details', centerX, y, { align: 'center' });
+        y += 3;
+        doc.line(margin, y, widthFull - margin, y);
+        y += 5;
+
+        // 5. Table Header
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'bold');
+        doc.text('Item', margin, y);
+        doc.text('Total', widthFull - margin, y, { align: 'right' });
+        y += 2;
+        doc.setLineWidth(0.2);
+        doc.line(margin, y, widthFull - margin, y);
         y += 4;
 
-        doc.setFontSize(9);
-        doc.setFont('helvetica', 'normal');
-        doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y); y += 3.5;
-        doc.text(`${labels.date}: ${formatDate(sale.date, 'DD/MM/YYYY')}`, margin, y); y += 3.5;
-        doc.text(`${labels.billedTo}: ${customer.name}`, margin, y); y += 4;
-
-        doc.line(margin, y, widthFull - margin, y); y += 3;
-        doc.setFont('helvetica', 'bold');
-        doc.text(labels.item, margin, y);
-        doc.text(labels.amount, widthFull - margin, y, { align: 'right' });
-        y += 2;
-        doc.line(margin, y, widthFull - margin, y); y += 3;
-
+        // 6. Items Loop (Stacked Layout like screenshot)
         doc.setFont('helvetica', 'normal');
         sale.items.forEach(item => {
             const itemTotal = Number(item.price) * Number(item.quantity);
-            const name = doc.splitTextToSize(item.productName, 85); // Wider text area
-            doc.text(name, margin, y);
-            doc.text(itemTotal.toLocaleString('en-IN'), widthFull - margin, y, { align: 'right' });
-            y += (name.length * 3.5);
-            doc.setFontSize(8);
-            doc.text(`${item.quantity} x ${Number(item.price).toLocaleString('en-IN')}`, margin, y);
+            
+            // Item Name
             doc.setFontSize(9);
-            y += 3.5;
+            doc.setTextColor('#000000');
+            
+            // Name wrapping (leave space for total on right)
+            const nameWidth = pageWidth - 20; 
+            const nameLines = doc.splitTextToSize(item.productName, nameWidth);
+            doc.text(nameLines, margin, y);
+            
+            // Total (aligned with first line of name)
+            doc.text(formatCurrency(itemTotal, currency), widthFull - margin, y, { align: 'right' });
+            
+            y += (nameLines.length * 4);
+            
+            // Detail line (Quantity @ Price) - Gray, smaller
+            doc.setFontSize(8);
+            doc.setTextColor('#555555');
+            doc.text(`(x${item.quantity} @ ${formatCurrency(Number(item.price), currency)})`, margin, y - 1); 
+            
+            y += 4;
         });
-
-        doc.line(margin, y, widthFull - margin, y); y += 3;
         
+        doc.setTextColor('#000000');
+        doc.setLineWidth(0.2);
+        doc.line(margin, y, widthFull - margin, y);
+        y += 5;
+
+        // 7. Totals
         const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
         const paid = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
+        const due = Number(sale.totalAmount) - paid;
+
+        const addTotalRow = (label: string, value: string, bold: boolean = false, fontSize: number = 9) => {
+            doc.setFont('helvetica', bold ? 'bold' : 'normal');
+            doc.setFontSize(fontSize);
+            // Label
+            doc.text(label, widthFull - margin - 25, y, { align: 'right' }); 
+            // Value
+            doc.text(value, widthFull - margin, y, { align: 'right' });
+            y += 4.5;
+        };
+
+        addTotalRow('Subtotal', formatCurrency(subTotal, currency));
+        if (sale.gstAmount > 0) addTotalRow('GST', formatCurrency(Number(sale.gstAmount), currency));
+        if (sale.discount > 0) addTotalRow('Discount', `-${formatCurrency(Number(sale.discount), currency)}`);
         
-        const addRow = (l: string, v: string, b = false) => {
-            doc.setFont('helvetica', b ? 'bold' : 'normal');
-            doc.text(l, 60, y, { align: 'right' });
-            doc.text(v, widthFull - margin, y, { align: 'right' });
-            y += 3.5;
-        }
+        y += 1;
+        addTotalRow('Total', formatCurrency(Number(sale.totalAmount), currency), true, 11);
+        
+        addTotalRow('Paid', formatCurrency(paid, currency));
+        addTotalRow('Due', formatCurrency(due, currency), true, 11);
 
-        addRow(labels.subtotal, subTotal.toLocaleString('en-IN'));
-        if (sale.discount > 0) addRow(labels.discount, `-${Number(sale.discount).toLocaleString('en-IN')}`);
-        addRow(labels.grandTotal, `${currency} ${Number(sale.totalAmount).toLocaleString('en-IN')}`, true);
-        if (paid < Number(sale.totalAmount)) {
-            addRow(labels.balance, `${currency} ${(Number(sale.totalAmount) - paid).toLocaleString('en-IN')}`, true);
-        }
-
-        y += 4;
+        // 8. Footer
+        y += 5;
         doc.setFont('helvetica', 'italic');
-        const footerLines = doc.splitTextToSize(templateConfig?.content.footerText || 'Thank You!', pageWidth);
-        doc.text(footerLines, centerX, y, { align: 'center' });
-        return y + (footerLines.length * 4) + 5;
+        doc.setFontSize(8);
+        doc.text(templateConfig?.content.footerText || 'Thank You!', centerX, y, { align: 'center' });
+        
+        return y + 10; // Total Height
     };
 
-    const dummy = new jsPDF({ orientation: 'p', unit: 'mm', format: [112, 2000] });
-    const h = renderContent(dummy);
-    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [112, h] });
+    // First pass to calculate height
+    const dummyDoc = new jsPDF({ orientation: 'p', unit: 'mm', format: [widthFull, 1000] });
+    const height = renderContent(dummyDoc);
+
+    // Second pass to render
+    const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: [widthFull, height] });
     renderContent(doc);
+    
     return doc;
 };
+
+// ... Rest of the file (GenericDocumentData, _generateConfigurablePDF, generateA4InvoicePdf, etc.) ...
 
 export interface GenericDocumentData {
     id: string;

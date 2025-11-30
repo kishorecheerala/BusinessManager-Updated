@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ChevronDown } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -11,10 +10,7 @@ import { Html5Qrcode } from 'html5-qrcode';
 import DeleteButton from '../components/DeleteButton';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { logoBase64 } from '../utils/logo';
-import DatePill from '../components/DatePill';
-import DateInput from '../components/DateInput';
-import Dropdown from '../components/Dropdown';
-import { generateA4InvoicePdf as generateA4InvoicePdfUtil } from '../utils/pdfGenerator'; // Use utility or local
+import { generateA4InvoicePdf, generateThermalInvoicePDF } from '../utils/pdfGenerator';
 
 const getLocalDateString = (date = new Date()) => {
   const year = date.getFullYear();
@@ -221,6 +217,9 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
     const customerDropdownRef = useRef<HTMLDivElement>(null);
     
+    // New state for receipt format selection
+    const [receiptFormat, setReceiptFormat] = useState<'thermal' | 'a4'>('thermal');
+
     useOnClickOutside(customerDropdownRef, () => {
         if (isCustomerDropdownOpen) {
             setIsCustomerDropdownOpen(false);
@@ -433,11 +432,19 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const generateAndSharePDF = async (sale: Sale, customer: Customer, paidAmountOnSale: number) => {
       try {
-        // Use the centralized generator
-        const doc = await generateA4InvoicePdfUtil(sale, customer, state.profile, state.invoiceTemplate, state.customFonts);
+        let doc;
+        let filename;
+
+        if (receiptFormat === 'thermal') {
+            doc = await generateThermalInvoicePDF(sale, customer, state.profile, state.receiptTemplate, state.customFonts);
+            filename = `Receipt-${sale.id}.pdf`;
+        } else {
+            doc = await generateA4InvoicePdf(sale, customer, state.profile, state.invoiceTemplate, state.customFonts);
+            filename = `Invoice-${sale.id}.pdf`;
+        }
         
         const pdfBlob = doc.output('blob');
-        const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
+        const pdfFile = new File([pdfBlob], filename, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
         const subTotal = sale.items.reduce((sum, item) => sum + (Number(item.price) * Number(item.quantity)), 0);
@@ -460,7 +467,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             files: [pdfFile],
           });
         } else {
-          doc.save(`Invoice-${sale.id}.pdf`);
+          doc.save(filename);
         }
       } catch (error) {
         console.error("PDF generation or sharing failed:", error);
@@ -726,7 +733,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                 <input type="number" value={item.quantity} onChange={e => handleItemChange(item.productId, 'quantity', e.target.value)} className="w-20 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Qty"/>
                                 <span>x</span>
                                 <input type="number" value={item.price} onChange={e => handleItemChange(item.productId, 'price', e.target.value)} className="w-24 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Price"/>
-                                <span>= Rs. {(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}</span>
+                                <span>= ₹{(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}</span>
                             </div>
                         </div>
                     ))}
@@ -735,11 +742,40 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
             <Card title="Transaction Details">
                 <div className="space-y-6">
+                    {/* Receipt Format Selection */}
+                    <div className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg border dark:border-slate-600">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Receipt Format</label>
+                        <div className="flex gap-4">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="receiptFormat" 
+                                    value="thermal" 
+                                    checked={receiptFormat === 'thermal'} 
+                                    onChange={() => setReceiptFormat('thermal')}
+                                    className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                                />
+                                <span className="text-sm text-gray-700 dark:text-gray-200">Thermal Receipt (80mm)</span>
+                            </label>
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input 
+                                    type="radio" 
+                                    name="receiptFormat" 
+                                    value="a4" 
+                                    checked={receiptFormat === 'a4'} 
+                                    onChange={() => setReceiptFormat('a4')}
+                                    className="w-4 h-4 text-primary border-gray-300 focus:ring-primary"
+                                />
+                                <span className="text-sm text-gray-700 dark:text-gray-200">A4 Invoice</span>
+                            </label>
+                        </div>
+                    </div>
+
                     {/* Section 1: Calculation Details */}
                     <div className="space-y-3">
                         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                             <span>Subtotal:</span>
-                            <span>Rs. {calculations.subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                            <span>₹{calculations.subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                         </div>
                         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                             <span>Discount:</span>
@@ -747,7 +783,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                             <span>GST Included:</span>
-                            <span>Rs. {calculations.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                            <span>₹{calculations.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                         </div>
                     </div>
 
@@ -755,7 +791,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <div className="text-center">
                         <p className="text-sm text-gray-500 dark:text-gray-400">Grand Total</p>
                         <p className="text-4xl font-bold text-primary">
-                            Rs. {calculations.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                            ₹{calculations.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
                     </div>
 
@@ -764,7 +800,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
-                                <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is Rs. ${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
+                                <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
