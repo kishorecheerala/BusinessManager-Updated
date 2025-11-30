@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'business-manager-v4';
+const CACHE_NAME = 'business-manager-v5';
 const urlsToCache = [
   './',
   './index.html',
