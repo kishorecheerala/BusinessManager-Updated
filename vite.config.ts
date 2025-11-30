@@ -6,5 +6,5 @@ export default defineConfig({
   plugins: [
     react(),
   ],
-  base: './', // Ensure relative paths for assets
+  base: '/', // Changed from './' to '/' for absolute pathing on Vercel
 })

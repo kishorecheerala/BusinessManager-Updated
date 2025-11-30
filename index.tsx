@@ -16,15 +16,15 @@ if ('serviceWorker' in navigator) {
     // We catch errors here to prevent "The document is in an invalid state" from crashing the app
     navigator.serviceWorker.getRegistrations().then((registrations) => {
       for (let registration of registrations) {
-        console.log('[App] Unregistering old SW:', registration.scope);
-        registration.unregister();
+        // Optional: Only unregister if not the current one, but easier to just refresh logic on reload
+        // console.log('[App] Unregistering old SW:', registration.scope);
+        // registration.unregister();
       }
       
-      // Wait a moment, then register the new one
+      // Register new worker with absolute path
       setTimeout(() => {
-        // USE RELATIVE PATH './sw.js' to match base: './' in vite.config.ts
         navigator.serviceWorker
-          .register('./sw.js', { scope: './' })
+          .register('/sw.js', { scope: '/' })
           .then((registration) => {
             console.log('✅ New SW registered successfully');
             console.log('   Scope:', registration.scope);
@@ -34,8 +34,7 @@ if ('serviceWorker' in navigator) {
           });
       }, 500);
     }).catch((err) => {
-        // This catch block handles "Failed to get ServiceWorkerRegistration objects: The document is in an invalid state."
-        console.warn('Service Worker registration skipped/failed (likely due to page unload):', err);
+        console.warn('Service Worker registration skipped/failed:', err);
     });
   });
 }

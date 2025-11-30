@@ -1,11 +1,11 @@
 
 // Service Worker for Business Manager Pro
-const CACHE_NAME = 'business-manager-v2';
+const CACHE_NAME = 'business-manager-v3'; // Bumped version to force update
 const URLS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './vite.svg'
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/vite.svg'
 ];
 
 // Install: Pre-cache critical files to pass PWA installability criteria
@@ -80,7 +80,7 @@ self.addEventListener('fetch', (event) => {
       return fetchPromise.catch(() => {
         // Fallback for navigation requests (HTML)
         if (request.mode === 'navigate') {
-          return caches.match('./index.html');
+          return caches.match('/index.html');
         }
       });
     })
