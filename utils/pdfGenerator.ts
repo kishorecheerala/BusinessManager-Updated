@@ -123,6 +123,13 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     // Layout Options
     const hideQty = templateConfig?.layout.tableOptions?.hideQty || false;
     const hideRate = templateConfig?.layout.tableOptions?.hideRate || false;
+    const headerAlign = templateConfig?.layout.headerAlignment || 'center';
+    const logoPos = templateConfig?.layout.logoPosition || 'center';
+    
+    // Absolute Positioning & Spacing
+    const logoPosX = templateConfig?.layout.logoPosX;
+    const logoPosY = templateConfig?.layout.logoPosY;
+    const elementSpacing = templateConfig?.layout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 };
 
     if (showQr) {
          qrCodeBase64 = await getQrCodeBase64(sale.id);
@@ -135,10 +142,27 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         // 1. Logo
         if (profile?.logo) {
             try {
-                const logoSize = templateConfig?.layout.logoSize ? Math.min(templateConfig.layout.logoSize, 25) : 18;
-                const logoX = (widthFull - logoSize) / 2;
+                // Use user defined size, do not clamp excessively
+                const logoSize = templateConfig?.layout.logoSize || 18;
+                let logoX = (widthFull - logoSize) / 2;
+                
+                if (logoPosX !== undefined) {
+                    logoX = logoPosX;
+                    y = logoPosY || y;
+                } else {
+                    if (logoPos === 'left') logoX = margin;
+                    if (logoPos === 'right') logoX = widthFull - margin - logoSize;
+                }
+                
                 doc.addImage(profile.logo, getImageType(profile.logo), logoX, y, logoSize, logoSize);
-                y += logoSize + 4;
+                
+                // Advance Y only if not absolute, or if absolute but we want to flow below
+                if (logoPosX === undefined) {
+                    y += logoSize + (elementSpacing.logoBottom || 4);
+                } else {
+                    // For absolute, ensure we start text below logo area generally
+                    y = Math.max(y, (logoPosY || 0) + logoSize + (elementSpacing.logoBottom || 4));
+                }
             } catch(e) { }
         }
 
@@ -146,8 +170,13 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         doc.setFont(titleFont, 'bold');
         doc.setFontSize(14);
         doc.setTextColor(primaryColor);
-        doc.text(profile?.name || 'Business Name', centerX, y, { align: 'center' });
-        y += 6;
+        
+        let alignX = centerX;
+        if (headerAlign === 'left') alignX = margin;
+        if (headerAlign === 'right') alignX = widthFull - margin;
+        
+        doc.text(profile?.name || 'Business Name', alignX, y, { align: headerAlign });
+        y += (6 + (elementSpacing.titleBottom || 0));
 
         doc.setTextColor(textColor);
         doc.setFont(bodyFont, 'normal');
@@ -160,9 +189,9 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         doc.text(`Invoice: ${sale.id}`, margin, y);
         y += 4;
         doc.text(`Date: ${formatDate(sale.date, templateConfig?.dateFormat)}`, margin, y);
-        y += 4;
+        y += (4 + (elementSpacing.addressBottom || 0));
 
-        if (qrCodeBase64) {
+        if (qrCodeBase64 && showQr) {
             try {
                 doc.addImage(qrCodeBase64, 'PNG', widthFull - margin - qrSize, startMetaY - 2, qrSize, qrSize);
             } catch(e) {}
@@ -180,7 +209,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         
         const addressLines = doc.splitTextToSize(customer.address, pageWidth);
         doc.text(addressLines, margin, y);
-        y += (addressLines.length * 4) + 2;
+        y += (addressLines.length * 4) + (elementSpacing.headerBottom || 2);
 
         // 5. Purchase Details Divider
         doc.setLineWidth(0.3);

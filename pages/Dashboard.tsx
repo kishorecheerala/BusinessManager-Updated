@@ -5,7 +5,6 @@ import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import { DataImportModal } from '../components/DataImportModal';
 import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataBackup, Expense } from '../types';
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
@@ -346,87 +345,6 @@ const SmartAnalystCard: React.FC<{
     );
 };
 
-const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime: number | null }> = ({ lastBackupDate, lastSyncTime }) => {
-    const now = new Date();
-    const todayStr = now.toISOString().slice(0, 10);
-    
-    let status: 'no-backup' | 'overdue' | 'safe' = 'no-backup';
-    let diffDays = 0;
-    let backupDate: Date | null = null;
-    let isCloud = false;
-
-    // Check Cloud Sync first
-    if (lastSyncTime) {
-        const syncD = new Date(lastSyncTime);
-        const syncStr = syncD.toISOString().slice(0, 10);
-        if (syncStr === todayStr) {
-            status = 'safe';
-            backupDate = syncD;
-            isCloud = true;
-        }
-    }
-
-    // Fallback to manual backup if cloud is not today
-    if (status !== 'safe' && lastBackupDate) {
-        const manualD = new Date(lastBackupDate);
-        const manualStr = manualD.toISOString().slice(0, 10);
-        if (manualStr === todayStr) {
-            status = 'safe';
-            backupDate = manualD;
-            isCloud = false;
-        } else {
-            // Determine most recent date for overdue calculation
-            const latestDate = lastSyncTime ? (manualD > new Date(lastSyncTime) ? manualD : new Date(lastSyncTime)) : manualD;
-            diffDays = Math.floor((now.getTime() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
-            status = 'overdue';
-            backupDate = latestDate;
-        }
-    } else if (status !== 'safe' && lastSyncTime) {
-         // Only cloud sync exists but old
-         const syncD = new Date(lastSyncTime);
-         diffDays = Math.floor((now.getTime() - syncD.getTime()) / (1000 * 60 * 60 * 24));
-         status = 'overdue';
-         backupDate = syncD;
-    }
-
-    const config = {
-        'no-backup': {
-            icon: ShieldX,
-            classes: 'bg-red-50 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800',
-            iconColor: 'text-red-600 dark:text-red-400',
-            title: 'No Backup Found',
-            message: 'Please create a backup immediately to protect your data.'
-        },
-        'overdue': {
-            icon: ShieldX,
-            classes: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800',
-            iconColor: 'text-amber-600 dark:text-amber-400',
-            title: 'Backup Overdue',
-            message: diffDays > 0 ? `Last backup was ${diffDays} day${diffDays > 1 ? 's' : ''} ago.` : "Last backup was not today."
-        },
-        'safe': {
-            icon: ShieldCheck,
-            classes: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800',
-            iconColor: 'text-emerald-600 dark:text-emerald-400',
-            title: `Data is Safe ${isCloud ? '(Cloud Sync)' : '(Manual Backup)'}`,
-            message: `Backed up today at ${backupDate?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.`
-        }
-    };
-
-    const current = config[status];
-    const Icon = current.icon;
-
-    return (
-        <div className={`flex items-start p-4 rounded-lg border ${current.classes} mb-6 group`}>
-            <Icon className={`w-6 h-6 mr-3 flex-shrink-0 ${current.iconColor} transition-transform group-hover:scale-110`} />
-            <div>
-                <h4 className="font-bold text-sm uppercase tracking-wide mb-1">{current.title}</h4>
-                <p className="text-sm opacity-90">{current.message}</p>
-            </div>
-        </div>
-    );
-};
-
 const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNavigate: (customerId: string) => void; }> = ({ sales, customers, onNavigate }) => {
     const { state } = useAppContext();
     const businessName = state.profile?.name || 'Our Business';
@@ -694,13 +612,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-    
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
-
-    const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-    
     const [isCheckpointsModalOpen, setIsCheckpointsModalOpen] = useState(false);
 
     const lastBackupDate = (app_metadata.find(m => m.id === 'lastBackup') as AppMetadataBackup | undefined)?.date || null;
@@ -781,101 +694,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         }
     };
 
-    const handleBackup = async () => {
-        setIsGeneratingReport(true);
-        try {
-            const data = await db.exportData();
-            const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            const filename = (state.profile?.name || 'business_manager').toLowerCase().replace(/\s+/g, '_');
-            a.download = `${filename}_backup_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            await db.setLastBackupDate();
-            dispatch({ type: 'SET_LAST_BACKUP_DATE', payload: new Date().toISOString() });
-            showToast("Backup downloaded successfully!", 'success');
-        } catch (e) {
-            console.error("Backup failed", e);
-            showToast("Backup failed!", 'error');
-        } finally {
-            setIsGeneratingReport(false);
-        }
-    };
-
-    const handleLoadTestData = async () => {
-        const confirmed = await showConfirm("This will OVERWRITE your current data with sample test data. Are you sure you want to proceed?", {
-            title: "Load Test Data",
-            confirmText: "Yes, Overwrite",
-            variant: "danger"
-        });
-        
-        if (confirmed) {
-            setIsGeneratingReport(true);
-            try {
-                await db.importData(testData as any);
-                await db.saveCollection('profile', [testProfile]);
-                window.location.reload();
-            } catch (error) {
-                console.error("Failed to load test data:", error);
-                showToast("Failed to load test data.", 'error');
-                setIsGeneratingReport(false);
-            }
-        }
-    };
-
-    const handleCreateCheckpoint = async () => {
-        const name = prompt("Enter a name for this checkpoint:", `Backup ${new Date().toLocaleTimeString()}`);
-        if (name) {
-            try {
-                await db.createSnapshot(name);
-                showToast("Checkpoint created successfully.", 'success');
-            } catch (e) {
-                console.error(e);
-                showToast("Failed to create checkpoint.", 'error');
-            }
-        }
-    };
-
     const handleNavigate = (page: Page, id: string) => {
         dispatch({ type: 'SET_SELECTION', payload: { page, id } });
         setCurrentPage(page);
     };
     
-    const handleFileRestore = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        
-        const processRestore = async () => {
-            const confirmed = await showConfirm("Restoring will OVERWRITE all current data. Are you sure you want to restore from this backup?", {
-                title: "Restore Backup",
-                confirmText: "Yes, Restore",
-                variant: "danger"
-            });
-            
-            if (confirmed) {
-                try {
-                    const text = await file.text();
-                    const data = JSON.parse(text);
-                    await db.importData(data);
-                    window.location.reload();
-                } catch (err) {
-                    showAlert("Failed to restore backup. The file might be invalid or corrupted.");
-                }
-            }
-        };
-
-        runSecureAction(processRestore);
-        e.target.value = ''; 
-    };
-
     return (
         <div className="space-y-6 animate-fade-in-fast">
-            <DataImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
             <CheckpointsModal isOpen={isCheckpointsModalOpen} onClose={() => setIsCheckpointsModalOpen(false)} />
             
             {isPinModalOpen && (
@@ -1024,79 +849,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
-                 <div className="space-y-6">
-                    <Card title="Quick Tools" className="mb-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <Button onClick={() => setCurrentPage('INVOICE_DESIGNER')} className="h-auto py-4 flex flex-col items-center justify-center gap-2">
-                                <PenTool size={24} />
-                                <span>Invoice Designer</span>
-                            </Button>
-                            <Button onClick={() => setCurrentPage('QUOTATIONS')} variant="secondary" className="h-auto py-4 flex flex-col items-center justify-center gap-2">
-                                <FileText size={24} />
-                                <span>Estimates</span>
-                            </Button>
-                        </div>
-                    </Card>
-
-                    <Card title="Data Management">
-                        <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />
-                        <div className="space-y-4 mt-4">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Your data is stored locally on this device. Please create regular backups to prevent data loss.
-                            </p>
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                <Button onClick={handleBackup} className="w-full" disabled={isGeneratingReport}>
-                                    <Download className="w-4 h-4 mr-2" /> {isGeneratingReport ? 'Preparing...' : 'Backup Data Now'}
-                                </Button>
-                                <label htmlFor="restore-backup" className="px-4 py-2 rounded-md font-semibold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-sm flex items-center justify-center gap-2 bg-secondary hover:bg-teal-500 focus:ring-secondary cursor-pointer w-full text-center dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600">
-                                    <Upload className="w-4 h-4 mr-2" /> Restore from Backup
-                                </label>
-                                <input 
-                                    id="restore-backup" 
-                                    type="file" 
-                                    accept="application/json" 
-                                    className="hidden" 
-                                    onChange={handleFileRestore} 
-                                />
-                                <Button onClick={() => runSecureAction(() => setIsImportModalOpen(true))} variant="secondary" className="w-full">
-                                    <Upload className="w-4 h-4 mr-2" /> Import Bulk Data from CSV
-                                </Button>
-                                {state.devMode && (
-                                    <Button onClick={() => runSecureAction(handleLoadTestData)} className="w-full bg-purple-600 hover:bg-purple-700 focus:ring-purple-600" disabled={isGeneratingReport}>
-                                        <TestTube2 className="w-4 h-4 mr-2" /> Load Test Data
-                                    </Button>
-                                )}
-                            </div>
-                            
-                            {/* Checkpoints Section */}
-                            <div className="pt-4 border-t dark:border-slate-700">
-                                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                                    <History size={16} /> Local Checkpoints
-                                </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <Button onClick={handleCreateCheckpoint} className="w-full bg-indigo-600 hover:bg-indigo-700">
-                                        <Clock className="w-4 h-4 mr-2" /> Create Checkpoint
-                                    </Button>
-                                    <Button onClick={() => setIsCheckpointsModalOpen(true)} variant="secondary" className="w-full">
-                                        View Checkpoints
-                                    </Button>
-                                </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                    Create instant restore points before making major changes.
-                                </p>
-                            </div>
-
-                             <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md border border-yellow-200 dark:border-yellow-700">
-                                <div className="flex gap-2">
-                                    <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-                                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
-                                        <strong>Tip:</strong> Send the backup file to your email or save it to Google Drive for safe keeping.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-                 </div>
             </div>
         </div>
     );

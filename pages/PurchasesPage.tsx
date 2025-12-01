@@ -385,7 +385,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                             {(purchase.invoiceImages?.length > 0 || purchase.invoiceUrl) && (
                                                 <div className="flex gap-2 mb-3 overflow-x-auto pb-1 custom-scrollbar">
                                                     {(purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean).map((img, idx) => (
-                                                        <div key={idx} className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity" onClick={() => setViewImageModal(img!)}>
+                                                        <div key={idx} className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity" onClick={(e) => { e.stopPropagation(); setViewImageModal(img!); }}>
                                                             <img src={img} alt="Invoice" className="h-full w-full object-cover" />
                                                         </div>
                                                     ))}
@@ -496,8 +496,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             <div className="space-y-4 animate-fade-in-fast">
                 {/* View Image Modal */}
                 {viewImageModal && (
-                    <div className="fixed inset-0 bg-black/80 z-[200] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
-                        <div className="relative max-w-full max-h-full">
+                    <div className="fixed inset-0 bg-black/80 z-[2000] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
+                        <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
                             <button className="absolute -top-10 right-0 text-white p-2" onClick={() => setViewImageModal(null)}><X size={24}/></button>
                             <img src={viewImageModal} alt="Invoice" className="max-w-full max-h-[90vh] rounded-lg shadow-2xl" />
                         </div>

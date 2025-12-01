@@ -37,7 +37,7 @@ import AppSkeletonLoader from './components/AppSkeletonLoader';
 import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
-import { useSwipe } from './hooks/useSwipe';
+import FloatingActionButton from './components/FloatingActionButton';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
@@ -195,6 +195,37 @@ const AppContent: React.FC = () => {
         window.scrollTo(0, 0); 
     }, [currentPage]);
 
+    // Double Back to Exit Logic & Disable Overscroll Swipe
+    useEffect(() => {
+        // Push state once to create a history entry we can trap
+        window.history.pushState(null, document.title, window.location.href);
+
+        let lastPopTime = 0;
+
+        const handlePopState = (event: PopStateEvent) => {
+            const now = Date.now();
+            if (now - lastPopTime < 2000) {
+                // Allowed to exit (double press detected within 2s)
+                // Browser handles going back
+            } else {
+                // Prevent exit
+                lastPopTime = now;
+                window.history.pushState(null, document.title, window.location.href);
+                showToast("Press back again to exit");
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        
+        // Prevent swipe navigation
+        document.body.style.overscrollBehaviorX = 'none';
+        
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            document.body.style.overscrollBehaviorX = 'auto';
+        };
+    }, [showToast]);
+
     // Apply Theme & Dynamic Icon
     useEffect(() => {
         // 1. Dark Mode Class
@@ -255,360 +286,160 @@ const AppContent: React.FC = () => {
             // Update Meta Theme Color
             const metaTheme = document.querySelector("meta[name='theme-color']");
             if (metaTheme) metaTheme.setAttribute("content", bg);
-
-            // Dynamic Manifest Update (Blob URL)
-            // This allows the PWA install prompt to potentially pick up the new icon/color on some browsers
-            const manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
-            if (manifestLink) {
-                const dynamicManifest = {
-                    name: "Business Manager Pro",
-                    short_name: "Business Mgr",
-                    id: "/?source=pwa",
-                    start_url: "./index.html",
-                    scope: ".",
-                    background_color: "#f8fafc",
-                    display: "standalone",
-                    orientation: "portrait",
-                    theme_color: bg,
-                    description: "A comprehensive sales, purchase, and customer management application.",
-                    icons: [
-                        { src: dataUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
-                        { src: dataUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any" },
-                        { src: dataUrl, sizes: "512x512", type: "image/svg+xml", purpose: "maskable" }
-                    ]
-                };
-                
-                const stringManifest = JSON.stringify(dynamicManifest);
-                const blob = new Blob([stringManifest], {type: 'application/json'});
-                const manifestURL = URL.createObjectURL(blob);
-                
-                manifestLink.href = manifestURL;
-            }
         };
+        
         updateIcons();
-
+        
     }, [state.theme, state.themeColor, state.themeGradient]);
 
-    // Analytics: Log page changes
-    useEffect(() => {
-        logPageView(currentPage);
-    }, [currentPage]);
-
-    // Handle Unsaved Changes
-    const handleNavigation = (page: Page) => {
+    // Navigation Handler with Dirty Check
+    const handleNavigate = (page: Page, action?: string) => {
         if (isDirty) {
-            if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
-                setIsDirty(false);
-                setCurrentPage(page);
+            if (!window.confirm("You have unsaved changes. Are you sure you want to leave?")) {
+                return;
             }
-        } else {
-            setCurrentPage(page);
+            setIsDirty(false); // Reset dirty flag if user confirms
         }
+        
+        if (action) {
+            // Set action in state to trigger useEffects in target page
+            dispatch({ type: 'SET_SELECTION', payload: { page, id: 'new' } });
+        }
+        setCurrentPage(page);
+        logPageView(page);
     };
 
-    // Calculate Navigation Layout based on user preference order
-    const { mainNavItems, pinnedItems, mobileMoreItems } = useMemo(() => {
-        const order = state.navOrder || [];
-        
-        const allDesktopItems = order.map(id => ({
-            page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
-        }));
+    if (!isDbLoaded) {
+        return <AppSkeletonLoader />;
+    }
 
-        // Mobile: 4 items + More + FAB (at end)
-        const pinnedIds = order.slice(0, 4);
-        const menuIds = order.slice(4);
-
-        const pinnedItems = pinnedIds.map(id => ({ page: id, label: LABEL_MAP[id], icon: ICON_MAP[id] }));
-        const mobileMoreItems = menuIds.map(id => ({ page: id, label: LABEL_MAP[id], icon: ICON_MAP[id] }));
-
-        return { mainNavItems: allDesktopItems, pinnedItems, mobileMoreItems };
-    }, [state.navOrder]);
-
-    const isMoreBtnActive = mobileMoreItems.some(item => item.page === currentPage);
-
-    // Swipe handlers for mobile navigation
-    useSwipe({
-        onSwipeLeft: () => {
-            // Simple cycle through top 5 items for swipe
-            const topPages = state.navOrder.slice(0, 5);
-            const idx = topPages.indexOf(currentPage);
-            if (idx >= 0 && idx < topPages.length - 1) {
-                handleNavigation(topPages[idx + 1] as Page);
-            }
-        },
-        onSwipeRight: () => {
-            const topPages = state.navOrder.slice(0, 5);
-            const idx = topPages.indexOf(currentPage);
-            if (idx > 0) {
-                handleNavigation(topPages[idx - 1] as Page);
-            }
-        }
-    });
-
-    if (!isDbLoaded) return <AppSkeletonLoader />;
-
-    // Main Content Class Logic
-    // If INVOICE_DESIGNER: Fixed full height, internal scrolling.
-    // Standard Pages: Native body scrolling (min-h-screen).
-    const mainClass = currentPage === 'INVOICE_DESIGNER' 
-        ? 'h-[100dvh] overflow-hidden' 
-        : `min-h-screen pt-16`;
+    // Determine Nav Items based on customization
+    const navItems = state.navOrder.slice(0, 4);
+    const moreItems = state.navOrder.slice(4);
 
     return (
-        <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
+        <div className="flex flex-col h-full bg-background dark:bg-slate-900 text-text dark:text-slate-300 overflow-hidden font-sans selection:bg-primary selection:text-white">
             <Toast />
-            <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
             
-            {/* Header - Hidden on Invoice Designer to maximize space */}
-            {currentPage !== 'INVOICE_DESIGNER' && (
-                <header className="fixed top-0 left-0 right-0 h-16 bg-theme text-white shadow-lg z-40 px-3 sm:px-4 flex items-center justify-between transition-all duration-300">
-                    
-                    {/* Left: Menu & Search */}
-                    <div className="flex items-center gap-1 sm:gap-2 z-20">
-                        <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Menu (Ctrl+M)">
-                            <Menu size={24} />
-                        </button>
-                        <button onClick={() => setIsSearchOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Search (Ctrl+K)">
-                            <Search size={20} />
-                        </button>
-                    </div>
+            <header className="bg-theme text-white shadow-lg sticky top-0 z-30 transition-all duration-500 bg-cover bg-center shrink-0" style={{ background: state.themeGradient || state.themeColor }}>
+                <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center relative">
+                    {/* Menu Button */}
+                    <button 
+                        onClick={() => setIsMenuOpen(true)} 
+                        className="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition-all focus:outline-none focus:ring-2 focus:ring-white/50"
+                        aria-label="Open Menu"
+                    >
+                        <Menu className="w-6 h-6" strokeWidth={2.5} />
+                    </button>
 
-                    {/* Center: Title - Absolutely Centered */}
-                    <div className="absolute left-0 right-0 flex justify-center pointer-events-none z-10">
-                        <button 
-                            onClick={() => handleNavigation('DASHBOARD')}
-                            className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-80 transition-opacity py-1"
-                        >
-                            <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight">
+                    {/* Logo / Brand - Centered */}
+                    <div className="absolute left-1/2 top-1/2 transform -translate-x-1/2 -translate-y-1/2 flex flex-col items-center cursor-pointer group" onClick={() => setCurrentPage('DASHBOARD')}>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xl font-extrabold tracking-tight drop-shadow-md whitespace-nowrap">
                                 {state.profile?.name || 'Business Manager'}
-                            </h1>
-                            {state.googleUser && (
-                                <span className="text-[10px] font-medium text-white/80 leading-none mt-0.5 flex items-center gap-1">
-                                    {state.googleUser.name.split(' ')[0]} • {state.syncStatus === 'syncing' ? 'Syncing...' : (state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Unsynced')}
-                                </span>
-                            )}
-                        </button>
+                            </span>
+                        </div>
                     </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex items-center gap-1 sm:gap-2 z-20">
-                        
-                        {/* Cloud Sync / Sign In Button */}
+                    {/* Right Actions */}
+                    <div className="flex items-center gap-1 sm:gap-2">
                         <button 
-                            onClick={() => { 
-                                if (!state.googleUser) {
-                                    googleSignIn();
-                                } else {
-                                    // Always attempt to sync, even on error (Retry)
-                                    syncData(); 
-                                }
-                            }} 
-                            onContextMenu={(e) => {
-                                // Right click to open diagnostics
-                                e.preventDefault();
-                                setIsCloudDebugOpen(true);
-                            }}
-                            className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
-                            title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Retry)' : state.syncStatus === 'syncing' ? 'Auto-Sync in progress...' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Not synced yet'}`}
+                            onClick={() => setIsAskAIOpen(true)} 
+                            className="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition-all relative group"
+                            aria-label="Ask AI Assistant"
                         >
-                            {state.syncStatus === 'syncing' ? (
-                                <RefreshCw size={20} className="animate-spin" />
-                            ) : state.syncStatus === 'error' ? (
-                                <CloudOff size={20} className="text-red-300" />
-                            ) : (
-                                <Cloud size={20} className={!state.googleUser ? "opacity-70" : ""} />
-                            )}
-                            
-                            {/* Status Dot - Only visible if user is logged in */}
-                            {state.googleUser && state.syncStatus !== 'syncing' && (
-                                <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white/20 ${
-                                    state.syncStatus === 'success' ? 'bg-green-400' : 
-                                    state.syncStatus === 'error' ? 'bg-red-500' : 
-                                    'bg-gray-300'
-                                }`}></span>
-                            )}
+                            <Sparkles className="w-5 h-5 text-yellow-300 group-hover:animate-pulse" strokeWidth={2.5} />
                         </button>
-
-                        {/* AI Button - Always visible */}
-                        <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
-                            <Sparkles size={20} />
+                        <button 
+                            onClick={() => setIsSearchOpen(true)} 
+                            className="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition-all"
+                            aria-label="Search"
+                        >
+                            <Search className="w-5 h-5" strokeWidth={2.5} />
                         </button>
-
-                        {/* Notifications */}
                         <div className="relative" ref={notificationsRef}>
-                            <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="p-2 hover:bg-white/20 rounded-full transition-colors relative">
-                                <Bell size={20} />
-                                {state.notifications.some(n => !n.read) && (
-                                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
+                            <button 
+                                onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} 
+                                className="p-2 rounded-lg hover:bg-white/20 active:scale-95 transition-all relative"
+                                aria-label="Notifications"
+                            >
+                                <Bell className="w-5 h-5" strokeWidth={2.5} />
+                                {state.notifications.filter(n => !n.read).length > 0 && (
+                                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white animate-pulse"></span>
                                 )}
                             </button>
-                            <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
+                            <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={(p) => handleNavigate(p)} />
                         </div>
-
-                        {/* Help Button - Hidden on small mobile */}
-                        <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
-                            <HelpCircle size={20} />
-                        </button>
                     </div>
-                </header>
-            )}
+                </div>
+            </header>
 
             {/* Main Content Area */}
-            <main className={`flex-grow w-full ${mainClass}`}>
-                <div className={`mx-auto ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'p-4 pb-32 max-w-7xl'}`}>
-                    {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
-                    {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+            <main className="flex-grow overflow-y-auto overflow-x-hidden relative scroll-smooth overscroll-contain">
+                <div className="max-w-7xl mx-auto p-4 pb-24 sm:pb-6 min-h-full">
+                    {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={setCurrentPage} />}
+                    {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={setCurrentPage} />}
                     {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'PURCHASES' && <PurchasesPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                    {currentPage === 'PURCHASES' && <PurchasesPage setIsDirty={setIsDirty} setCurrentPage={setCurrentPage} />}
+                    {currentPage === 'INSIGHTS' && <InsightsPage setCurrentPage={setCurrentPage} />}
                     {currentPage === 'PRODUCTS' && <ProductsPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'REPORTS' && <ReportsPage setCurrentPage={handleNavigation} />}
-                    {currentPage === 'RETURNS' && <ReturnsPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'INSIGHTS' && <InsightsPage setCurrentPage={handleNavigation} />}
+                    {currentPage === 'REPORTS' && <ReportsPage setCurrentPage={setCurrentPage} />}
                     {currentPage === 'EXPENSES' && <ExpensesPage setIsDirty={setIsDirty} />}
+                    {currentPage === 'RETURNS' && <ReturnsPage setIsDirty={setIsDirty} />}
                     {currentPage === 'QUOTATIONS' && <QuotationsPage />}
-                    {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                    {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={setCurrentPage} />}
                     {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
                 </div>
             </main>
 
-            {/* Modals & Overlays */}
-            <MenuPanel 
-                isOpen={isMenuOpen} 
-                onClose={() => setIsMenuOpen(false)} 
-                onProfileClick={() => setIsProfileModalOpen(true)}
-                onNavigate={handleNavigation}
-                onOpenDevTools={() => setIsDevToolsOpen(true)}
-                onOpenChangeLog={() => setIsChangeLogOpen(true)}
-            />
-            <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
-            <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
-            <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-            <DeveloperToolsModal isOpen={isDevToolsOpen} onClose={() => setIsDevToolsOpen(false)} onOpenCloudDebug={() => setIsCloudDebugOpen(true)} />
-            <CloudDebugModal isOpen={isCloudDebugOpen} onClose={() => setIsCloudDebugOpen(false)} />
-            <ProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
-            <NavCustomizerModal isOpen={isNavCustomizerOpen} onClose={() => setIsNavCustomizerOpen(false)} />
-            
-            {/* Bottom Navigation */}
-            {currentPage !== 'INVOICE_DESIGNER' && (
-            <nav className="fixed bottom-0 left-0 right-0 glass pb-[env(safe-area-inset-bottom)] z-50 border-t border-gray-200/50 dark:border-slate-700/50">
-                {/* Desktop View - Scrollable */}
-                <div className="hidden md:flex w-full overflow-x-auto custom-scrollbar">
-                    <div className="flex flex-nowrap mx-auto items-center gap-2 lg:gap-6 p-2 px-6 min-w-max">
-                        {mainNavItems.map(item => (
-                            <div key={item.page} className="w-16 lg:w-20 flex-shrink-0">
-                                <NavItem 
-                                    page={item.page} 
-                                    label={item.label} 
-                                    icon={item.icon} 
-                                    onClick={() => handleNavigation(item.page as Page)} 
-                                    isActive={currentPage === item.page} 
-                                />
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Mobile View - Custom Layout */}
-                <div className="flex md:hidden justify-between items-end px-3 pb-2 pt-1 mx-auto w-full max-w-md relative">
-                    {/* Pinned Items (First 4) */}
-                    {pinnedItems.map(item => (
-                        <NavItem 
-                            key={item.page}
-                            page={item.page} 
-                            label={item.label} 
-                            icon={item.icon} 
-                            onClick={() => handleNavigation(item.page as Page)} 
-                            isActive={currentPage === item.page && !isMoreMenuOpen && !isMobileQuickAddOpen} 
-                        />
-                    ))}
+            {/* Bottom Navigation Bar */}
+            <nav className="md:hidden fixed bottom-0 w-full bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-slate-800 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] z-30">
+                <div className="flex justify-around items-end h-[60px] px-2 pb-1 relative">
                     
-                    {/* More Menu */}
-                    <div className="relative flex flex-col items-center justify-center w-full" ref={moreMenuRef}>
-                        <button
-                            onClick={() => { setIsMoreMenuOpen(prev => !prev); setIsMobileQuickAddOpen(false); }}
-                            className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
-                                isMoreBtnActive 
-                                ? 'text-primary transform -translate-y-1' 
-                                : 'text-gray-400 dark:text-gray-500'
-                            }`}
-                            >
-                            <div className={`p-1 rounded-full transition-all duration-300 ${isMoreBtnActive ? 'bg-primary/10 scale-110' : ''}`}>
-                                <Menu className={`w-6 h-6 transition-transform duration-300 ${isMoreBtnActive ? 'rotate-90' : ''}`} strokeWidth={isMoreBtnActive ? 2.5 : 2} />
-                            </div>
-                            <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">More</span>
-                        </button>
+                    {/* Render customized nav items */}
+                    {navItems.map(pageId => {
+                        const Icon = ICON_MAP[pageId];
+                        return (
+                            <NavItem 
+                                key={pageId}
+                                page={pageId}
+                                label={LABEL_MAP[pageId]}
+                                icon={Icon}
+                                onClick={() => handleNavigate(pageId as Page)}
+                                isActive={currentPage === pageId}
+                            />
+                        );
+                    })}
 
-                        {isMoreMenuOpen && (
-                            <div className="absolute bottom-[calc(100%+16px)] right-0 w-52 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 z-50 animate-scale-in origin-bottom-right overflow-hidden ring-1 ring-black/5">
-                                <div className="p-1.5 grid gap-1 max-h-[60vh] overflow-y-auto">
-                                    {mobileMoreItems.map(item => (
-                                        <button 
-                                            key={item.page} 
-                                            onClick={() => { handleNavigation(item.page as Page); setIsMoreMenuOpen(false); }} 
-                                            className={`w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-all group ${
-                                                currentPage === item.page 
-                                                    ? 'bg-primary/10 text-primary font-bold' 
-                                                    : 'hover:bg-gray-50 dark:hover:bg-slate-700/50 text-gray-600 dark:text-gray-300'
-                                            }`}
-                                        >
-                                            <item.icon className={`w-5 h-5 transition-transform group-hover:scale-110 ${currentPage === item.page ? 'scale-110' : ''}`} />
-                                            <span className="text-sm">{item.label}</span>
-                                        </button>
-                                    ))}
-                                    
-                                    <div className="my-1 border-t dark:border-slate-700/50"></div>
-                                    
-                                    <button 
-                                        onClick={() => { setIsNavCustomizerOpen(true); setIsMoreMenuOpen(false); }} 
-                                        className="w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-all hover:bg-gray-50 dark:hover:bg-slate-700/50 text-indigo-600 dark:text-indigo-400 font-medium"
-                                    >
-                                        <Layout className="w-5 h-5" />
-                                        <span className="text-sm">Customize Menu</span>
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Quick Add FAB - Moved to End */}
-                    <div className="relative -top-4 ml-1 flex flex-col items-center justify-center w-auto shrink-0" ref={mobileQuickAddRef}>
+                    {/* More Menu Item */}
+                    <div className="relative" ref={moreMenuRef}>
                         <button 
-                            onClick={() => { setIsMobileQuickAddOpen(!isMobileQuickAddOpen); setIsMoreMenuOpen(false); }}
-                            className={`w-14 h-14 rounded-full bg-theme text-white shadow-xl shadow-primary/40 flex items-center justify-center transition-transform duration-300 ${isMobileQuickAddOpen ? 'rotate-45 scale-110' : 'active:scale-95'}`}
-                            aria-label="Quick Add"
+                            onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
+                            className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${isMoreMenuOpen ? 'text-primary transform -translate-y-1' : 'text-gray-400 dark:text-gray-500'}`}
                         >
-                            <Plus size={32} strokeWidth={2.5} />
+                            <div className={`p-1 rounded-full transition-all duration-300 ${isMoreMenuOpen ? 'bg-primary/10 scale-110' : ''}`}>
+                                <Layout className={`w-6 h-6 transition-transform duration-300 ${isMoreMenuOpen ? 'scale-110' : 'group-hover:scale-105'}`} strokeWidth={isMoreMenuOpen ? 2.5 : 2} />
+                            </div>
+                            <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight ${isMoreMenuOpen ? 'opacity-100' : 'opacity-80'}`}>More</span>
                         </button>
-                        {isMobileQuickAddOpen && (
-                            <div className="absolute bottom-[calc(100%+12px)] right-0 w-64 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-3 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
-                                <div className="flex justify-between items-center mb-2 px-1">
-                                    <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-center flex-grow pl-4">Quick Actions</div>
-                                    <button 
-                                        onClick={() => { setIsNavCustomizerOpen(true); setIsMobileQuickAddOpen(false); }}
-                                        className="text-primary hover:text-primary/80 transition-colors p-1 rounded-full hover:bg-primary/5"
-                                        title="Edit Quick Actions"
-                                    >
-                                        <Edit size={14} />
+
+                        {/* More Menu Dropdown (Upward) */}
+                        {isMoreMenuOpen && (
+                            <div className="absolute bottom-full right-0 mb-4 w-48 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 overflow-hidden animate-slide-up-fade origin-bottom-right p-1 z-50">
+                                <div className="grid grid-cols-1 gap-0.5">
+                                    <button onClick={() => { setIsNavCustomizerOpen(true); setIsMoreMenuOpen(false); }} className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left w-full text-xs font-bold uppercase text-gray-400 tracking-wider">
+                                        Customize Menu
                                     </button>
-                                </div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    {state.quickActions.map((actionId, idx) => {
-                                        const action = QUICK_ACTION_REGISTRY[actionId];
-                                        if (!action) return null;
+                                    {moreItems.map(pageId => {
+                                        const Icon = ICON_MAP[pageId];
                                         return (
-                                            <button
-                                                key={idx}
-                                                onClick={() => { 
-                                                    if (action.action) {
-                                                        dispatch({ type: 'SET_SELECTION', payload: { page: action.page, id: action.action as any } }); 
-                                                    }
-                                                    handleNavigation(action.page);
-                                                    setIsMobileQuickAddOpen(false);
-                                                }}
-                                                className="flex flex-col items-center justify-center gap-1 p-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl transition-colors group/item border border-gray-100 dark:border-slate-600"
+                                            <button 
+                                                key={pageId}
+                                                onClick={() => { handleNavigate(pageId as Page); setIsMoreMenuOpen(false); }}
+                                                className={`flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left w-full ${currentPage === pageId ? 'bg-primary/5 text-primary' : 'text-gray-700 dark:text-gray-300'}`}
                                             >
-                                                <action.icon size={20} className="text-primary group-hover/item:scale-110 transition-transform" />
-                                                <span className="text-xs font-medium text-gray-700 dark:text-gray-200">{action.label}</span>
+                                                <Icon size={18} />
+                                                <span className="font-semibold text-sm">{LABEL_MAP[pageId]}</span>
                                             </button>
                                         );
                                     })}
@@ -618,49 +449,46 @@ const AppContent: React.FC = () => {
                     </div>
                 </div>
             </nav>
-            )}
-        </div>
-    );
-};
 
-const App: React.FC = () => {
-    const [theme, setTheme] = useState('light')
-    const [themeReady, setThemeReady] = useState(false)
-
-    // Load theme AFTER component mounts, not during render
-    useEffect(() => {
-        try {
-            // Check localStorage specifically for the theme key used in index.html and AppContent
-            const saved = localStorage.getItem('theme') || 'light'
-            setTheme(saved)
+            {/* Desktop Sidebar (Optional - using simplified responsive layout for now, assuming mobile-first PWA focus) */}
             
-            // Apply immediately to document to prevent flash
-            if (saved === 'dark') {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            document.documentElement.setAttribute('data-theme', saved)
-        } catch (err) {
-            console.warn('Theme load failed:', err)
-        }
-        setThemeReady(true)
-    }, [])
+            {/* Modals & Panels */}
+            <MenuPanel 
+                isOpen={isMenuOpen} 
+                onClose={() => setIsMenuOpen(false)} 
+                onProfileClick={() => setIsProfileModalOpen(true)}
+                onNavigate={handleNavigate}
+                onOpenDevTools={() => setIsDevToolsOpen(true)}
+                onLockApp={() => {
+                    // Logic to lock app (requires re-PIN) - simplistic refresh for now
+                    window.location.reload(); 
+                }}
+                onOpenChangeLog={() => setIsChangeLogOpen(true)}
+            />
+            
+            <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigate} />
+            <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
+            <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+            <DeveloperToolsModal isOpen={isDevToolsOpen} onClose={() => setIsDevToolsOpen(false)} onOpenCloudDebug={() => setIsCloudDebugOpen(true)} />
+            <CloudDebugModal isOpen={isCloudDebugOpen} onClose={() => setIsCloudDebugOpen(false)} />
+            <ProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} />
+            <NavCustomizerModal isOpen={isNavCustomizerOpen} onClose={() => setIsNavCustomizerOpen(false)} />
+            <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
 
-    // Don't render until theme is ready
-    if (!themeReady) {
-        return null
-    }
+            {/* Floating Action Button */}
+            <FloatingActionButton onNavigate={handleNavigate} />
 
-    return (
-        <div data-theme={theme} className="contents">
-            <AppProvider>
-                <DialogProvider>
-                    <AppContent />
-                </DialogProvider>
-            </AppProvider>
         </div>
     );
 };
 
-export default App;
+// Named Export App to match index.tsx import { App }
+export const App: React.FC = () => {
+  return (
+    <AppProvider>
+      <DialogProvider>
+        <AppContent />
+      </DialogProvider>
+    </AppProvider>
+  );
+};
