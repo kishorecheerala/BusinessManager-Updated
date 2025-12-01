@@ -195,7 +195,7 @@ const AppContent: React.FC = () => {
         window.scrollTo(0, 0); 
     }, [currentPage]);
 
-    // Apply Theme
+    // Apply Theme & Dynamic Icon
     useEffect(() => {
         // 1. Dark Mode Class
         if (state.theme === 'dark') {
@@ -206,8 +206,7 @@ const AppContent: React.FC = () => {
         
         const root = document.documentElement;
         
-        // 2. Dynamic Primary Color (Convert Hex to RGB for Tailwind opacity)
-        // Tailwind config uses: rgb(var(--primary-color) / <alpha-value>)
+        // 2. Dynamic Primary Color
         const hex = state.themeColor.replace(/^#/, '');
         if (/^[0-9A-F]{6}$/i.test(hex)) {
             const r = parseInt(hex.substring(0, 2), 16);
@@ -215,11 +214,10 @@ const AppContent: React.FC = () => {
             const b = parseInt(hex.substring(4, 6), 16);
             root.style.setProperty('--primary-color', `${r} ${g} ${b}`);
         } else {
-            // Fallback default teal if invalid
             root.style.setProperty('--primary-color', '13 148 136'); 
         }
 
-        // 3. Header Background (Gradient or Solid)
+        // 3. Header Background
         if (state.themeGradient) {
             root.style.setProperty('--header-bg', state.themeGradient);
             root.style.setProperty('--theme-gradient', state.themeGradient);
@@ -228,7 +226,7 @@ const AppContent: React.FC = () => {
             root.style.setProperty('--theme-gradient', `linear-gradient(135deg, ${state.themeColor} 0%, ${state.themeColor} 100%)`);
         }
 
-        // 4. Persist to LocalStorage (for index.html script to pick up on reload)
+        // 4. Persist to LocalStorage
         localStorage.setItem('theme', state.theme);
         localStorage.setItem('themeColor', state.themeColor);
         if (state.themeGradient) {
@@ -237,9 +235,8 @@ const AppContent: React.FC = () => {
             localStorage.removeItem('themeGradient');
         }
 
-        // 5. Dynamic App Icon (Favicon)
-        // Updated to use Theme Color as Background, White as Text, Om Symbol
-        const updateFavicon = () => {
+        // 5. Dynamic Icons (Favicon, Apple Touch, Manifest)
+        const updateIcons = () => {
             const bg = state.themeColor;
             const fill = '#ffffff'; 
             const svgString = `
@@ -251,11 +248,44 @@ const AppContent: React.FC = () => {
             
             const dataUrl = `data:image/svg+xml,${encodeURIComponent(svgString)}`;
             
-            // Update all favicon links
+            // Update Favicon links
             const links = document.querySelectorAll("link[rel*='icon']");
             links.forEach(link => (link as HTMLLinkElement).href = dataUrl);
+
+            // Update Meta Theme Color
+            const metaTheme = document.querySelector("meta[name='theme-color']");
+            if (metaTheme) metaTheme.setAttribute("content", bg);
+
+            // Dynamic Manifest Update (Blob URL)
+            // This allows the PWA install prompt to potentially pick up the new icon/color on some browsers
+            const manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
+            if (manifestLink) {
+                const dynamicManifest = {
+                    name: "Business Manager Pro",
+                    short_name: "Business Mgr",
+                    id: "/?source=pwa",
+                    start_url: "./index.html",
+                    scope: ".",
+                    background_color: "#f8fafc",
+                    display: "standalone",
+                    orientation: "portrait",
+                    theme_color: bg,
+                    description: "A comprehensive sales, purchase, and customer management application.",
+                    icons: [
+                        { src: dataUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
+                        { src: dataUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any" },
+                        { src: dataUrl, sizes: "512x512", type: "image/svg+xml", purpose: "maskable" }
+                    ]
+                };
+                
+                const stringManifest = JSON.stringify(dynamicManifest);
+                const blob = new Blob([stringManifest], {type: 'application/json'});
+                const manifestURL = URL.createObjectURL(blob);
+                
+                manifestLink.href = manifestURL;
+            }
         };
-        updateFavicon();
+        updateIcons();
 
     }, [state.theme, state.themeColor, state.themeGradient]);
 
