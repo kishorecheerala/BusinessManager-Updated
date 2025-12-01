@@ -117,7 +117,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     // Theme configs
     const primaryColor = templateConfig?.colors.primary || '#0d9488';
     const textColor = templateConfig?.colors.text || '#000000';
-    const titleFont = templateConfig?.fonts.titleFont || 'times';
+    const titleFont = templateConfig?.fonts.titleFont || 'helvetica';
     const bodyFont = templateConfig?.fonts.bodyFont || 'helvetica';
     
     // Layout Options
@@ -144,7 +144,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
 
         // 2. Header
         doc.setFont(titleFont, 'bold');
-        doc.setFontSize(16);
+        doc.setFontSize(14);
         doc.setTextColor(primaryColor);
         doc.text(profile?.name || 'Business Name', centerX, y, { align: 'center' });
         y += 6;
@@ -199,10 +199,6 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         sale.items.forEach(item => {
             const itemTotal = Number(item.price) * Number(item.quantity);
             
-            // Format: 
-            // Item Name.......................Total
-            // (Qty x Rate) or just Name if options hidden
-            
             doc.setFontSize(9);
             doc.setTextColor(textColor);
             doc.setFont(bodyFont, 'bold');
@@ -214,29 +210,27 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
             const nameLines = doc.splitTextToSize(item.productName, nameWidth);
             doc.text(nameLines, margin, y);
             
-            // Total aligned with first line of Name
             doc.text(totalStr, widthFull - margin, y, { align: 'right' });
             
             y += (nameLines.length * 4);
             
             // Sub-details line (Qty/Rate) if not hidden
-            if (!hideQty || !hideRate) {
+            let detailsText = '';
+            if (!hideQty && !hideRate) {
+                detailsText = `(x${item.quantity} @ ${formatCurrency(Number(item.price), currency, bodyFont)})`;
+            } else if (!hideQty) {
+                detailsText = `(Qty: ${item.quantity})`;
+            } else if (!hideRate) {
+                detailsText = `(@ ${formatCurrency(Number(item.price), currency, bodyFont)})`;
+            }
+
+            if (detailsText) {
                 doc.setFontSize(8);
                 doc.setTextColor('#555555');
                 doc.setFont(bodyFont, 'normal');
-                let detailsText = '';
-                if (!hideQty && !hideRate) {
-                    detailsText = `(x${item.quantity} @ ${formatCurrency(Number(item.price), currency, bodyFont)})`;
-                } else if (!hideQty) {
-                    detailsText = `(Qty: ${item.quantity})`;
-                } else if (!hideRate) {
-                    detailsText = `(@ ${formatCurrency(Number(item.price), currency, bodyFont)})`;
-                }
-                
                 doc.text(detailsText, margin + 2, y); 
                 y += 5;
             } else {
-                // Small buffer if no details line
                 y += 2; 
             }
         });

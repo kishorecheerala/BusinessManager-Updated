@@ -53,7 +53,7 @@ const ProductDetailsModal: React.FC<{
                                     <ImageIcon size={48} className="text-slate-400" />
                                 )}
                             </div>
-                            <div className="mt-3 flex gap-2 overflow-x-auto pb-2">
+                            <div className="mt-3 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                                 {product.additionalImages?.map((img, i) => (
                                     <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border dark:border-slate-600 flex-shrink-0">
                                         <img src={img} className="w-full h-full object-cover" alt="Detail" />
@@ -124,7 +124,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const { showConfirm } = useDialog();
     
     const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
-    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid'); // New State for Toggle
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [editedProduct, setEditedProduct] = useState<Product>(initialProductState);
     const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
@@ -411,7 +411,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 {filteredProducts.map(product => (
                                     <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
                                         <td className="px-4 py-2">
-                                            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-600 rounded overflow-hidden">
+                                            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-600 rounded overflow-hidden cursor-pointer" onClick={() => product.image && setViewImageModal(product.image)}>
                                                 {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><ImageIcon size={16}/></div>}
                                             </div>
                                         </td>
@@ -472,7 +472,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     {/* Images Section */}
                     <div>
                         <label className="block text-sm font-medium mb-2">Product Images</label>
-                        <div className="flex gap-2 overflow-x-auto pb-2">
+                        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
                                 className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800 transition-colors flex-shrink-0"
