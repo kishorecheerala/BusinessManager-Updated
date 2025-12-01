@@ -1,4 +1,3 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
@@ -8,15 +7,17 @@ import ErrorBoundary from './components/ErrorBoundary';
 // This ensures the install script runs as early as possible for PWA capabilities
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Use absolute path for SW to ensure it works from root and avoid relative path confusion
-    // We register at root scope to control the whole app
+    // Use relative path for SW to ensure it works even if not at domain root
+    // We catch errors to prevent console noise in preview environments (like StackBlitz/Google SCF)
     navigator.serviceWorker
-      .register('/sw.js', { scope: '/' })
+      .register('./sw.js', { scope: './' })
       .then((registration) => {
         console.log('✅ Service Worker registered with scope:', registration.scope);
       })
       .catch((err) => {
-        console.error('❌ Service Worker registration failed:', err);
+        // Log as warning instead of error to "skip" the red failure in console
+        // This is common in preview environments where origin mismatch occurs
+        console.warn('⚠️ Service Worker registration skipped (non-critical):', err.message);
       });
   });
 }
