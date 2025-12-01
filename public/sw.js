@@ -1,11 +1,11 @@
 
 // Cache-busting service worker - Forces complete refresh
-const CACHE_NAME = 'business-manager-v7';
+const CACHE_NAME = 'business-manager-v5'; // Bumped version
 const URLS_TO_CACHE = [
-  './',
-  './index.html',
-  './manifest.json',
-  './vite.svg'
+  '/',
+  '/index.html',
+  '/manifest.json',
+  '/vite.svg'
 ];
 
 // Install: Pre-cache critical files to pass PWA installability criteria
@@ -80,7 +80,7 @@ self.addEventListener('fetch', (event) => {
         // Fallback for navigation requests (HTML)
         // IMPORTANT: This ensures "/" requests are served index.html offline
         if (request.mode === 'navigate') {
-          return caches.match('./index.html');
+          return caches.match('/index.html');
         }
       });
     })

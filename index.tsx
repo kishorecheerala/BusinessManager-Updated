@@ -8,10 +8,10 @@ import ErrorBoundary from './components/ErrorBoundary';
 // This ensures the install script runs as early as possible for PWA capabilities
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    // Use relative path for SW to ensure it works even if not at domain root
-    // This fixes the "scriptURL does not match origin" error when served from subpaths
+    // Use absolute path for SW to ensure it works from root and avoid relative path confusion
+    // We register at root scope to control the whole app
     navigator.serviceWorker
-      .register('./sw.js', { scope: './' })
+      .register('/sw.js', { scope: '/' })
       .then((registration) => {
         console.log('✅ Service Worker registered with scope:', registration.scope);
       })
