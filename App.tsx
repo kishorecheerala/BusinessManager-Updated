@@ -246,15 +246,13 @@ const AppContent: React.FC = () => {
                 </svg>
             `.trim();
             
-            // Robust encoding for Unicode characters in Data URI
-            const base64Icon = window.btoa(unescape(encodeURIComponent(svgString)));
-            const dataUrl = `data:image/svg+xml;base64,${base64Icon}`;
+            const dataUrl = `data:image/svg+xml,${encodeURIComponent(svgString)}`;
             
-            // Update Favicon links (Standard and Apple)
+            // Update Favicon links
             const links = document.querySelectorAll("link[rel*='icon']");
             links.forEach(link => (link as HTMLLinkElement).href = dataUrl);
 
-            // Update Theme Color Meta
+            // Update Meta Theme Color
             const metaTheme = document.querySelector("meta[name='theme-color']");
             if (metaTheme) metaTheme.setAttribute("content", bg);
 
@@ -284,7 +282,6 @@ const AppContent: React.FC = () => {
                 const blob = new Blob([stringManifest], {type: 'application/json'});
                 const manifestURL = URL.createObjectURL(blob);
                 
-                // Cleanup old blob if needed, though browser handles mostly.
                 manifestLink.href = manifestURL;
             }
         };
