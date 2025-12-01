@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Plus, Search, Edit, Barcode, Image as ImageIcon, Package, X, Save, ScanLine } from 'lucide-react';
+import { Plus, Search, Edit, Barcode, Image as ImageIcon, Package, X, Save, ScanLine, Wand2, LayoutGrid, List, Eye } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product } from '../types';
 import Card from '../components/Card';
@@ -9,6 +9,7 @@ import BarcodeModal from '../components/BarcodeModal';
 import { compressImage } from '../utils/imageUtils';
 import { useDialog } from '../context/DialogContext';
 import QRScannerModal from '../components/QRScannerModal';
+import MarketingGeneratorModal from '../components/MarketingGeneratorModal';
 
 interface ProductsPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -27,17 +28,116 @@ const initialProductState: Product = {
     additionalImages: []
 };
 
+const ProductDetailsModal: React.FC<{
+    product: Product;
+    onClose: () => void;
+}> = ({ product, onClose }) => {
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 backdrop-blur-sm flex items-center justify-center z-[150] p-4 animate-fade-in-fast">
+            <Card className="w-full max-w-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh] p-0">
+                <div className="bg-slate-100 dark:bg-slate-800 p-4 border-b dark:border-slate-700 flex justify-between items-center">
+                    <h2 className="text-xl font-bold text-slate-800 dark:text-white">Product Details</h2>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                        <X size={24} className="text-slate-500" />
+                    </button>
+                </div>
+                
+                <div className="overflow-y-auto p-6 space-y-6">
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {/* Image Section */}
+                        <div className="w-full md:w-1/3 flex-shrink-0">
+                            <div className="aspect-square bg-slate-200 dark:bg-slate-700 rounded-xl overflow-hidden border dark:border-slate-600 flex items-center justify-center">
+                                {product.image ? (
+                                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                ) : (
+                                    <ImageIcon size={48} className="text-slate-400" />
+                                )}
+                            </div>
+                            <div className="mt-3 flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
+                                {product.additionalImages?.map((img, i) => (
+                                    <div key={i} className="w-16 h-16 rounded-lg overflow-hidden border dark:border-slate-600 flex-shrink-0">
+                                        <img src={img} className="w-full h-full object-cover" alt="Detail" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Details Section */}
+                        <div className="flex-grow space-y-4">
+                            <div>
+                                <h3 className="text-2xl font-bold text-slate-800 dark:text-white">{product.name}</h3>
+                                <div className="flex gap-2 mt-1">
+                                    <span className="bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2 py-0.5 rounded text-xs font-mono">
+                                        ID: {product.id}
+                                    </span>
+                                    {product.category && (
+                                        <span className="bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded text-xs font-semibold">
+                                            {product.category}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4 bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border dark:border-slate-700">
+                                <div>
+                                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Sale Price</p>
+                                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">₹{product.salePrice.toLocaleString('en-IN')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Stock</p>
+                                    <p className={`text-xl font-bold ${product.quantity < 5 ? 'text-red-500' : 'text-slate-800 dark:text-white'}`}>
+                                        {product.quantity}
+                                    </p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">Purchase Price</p>
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">₹{product.purchasePrice.toLocaleString('en-IN')}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-slate-500 uppercase font-bold mb-1">GST %</p>
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300">{product.gstPercent}%</p>
+                                </div>
+                            </div>
+
+                            {product.description && (
+                                <div>
+                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Description</p>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-relaxed bg-white dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-700">
+                                        {product.description}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+                
+                <div className="p-4 bg-slate-100 dark:bg-slate-800 border-t dark:border-slate-700 text-right">
+                    <Button onClick={onClose} variant="secondary">Close</Button>
+                </div>
+            </Card>
+        </div>
+    );
+};
+
 const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const { state, dispatch, showToast } = useAppContext();
     const { showConfirm } = useDialog();
     
     const [view, setView] = useState<'list' | 'add' | 'edit'>('list');
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
     const [searchTerm, setSearchTerm] = useState('');
     const [editedProduct, setEditedProduct] = useState<Product>(initialProductState);
     const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
     const [selectedProductForBarcode, setSelectedProductForBarcode] = useState<Product | null>(null);
     const [isScanning, setIsScanning] = useState(false);
     const [viewImageModal, setViewImageModal] = useState<string | null>(null);
+    
+    // Details Modal State
+    const [selectedProductDetails, setSelectedProductDetails] = useState<Product | null>(null);
+
+    // Marketing Modal State
+    const [isMarketingModalOpen, setIsMarketingModalOpen] = useState(false);
+    const [marketingProduct, setMarketingProduct] = useState<Product | null>(null);
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isDirtyRef = useRef(false);
@@ -150,6 +250,11 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         setSelectedProductForBarcode(product);
         setIsBarcodeModalOpen(true);
     };
+    
+    const openMarketingModal = (product: Product) => {
+        setMarketingProduct(product);
+        setIsMarketingModalOpen(true);
+    };
 
     const handleScan = (code: string) => {
         setIsScanning(false);
@@ -166,12 +271,27 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     if (view === 'list') {
         return (
             <div className="space-y-4 animate-fade-in-fast">
+                {selectedProductDetails && (
+                    <ProductDetailsModal 
+                        product={selectedProductDetails} 
+                        onClose={() => setSelectedProductDetails(null)} 
+                    />
+                )}
+
                 {isBarcodeModalOpen && selectedProductForBarcode && (
                     <BarcodeModal 
                         isOpen={isBarcodeModalOpen}
                         onClose={() => setIsBarcodeModalOpen(false)}
                         product={selectedProductForBarcode}
                         businessName={state.profile?.name || 'Business Manager'}
+                    />
+                )}
+                
+                {isMarketingModalOpen && marketingProduct && (
+                    <MarketingGeneratorModal 
+                        isOpen={isMarketingModalOpen}
+                        onClose={() => setIsMarketingModalOpen(false)}
+                        product={marketingProduct}
                     />
                 )}
 
@@ -184,13 +304,31 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     </div>
                 )}
 
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center flex-wrap gap-2">
                     <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
                         <Package /> Inventory
                     </h1>
-                    <Button onClick={() => { setEditedProduct(initialProductState); setView('add'); }}>
-                        <Plus size={16} className="mr-2"/> Add Product
-                    </Button>
+                    <div className="flex gap-2">
+                        <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                            <button 
+                                onClick={() => setViewMode('grid')}
+                                className={`p-1.5 rounded-md transition-all ${viewMode === 'grid' ? 'bg-white dark:bg-slate-600 shadow text-primary' : 'text-slate-500'}`}
+                                title="Grid View"
+                            >
+                                <LayoutGrid size={18} />
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('table')}
+                                className={`p-1.5 rounded-md transition-all ${viewMode === 'table' ? 'bg-white dark:bg-slate-600 shadow text-primary' : 'text-slate-500'}`}
+                                title="List View"
+                            >
+                                <List size={18} />
+                            </button>
+                        </div>
+                        <Button onClick={() => { setEditedProduct(initialProductState); setView('add'); }}>
+                            <Plus size={16} className="mr-2"/> Add
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="relative">
@@ -204,49 +342,113 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     />
                 </div>
 
-                <div className="grid grid-cols-1 gap-3">
-                    {filteredProducts.map((product) => (
-                        <div key={product.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm border dark:border-slate-700 flex gap-3 animate-slide-up-fade">
-                            <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-md flex-shrink-0 overflow-hidden border dark:border-slate-600 cursor-pointer" onClick={() => product.image && setViewImageModal(product.image)}>
-                                {product.image ? (
-                                    <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-                                ) : (
-                                    <div className="w-full h-full flex items-center justify-center text-gray-400">
-                                        <ImageIcon size={24} />
+                {filteredProducts.length === 0 ? (
+                    <div className="text-center py-10 text-gray-500">
+                        <Package size={48} className="mx-auto mb-2 opacity-50" />
+                        <p>No products found.</p>
+                    </div>
+                ) : viewMode === 'grid' ? (
+                    <div className="grid grid-cols-1 gap-3">
+                        {filteredProducts.map((product) => (
+                            <div key={product.id} className="bg-white dark:bg-slate-800 p-3 rounded-lg shadow-sm border dark:border-slate-700 flex gap-3 animate-slide-up-fade">
+                                <div className="w-16 h-16 bg-gray-100 dark:bg-slate-700 rounded-md flex-shrink-0 overflow-hidden border dark:border-slate-600 cursor-pointer" onClick={() => product.image && setViewImageModal(product.image)}>
+                                    {product.image ? (
+                                        <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                            <ImageIcon size={24} />
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-grow min-w-0">
+                                    <div className="flex justify-between items-start">
+                                        <div>
+                                            <h3 className="font-bold text-gray-800 dark:text-gray-200 truncate cursor-pointer hover:text-primary" onClick={() => setSelectedProductDetails(product)}>{product.name}</h3>
+                                            <p className="text-xs text-gray-500 font-mono">{product.id}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</p>
+                                            <p className={`text-xs font-bold ${product.quantity < 5 ? 'text-red-500' : 'text-green-600'}`}>
+                                                Stock: {product.quantity}
+                                            </p>
+                                        </div>
                                     </div>
-                                )}
-                            </div>
-                            <div className="flex-grow min-w-0">
-                                <div className="flex justify-between items-start">
-                                    <div>
-                                        <h3 className="font-bold text-gray-800 dark:text-gray-200 truncate">{product.name}</h3>
-                                        <p className="text-xs text-gray-500 font-mono">{product.id}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</p>
-                                        <p className={`text-xs font-bold ${product.quantity < 5 ? 'text-red-500' : 'text-green-600'}`}>
-                                            Stock: {product.quantity}
-                                        </p>
+                                    <div className="flex justify-end gap-2 mt-2">
+                                        <button 
+                                            onClick={() => openMarketingModal(product)} 
+                                            className="h-8 px-2 text-xs bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-900/50 rounded flex items-center border border-purple-200 dark:border-purple-800 transition-colors"
+                                            title="Create Marketing Content"
+                                        >
+                                            <Wand2 size={14} className="mr-1"/> Promote
+                                        </button>
+                                        <Button onClick={() => openBarcodeModal(product)} variant="secondary" className="h-8 px-2 text-xs">
+                                            <Barcode size={14} className="mr-1"/> Label
+                                        </Button>
+                                        <Button onClick={() => handleEdit(product)} variant="secondary" className="h-8 px-2 text-xs">
+                                            <Edit size={14} className="mr-1"/> Edit
+                                        </Button>
                                     </div>
                                 </div>
-                                <div className="flex justify-end gap-2 mt-2">
-                                    <Button onClick={() => openBarcodeModal(product)} variant="secondary" className="h-8 px-2 text-xs">
-                                        <Barcode size={14} className="mr-1"/> Label
-                                    </Button>
-                                    <Button onClick={() => handleEdit(product)} variant="secondary" className="h-8 px-2 text-xs">
-                                        <Edit size={14} className="mr-1"/> Edit
-                                    </Button>
-                                </div>
                             </div>
-                        </div>
-                    ))}
-                    {filteredProducts.length === 0 && (
-                        <div className="text-center py-10 text-gray-500">
-                            <Package size={48} className="mx-auto mb-2 opacity-50" />
-                            <p>No products found.</p>
-                        </div>
-                    )}
-                </div>
+                        ))}
+                    </div>
+                ) : (
+                    // TABLE VIEW
+                    <div className="overflow-x-auto bg-white dark:bg-slate-800 rounded-lg shadow border dark:border-slate-700 animate-fade-in-up">
+                        <table className="w-full text-sm text-left">
+                            <thead className="text-xs text-slate-500 uppercase bg-slate-50 dark:bg-slate-700 dark:text-slate-300">
+                                <tr>
+                                    <th className="px-4 py-3">Image</th>
+                                    <th className="px-4 py-3">Name / ID</th>
+                                    <th className="px-4 py-3">Category</th>
+                                    <th className="px-4 py-3 text-right">Cost</th>
+                                    <th className="px-4 py-3 text-right">Price</th>
+                                    <th className="px-4 py-3 text-center">Stock</th>
+                                    <th className="px-4 py-3 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {filteredProducts.map(product => (
+                                    <tr key={product.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                        <td className="px-4 py-2">
+                                            <div className="w-10 h-10 bg-slate-100 dark:bg-slate-600 rounded overflow-hidden cursor-pointer" onClick={() => product.image && setViewImageModal(product.image)}>
+                                                {product.image ? <img src={product.image} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-slate-400"><ImageIcon size={16}/></div>}
+                                            </div>
+                                        </td>
+                                        <td className="px-4 py-2">
+                                            <div className="font-semibold text-slate-800 dark:text-slate-200 cursor-pointer hover:text-primary" onClick={() => setSelectedProductDetails(product)}>{product.name}</div>
+                                            <div className="text-xs text-slate-500 font-mono">{product.id}</div>
+                                        </td>
+                                        <td className="px-4 py-2 text-slate-600 dark:text-slate-400">
+                                            {product.category || '-'}
+                                        </td>
+                                        <td className="px-4 py-2 text-right text-slate-600 dark:text-slate-400">
+                                            ₹{product.purchasePrice.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2 text-right font-bold text-slate-800 dark:text-slate-200">
+                                            ₹{product.salePrice.toLocaleString()}
+                                        </td>
+                                        <td className="px-4 py-2 text-center">
+                                            <span className={`px-2 py-1 rounded text-xs font-bold ${product.quantity < 5 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'}`}>
+                                                {product.quantity}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-2 text-right">
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={() => setSelectedProductDetails(product)} className="p-1.5 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-600 rounded" title="View Details">
+                                                    <Eye size={16} />
+                                                </button>
+                                                <button onClick={() => handleEdit(product)} className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded" title="Edit">
+                                                    <Edit size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
         );
     }
@@ -270,7 +472,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                     {/* Images Section */}
                     <div>
                         <label className="block text-sm font-medium mb-2">Product Images</label>
-                        <div className="flex gap-2 overflow-x-auto pb-2">
+                        <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
                             <button 
                                 onClick={() => fileInputRef.current?.click()}
                                 className="w-20 h-20 flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:bg-gray-50 dark:border-slate-600 dark:hover:bg-slate-800 transition-colors flex-shrink-0"
