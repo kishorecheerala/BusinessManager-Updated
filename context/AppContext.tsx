@@ -626,7 +626,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
   }
 };
 
-const AppContext = createContext<{
+// Exporting the Context itself to allow useContext usage directly if needed
+export const AppContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<any>;
   isDbLoaded: boolean;

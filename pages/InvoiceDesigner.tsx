@@ -363,7 +363,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         };
     }, [resize, stopResizing]);
 
-    const getInitialConfig = (type: DocumentType): ExtendedLayoutConfig => {
+    const getInitialConfig = (type: DocumentType): InvoiceTemplateConfig => {
         let baseConfig: InvoiceTemplateConfig;
         switch (type) {
             case 'ESTIMATE': baseConfig = state.estimateTemplate; break;
@@ -405,20 +405,14 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
             }
         };
 
-        // Enforce smart defaults for receipts if they seem off (e.g. A4 margins on narrow paper)
-        if (type === 'RECEIPT') {
-            if (config.layout.margin > 5) config.layout.margin = 2;
-            if (config.layout.logoSize > 20) config.layout.logoSize = 15;
-        }
-
         return config;
     };
 
-    const [localConfig, setLocalConfig] = useState<ExtendedLayoutConfig>(getInitialConfig('INVOICE'));
+    const [localConfig, setLocalConfig] = useState<InvoiceTemplateConfig>(getInitialConfig('INVOICE'));
     // Ref to hold the latest config for solving race condition
-    const configRef = useRef<ExtendedLayoutConfig>(localConfig);
+    const configRef = useRef<InvoiceTemplateConfig>(localConfig);
     const [initialConfigJson, setInitialConfigJson] = useState('');
-    const [history, setHistory] = useState<ExtendedLayoutConfig[]>([getInitialConfig('INVOICE')]);
+    const [history, setHistory] = useState<InvoiceTemplateConfig[]>([getInitialConfig('INVOICE')]);
     const [historyIndex, setHistoryIndex] = useState(0);
 
     useEffect(() => {
@@ -441,7 +435,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         setIsDirty(isChanged);
     }, [localConfig, initialConfigJson, setIsDirty]);
 
-    const pushToHistory = (newConfig: ExtendedLayoutConfig) => {
+    const pushToHistory = (newConfig: InvoiceTemplateConfig) => {
         const newHistory = history.slice(0, historyIndex + 1);
         newHistory.push(newConfig);
         if (newHistory.length > 50) newHistory.shift();
@@ -470,7 +464,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         pushToHistory(newConfig);
     };
 
-    const handleBatchLayoutChange = (updates: Partial<ExtendedLayoutConfig['layout']>) => {
+    const handleBatchLayoutChange = (updates: Partial<InvoiceTemplateConfig['layout']>) => {
         const current = configRef.current;
         const newConfig = {
             ...current,
@@ -494,7 +488,7 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                     [key]: value
                 }
             }
-        } as ExtendedLayoutConfig;
+        } as InvoiceTemplateConfig;
         configRef.current = newConfig;
         pushToHistory(newConfig);
     };
@@ -562,21 +556,14 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         if (preset) {
             let layoutUpdate = { ...preset.layout };
             
-            // Smart Preset Logic for Receipts
-            if (docType === 'RECEIPT') {
-                layoutUpdate.margin = 2; // Narrow margins
-                layoutUpdate.logoSize = Math.min(layoutUpdate.logoSize, 18);
-                layoutUpdate.paperSize = undefined; // Force custom size calc
-            }
-
             const current = configRef.current as InvoiceTemplateConfig;
             const newConfig = {
                 ...current,
                 colors: { ...current.colors, ...preset.colors },
                 fonts: { ...current.fonts, ...preset.fonts },
-                layout: { ...(current as ExtendedLayoutConfig).layout, ...layoutUpdate },
+                layout: { ...(current as InvoiceTemplateConfig).layout, ...layoutUpdate },
                 content: { ...current.content, ...preset.content }
-            } as ExtendedLayoutConfig;
+            } as InvoiceTemplateConfig;
             configRef.current = newConfig;
             pushToHistory(newConfig);
         }

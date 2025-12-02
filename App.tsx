@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -121,7 +122,9 @@ const AppContent: React.FC = () => {
 
         try {
             const saved = localStorage.getItem('business_manager_last_page');
-            if (saved && Object.keys(ICON_MAP).includes(saved)) {
+            // Exclude admin/utility pages from auto-restore to prevent getting stuck
+            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER'];
+            if (saved && Object.keys(ICON_MAP).includes(saved) && !excludedPages.includes(saved)) {
                 return saved as Page;
             }
         } catch(e) {}
@@ -134,8 +137,14 @@ const AppContent: React.FC = () => {
         const action = params.get('action');
         if (action === 'new_customer') {
             dispatch({ type: 'SET_SELECTION', payload: { page: 'CUSTOMERS', id: 'new' } });
-            // Clean URL
-            window.history.replaceState({}, '', '/');
+            // Clean URL safely
+            try {
+                // Use replaceState with current path to remove query params if possible, otherwise ignore
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, '', newUrl);
+            } catch (e) {
+                console.warn('Could not clean URL history', e);
+            }
         }
     }, [dispatch]);
 
@@ -192,6 +201,57 @@ const AppContent: React.FC = () => {
         localStorage.setItem('business_manager_last_page', currentPage);
         window.scrollTo(0, 0); 
     }, [currentPage]);
+
+    // Double Back to Exit Logic
+    useEffect(() => {
+        // Wrapper for safer history manipulation (avoids crashes in restricted frames/blobs)
+        const safePushState = (data: any, title: string, url?: string | null) => {
+            try {
+                window.history.pushState(data, title, url);
+            } catch (e) {
+                console.debug('History pushState restricted');
+            }
+        };
+
+        // Push a dummy state initially so 'back' event is captured by popstate
+        // Passing null for URL respects current location (safer for blobs)
+        safePushState(null, '', null); 
+
+        let backPressCount = 0;
+        let backPressTimer: any;
+
+        const handlePopState = (event: PopStateEvent) => {
+            // Prevent default back navigation if we want to intercept it
+            // However, popstate fires AFTER the history change.
+            // So we need to re-push the state if we want to stay.
+            
+            backPressCount++;
+            
+            if (backPressCount === 1) {
+                // First press: Show warning and stay in app
+                showToast("Press back again to exit", "info");
+                // Push state again so next back press triggers popstate again
+                safePushState(null, '', null);
+                
+                // Reset counter after 2 seconds
+                backPressTimer = setTimeout(() => {
+                    backPressCount = 0;
+                }, 2000);
+            } else {
+                // Second press: Do nothing (allow exit/back)
+                // Or explicitly close if in a PWA wrapper?
+                // Standard behavior is just letting the history pop naturally now.
+                clearTimeout(backPressTimer);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            clearTimeout(backPressTimer);
+        };
+    }, []);
 
     // Apply Theme & Dynamic Icon
     useEffect(() => {
@@ -324,26 +384,8 @@ const AppContent: React.FC = () => {
 
     const isMoreBtnActive = mobileMoreItems.some(item => item.page === currentPage);
 
-    // Swipe Navigation Removed as per user request to prevent accidental closure/navigation
-    /*
-    useSwipe({
-        onSwipeLeft: () => {
-            // Simple cycle through top 5 items for swipe
-            const topPages = state.navOrder.slice(0, 5);
-            const idx = topPages.indexOf(currentPage);
-            if (idx >= 0 && idx < topPages.length - 1) {
-                handleNavigation(topPages[idx + 1] as Page);
-            }
-        },
-        onSwipeRight: () => {
-            const topPages = state.navOrder.slice(0, 5);
-            const idx = topPages.indexOf(currentPage);
-            if (idx > 0) {
-                handleNavigation(topPages[idx - 1] as Page);
-            }
-        }
-    });
-    */
+    // Swipe Navigation Removed to prevent accidental closure
+    // The user requested to disable single swipe closure, relying on double-back button logic instead.
 
     if (!isDbLoaded) return <AppSkeletonLoader />;
 

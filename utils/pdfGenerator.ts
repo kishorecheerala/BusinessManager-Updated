@@ -106,7 +106,7 @@ const numberToWords = (n: number): string => {
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, templateConfig?: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
     const currency = templateConfig?.currencySymbol || 'Rs.';
     const widthFull = 80; 
-    const margin = templateConfig?.layout.margin ? Math.min(templateConfig.layout.margin, 5) : 3;
+    const margin = templateConfig?.layout.margin ?? 3; // Use config margin or default 3
     const pageWidth = widthFull - (margin * 2);
     const centerX = widthFull / 2;
 
@@ -142,7 +142,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         // 1. Logo
         if (profile?.logo) {
             try {
-                const logoSize = templateConfig?.layout.logoSize ? Math.min(templateConfig.layout.logoSize, 25) : 18;
+                const logoSize = templateConfig?.layout.logoSize ? templateConfig.layout.logoSize : 18;
                 let x = (widthFull - logoSize) / 2;
                 let ly = y;
 

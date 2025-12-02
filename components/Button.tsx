@@ -1,6 +1,6 @@
 
-import React, { forwardRef } from 'react';
-import { useAppContext } from '../context/AppContext';
+import React, { forwardRef, useContext } from 'react';
+import { AppContext } from '../context/AppContext';
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   children: React.ReactNode;
@@ -9,8 +9,10 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(({ children, variant = 'primary', className = '', type = 'button', ...props }, ref) => {
-  const { state } = useAppContext();
-  const style = state.uiPreferences?.buttonStyle || 'rounded';
+  // Use useContext directly to avoid throwing if provider is missing (e.g. inside ErrorBoundary)
+  const context = useContext(AppContext);
+  const state = context?.state;
+  const style = state?.uiPreferences?.buttonStyle || 'rounded';
 
   let roundedClass = 'rounded-md'; // Default
   if (style === 'pill') roundedClass = 'rounded-full';

@@ -1,6 +1,6 @@
 
-import React from 'react';
-import { useAppContext } from '../context/AppContext';
+import React, { useContext } from 'react';
+import { AppContext } from '../context/AppContext';
 
 // Extend from HTMLAttributes to accept props like onClick
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -10,8 +10,10 @@ interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 const Card: React.FC<CardProps> = ({ children, className = '', title, ...props }) => {
-  const { state } = useAppContext();
-  const style = state.uiPreferences?.cardStyle || 'solid';
+  // Use useContext directly to avoid throwing if provider is missing (e.g. inside ErrorBoundary)
+  const context = useContext(AppContext);
+  const state = context?.state;
+  const style = state?.uiPreferences?.cardStyle || 'solid';
 
   let styleClasses = 'bg-white dark:bg-slate-800 shadow-md border-t-4 border-primary'; // Default Solid
   
