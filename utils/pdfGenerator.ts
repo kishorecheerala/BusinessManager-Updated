@@ -105,6 +105,9 @@ const numberToWords = (n: number): string => {
 // --- Thermal Receipt Generator (80mm Standard) ---
 export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, profile: ProfileData | null, templateConfig?: InvoiceTemplateConfig, customFonts?: CustomFont[]) => {
     const currency = templateConfig?.currencySymbol || 'Rs.';
+    const labels = { ...defaultLabels, ...templateConfig?.content.labels };
+    const spacing = templateConfig?.layout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 };
+    
     const widthFull = 80; 
     const margin = templateConfig?.layout.margin ?? 3; // Use config margin or default 3
     const pageWidth = widthFull - (margin * 2);
@@ -157,7 +160,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
                 doc.addImage(profile.logo, getImageType(profile.logo), x, ly, logoSize, logoSize);
                 
                 if (!isAbsoluteLogo) {
-                    y += logoSize + 4;
+                    y += logoSize + (spacing.logoBottom ?? 4);
                 }
             } catch(e) { }
         }
@@ -172,7 +175,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         if (headerAlign === 'right') alignX = widthFull - margin;
         
         doc.text(profile?.name || 'Business Name', alignX, y, { align: headerAlign });
-        y += 6;
+        y += (6 + (spacing.titleBottom ?? 0));
 
         doc.setTextColor(textColor);
         doc.setFont(bodyFont, 'normal');
@@ -182,9 +185,9 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         const startMetaY = y;
         const qrSize = 18;
         
-        doc.text(`Invoice: ${sale.id}`, margin, y);
+        doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y);
         y += 4;
-        doc.text(`Date: ${formatDate(sale.date, templateConfig?.dateFormat)}`, margin, y);
+        doc.text(`${labels.date}: ${formatDate(sale.date, templateConfig?.dateFormat)}`, margin, y);
         y += 4;
 
         if (qrCodeBase64) {
@@ -197,7 +200,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
 
         // 4. Billed To
         doc.setFont(bodyFont, 'bold');
-        doc.text('Billed To:', margin, y);
+        doc.text(labels.billedTo, margin, y);
         y += 4;
         doc.setFont(bodyFont, 'normal');
         doc.text(customer.name, margin, y);
@@ -214,6 +217,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         y += 5;
         doc.setFont(bodyFont, 'bold');
         doc.setFontSize(10);
+        // Using "Item" label or generic
         doc.text('Purchase Details', centerX, y, { align: 'center' });
         y += 2;
         doc.line(margin, y, widthFull - margin, y);
@@ -244,7 +248,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
             if (!hideQty && !hideRate) {
                 detailsText = `(x${item.quantity} @ ${formatCurrency(Number(item.price), currency, bodyFont)})`;
             } else if (!hideQty) {
-                detailsText = `(Qty: ${item.quantity})`;
+                detailsText = `(${labels.qty}: ${item.quantity})`;
             } else if (!hideRate) {
                 detailsText = `(@ ${formatCurrency(Number(item.price), currency, bodyFont)})`;
             }
@@ -279,20 +283,20 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         };
 
         if (sale.discount > 0 || sale.gstAmount > 0) {
-            addTotalRow('Subtotal', formatCurrency(subTotal, currency, bodyFont));
+            addTotalRow(labels.subtotal, formatCurrency(subTotal, currency, bodyFont));
             if (templateConfig?.content.showGst !== false && sale.gstAmount > 0) {
-                addTotalRow('GST', formatCurrency(Number(sale.gstAmount), currency, bodyFont));
+                addTotalRow(labels.gst, formatCurrency(Number(sale.gstAmount), currency, bodyFont));
             }
-            if (sale.discount > 0) addTotalRow('Discount', `-${formatCurrency(Number(sale.discount), currency, bodyFont)}`);
+            if (sale.discount > 0) addTotalRow(labels.discount, `-${formatCurrency(Number(sale.discount), currency, bodyFont)}`);
             y += 1;
         }
         
-        addTotalRow('Total', formatCurrency(Number(sale.totalAmount), currency, bodyFont), true, 11);
-        if (paid > 0) addTotalRow('Paid', formatCurrency(paid, currency, bodyFont));
+        addTotalRow(labels.grandTotal, formatCurrency(Number(sale.totalAmount), currency, bodyFont), true, 11);
+        if (paid > 0) addTotalRow(labels.paid, formatCurrency(paid, currency, bodyFont));
         if (due > 0.01) {
-            addTotalRow('Due', formatCurrency(due, currency, bodyFont), true, 10);
+            addTotalRow(labels.balance, formatCurrency(due, currency, bodyFont), true, 10);
         } else {
-            addTotalRow('Due', `${currency} 0.00`, true, 10);
+            addTotalRow(labels.balance, `${currency} 0.00`, true, 10);
         }
 
         // Amount In Words
