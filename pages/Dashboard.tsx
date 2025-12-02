@@ -1,11 +1,9 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, XCircle, CheckCircle, Info, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, ArrowRight, Zap, BrainCircuit, TrendingDown, Wallet, CalendarClock, Tag, Undo2, Crown, Calendar, Receipt, MessageCircle, Clock, History, PenTool, FileText, Loader2, RotateCw, Share, Volume2, StopCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
 import Button from '../components/Button';
-import { DataImportModal } from '../components/DataImportModal';
 import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataBackup, Expense } from '../types';
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
@@ -57,7 +55,7 @@ const MetricCard: React.FC<{
     </div>
 );
 
-// Helper for TTS decoding
+// --- Helper for TTS decoding ---
 async function decodeAudioData(data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> {
   const dataInt16 = new Int16Array(data.buffer);
   const frameCount = dataInt16.length / numChannels;
@@ -98,7 +96,6 @@ const SmartAnalystCard: React.FC<{
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-    // Hardcoded insights (Default fallback)
     const staticInsights = useMemo(() => {
         const list: { icon: React.ElementType, text: string, color: string, type: string }[] = [];
         const now = new Date();
@@ -107,7 +104,6 @@ const SmartAnalystCard: React.FC<{
         const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
         const currentDay = Math.max(1, now.getDate());
 
-        // 1. Revenue Projection
         const thisMonthSales = sales.filter(s => {
             const d = new Date(s.date);
             return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -127,7 +123,6 @@ const SmartAnalystCard: React.FC<{
             }
         }
 
-        // 2. Cash Flow
         const thisMonthPurchases = purchases.filter(p => {
             const d = new Date(p.date);
             return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
@@ -145,7 +140,6 @@ const SmartAnalystCard: React.FC<{
             }
         }
 
-        // 3. Dead Stock
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
         const activeProductIds = new Set();
@@ -166,7 +160,6 @@ const SmartAnalystCard: React.FC<{
             });
         }
 
-        // Fallback
         if (list.length === 0) {
             list.push({
                 icon: Sparkles,
@@ -176,7 +169,7 @@ const SmartAnalystCard: React.FC<{
             });
         }
 
-        return list.slice(0, 2); // Show top 2
+        return list.slice(0, 2); 
     }, [sales, products, customers, purchases, returns, expenses]);
 
     const handleGenerateBriefing = async () => {
@@ -187,7 +180,6 @@ const SmartAnalystCard: React.FC<{
 
             const ai = new GoogleGenAI({ apiKey });
             
-            // Prepare small data summary
             const recentSales = sales.slice(-10);
             const totalRev = sales.reduce((acc, s) => acc + Number(s.totalAmount), 0);
             const totalDue = customers.reduce((acc, c) => {
@@ -240,7 +232,6 @@ const SmartAnalystCard: React.FC<{
             const ai = new GoogleGenAI({ apiKey });
             const briefingText = aiBriefing || "Your business is running smoothly. Check your sales and stock levels for more details.";
             
-            // TTS Prompt
             const prompt = `Say in a professional, encouraging news-anchor voice: "Here is your business briefing, ${ownerName}. ${briefingText.replace(/[*#]/g, '')}"`;
 
             const response = await ai.models.generateContent({
@@ -355,7 +346,6 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime:
     let backupDate: Date | null = null;
     let isCloud = false;
 
-    // Check Cloud Sync first
     if (lastSyncTime) {
         const syncD = new Date(lastSyncTime);
         const syncStr = syncD.toISOString().slice(0, 10);
@@ -366,7 +356,6 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime:
         }
     }
 
-    // Fallback to manual backup if cloud is not today
     if (status !== 'safe' && lastBackupDate) {
         const manualD = new Date(lastBackupDate);
         const manualStr = manualD.toISOString().slice(0, 10);
@@ -375,14 +364,12 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime:
             backupDate = manualD;
             isCloud = false;
         } else {
-            // Determine most recent date for overdue calculation
             const latestDate = lastSyncTime ? (manualD > new Date(lastSyncTime) ? manualD : new Date(lastSyncTime)) : manualD;
             diffDays = Math.floor((now.getTime() - latestDate.getTime()) / (1000 * 60 * 60 * 24));
             status = 'overdue';
             backupDate = latestDate;
         }
     } else if (status !== 'safe' && lastSyncTime) {
-         // Only cloud sync exists but old
          const syncD = new Date(lastSyncTime);
          diffDays = Math.floor((now.getTime() - syncD.getTime()) / (1000 * 60 * 60 * 24));
          status = 'overdue';
@@ -438,11 +425,9 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
 
         sales.forEach(sale => {
             const saleDate = new Date(sale.date);
-
             if (saleDate < thirtyDaysAgo) {
                 const amountPaid = (sale.payments || []).reduce((sum, p) => sum + Number(p.amount), 0);
                 const dueAmount = Number(sale.totalAmount) - amountPaid;
-
                 if (dueAmount > 0.01) {
                     const customerId = sale.customerId;
                     if (!overdueCustomers[customerId]) {
@@ -455,7 +440,6 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
                             };
                         }
                     }
-
                     if (overdueCustomers[customerId]) {
                         overdueCustomers[customerId].totalOverdue += dueAmount;
                         if (new Date(sale.date) < new Date(overdueCustomers[customerId].oldestOverdueDate)) {
@@ -465,7 +449,6 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
                 }
             }
         });
-
         return Object.values(overdueCustomers);
     }, [sales, customers]);
 
@@ -475,7 +458,6 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
         const encodedMessage = encodeURIComponent(message);
         const cleanPhone = customer.phone.replace(/\D/g, '');
         const finalPhone = cleanPhone.length === 10 ? `91${cleanPhone}` : cleanPhone;
-        
         window.open(`https://wa.me/${finalPhone}?text=${encodedMessage}`, '_blank');
     };
 
@@ -520,13 +502,7 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
                             <p className="font-bold text-lg text-red-600 dark:text-red-400">₹{totalOverdue.toLocaleString('en-IN')}</p>
                             <div className="flex items-center justify-end gap-2">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">{Math.floor((new Date().getTime() - new Date(oldestOverdueDate).getTime()) / (1000 * 60 * 60 * 24))} days old</p>
-                                <button
-                                    onClick={(e) => sendWhatsAppReminder(e, customer, totalOverdue)}
-                                    className="bg-green-500 text-white p-1 rounded-full hover:scale-110 transition-transform"
-                                    title="Send Reminder"
-                                >
-                                    <MessageCircle size={12} />
-                                </button>
+                                <button onClick={(e) => sendWhatsAppReminder(e, customer, totalOverdue)} className="bg-green-500 text-white p-1 rounded-full hover:scale-110 transition-transform" title="Send Reminder"><MessageCircle size={12} /></button>
                             </div>
                         </div>
                     </div>
@@ -542,17 +518,9 @@ const UpcomingPurchaseDuesCard: React.FC<{
     onNavigate: (supplierId: string) => void; 
 }> = ({ purchases, suppliers, onNavigate }) => {
     const upcomingDues = useMemo(() => {
-        const dues: {
-            purchaseId: string;
-            supplier: Supplier;
-            totalPurchaseDue: number;
-            dueDate: Date;
-            daysRemaining: number;
-        }[] = [];
-
+        const dues: any[] = [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        
         const thirtyDaysFromNow = new Date();
         thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
         thirtyDaysFromNow.setHours(23, 59, 59, 999);
@@ -566,40 +534,29 @@ const UpcomingPurchaseDuesCard: React.FC<{
                 if (!supplier) return;
 
                 purchase.paymentDueDates.forEach(dateStr => {
-                    const dueDate = new Date(dateStr + 'T00:00:00'); // Treat date string as local time
-                    
+                    const dueDate = new Date(dateStr + 'T00:00:00');
                     if (dueDate >= today && dueDate <= thirtyDaysFromNow) {
                         const timeDiff = dueDate.getTime() - today.getTime();
                         const daysRemaining = Math.ceil(timeDiff / (1000 * 3600 * 24));
-                        
-                        dues.push({
-                            purchaseId: purchase.id,
-                            supplier: supplier,
-                            totalPurchaseDue: dueAmount,
-                            dueDate: dueDate,
-                            daysRemaining: daysRemaining,
-                        });
+                        dues.push({ purchaseId: purchase.id, supplier: supplier, totalPurchaseDue: dueAmount, dueDate: dueDate, daysRemaining: daysRemaining });
                     }
                 });
             }
         });
-
         return dues.sort((a, b) => a.daysRemaining - b.daysRemaining);
     }, [purchases, suppliers]);
 
-    if (upcomingDues.length === 0) {
-        return (
-            <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
-                <div className="flex items-center">
-                    <PackageCheck className="w-8 h-8 text-green-600 dark:text-green-400 mr-4" />
-                    <div>
-                        <p className="font-bold text-green-800 dark:text-green-200">No Upcoming Purchase Dues</p>
-                        <p className="text-sm text-green-700 dark:text-green-300">There are no payment dues to suppliers in the next 30 days.</p>
-                    </div>
+    if (upcomingDues.length === 0) return (
+        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
+            <div className="flex items-center">
+                <PackageCheck className="w-8 h-8 text-green-600 dark:text-green-400 mr-4" />
+                <div>
+                    <p className="font-bold text-green-800 dark:text-green-200">No Upcoming Purchase Dues</p>
+                    <p className="text-sm text-green-700 dark:text-green-300">There are no payment dues to suppliers in the next 30 days.</p>
                 </div>
-            </Card>
-        );
-    }
+            </div>
+        </Card>
+    );
 
     return (
         <Card className="border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600">
@@ -610,17 +567,9 @@ const UpcomingPurchaseDuesCard: React.FC<{
             <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">The following payments to suppliers are due within the next 30 days.</p>
             <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {upcomingDues.map((due) => {
-                    const countdownText = due.daysRemaining === 0
-                        ? "Due today"
-                        : `Due in ${due.daysRemaining} day${due.daysRemaining !== 1 ? 's' : ''}`;
+                    const countdownText = due.daysRemaining === 0 ? "Due today" : `Due in ${due.daysRemaining} day${due.daysRemaining !== 1 ? 's' : ''}`;
                     return (
-                        <div
-                            key={`${due.purchaseId}-${due.dueDate.toISOString()}`}
-                            className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex justify-between items-center border dark:border-slate-700"
-                            onClick={() => onNavigate(due.supplier.id)}
-                            role="button"
-                            tabIndex={0}
-                        >
+                        <div key={`${due.purchaseId}-${due.dueDate.toISOString()}`} className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex justify-between items-center border dark:border-slate-700" onClick={() => onNavigate(due.supplier.id)}>
                             <div className="flex items-center gap-3">
                                 <Package className="w-6 h-6 text-amber-700 dark:text-amber-400 flex-shrink-0" />
                                 <div>
@@ -645,19 +594,17 @@ const LowStockCard: React.FC<{ products: Product[]; onNavigate: (id: string) => 
         return products.filter(p => p.quantity < 5).sort((a, b) => a.quantity - b.quantity);
     }, [products]);
 
-    if (lowStockProducts.length === 0) {
-        return (
-            <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
-                <div className="flex items-center">
-                    <PackageCheck className="w-8 h-8 text-green-600 dark:text-green-400 mr-4" />
-                    <div>
-                        <p className="font-bold text-green-800 dark:text-green-200">Stock Healthy</p>
-                        <p className="text-sm text-green-700 dark:text-green-300">All products have sufficient stock levels (5+).</p>
-                    </div>
+    if (lowStockProducts.length === 0) return (
+        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
+            <div className="flex items-center">
+                <PackageCheck className="w-8 h-8 text-green-600 dark:text-green-400 mr-4" />
+                <div>
+                    <p className="font-bold text-green-800 dark:text-green-200">Stock Healthy</p>
+                    <p className="text-sm text-green-700 dark:text-green-300">All products have sufficient stock levels (5+).</p>
                 </div>
-            </Card>
-        );
-    }
+            </div>
+        </Card>
+    );
 
     return (
         <Card className="border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-600">
@@ -667,11 +614,7 @@ const LowStockCard: React.FC<{ products: Product[]; onNavigate: (id: string) => 
             </div>
             <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                 {lowStockProducts.map(product => (
-                    <div
-                        key={product.id}
-                        className="p-2 bg-white dark:bg-slate-800 rounded shadow-sm flex justify-between items-center cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border dark:border-slate-700"
-                        onClick={() => onNavigate(product.id)}
-                    >
+                    <div key={product.id} className="p-2 bg-white dark:bg-slate-800 rounded shadow-sm flex justify-between items-center cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border dark:border-slate-700" onClick={() => onNavigate(product.id)}>
                         <div>
                             <p className="font-semibold text-sm dark:text-slate-200">{product.name}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-400">ID: {product.id}</p>
@@ -694,13 +637,11 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
-    const [isImportModalOpen, setIsImportModalOpen] = useState(false);
     
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
     const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-    
     const [isCheckpointsModalOpen, setIsCheckpointsModalOpen] = useState(false);
 
     const lastBackupDate = (app_metadata.find(m => m.id === 'lastBackup') as AppMetadataBackup | undefined)?.date || null;
@@ -727,7 +668,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         const filteredYearSales = sales.filter(s => new Date(s.date).getFullYear() === yearInt);
         const filteredYearPurchases = purchases.filter(p => new Date(p.date).getFullYear() === yearInt);
         
-        // 2. Monthly (or All Months if selected)
+        // 2. Monthly
         let filteredMonthSales = [];
         let filteredMonthPurchases = [];
 
@@ -743,7 +684,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         const monthSalesTotal = filteredMonthSales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
         const monthPurchasesTotal = filteredMonthPurchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
         
-        // Customer Dues (All time, not just this month)
+        // Customer Dues (All time)
         const totalCustomerDues = sales.reduce((sum, s) => {
             const paid = (s.payments || []).reduce((pSum, p) => pSum + Number(p.amount), 0);
             return sum + (Number(s.totalAmount) - paid);
@@ -807,27 +748,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         }
     };
 
-    const handleLoadTestData = async () => {
-        const confirmed = await showConfirm("This will OVERWRITE your current data with sample test data. Are you sure you want to proceed?", {
-            title: "Load Test Data",
-            confirmText: "Yes, Overwrite",
-            variant: "danger"
-        });
-        
-        if (confirmed) {
-            setIsGeneratingReport(true);
-            try {
-                await db.importData(testData as any);
-                await db.saveCollection('profile', [testProfile]);
-                window.location.reload();
-            } catch (error) {
-                console.error("Failed to load test data:", error);
-                showToast("Failed to load test data.", 'error');
-                setIsGeneratingReport(false);
-            }
-        }
-    };
-
     const handleCreateCheckpoint = async () => {
         const name = prompt("Enter a name for this checkpoint:", `Backup ${new Date().toLocaleTimeString()}`);
         if (name) {
@@ -873,9 +793,27 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         e.target.value = ''; 
     };
 
+    const handleLoadTestData = async () => {
+        const confirmed = await showConfirm("This will OVERWRITE your current data with sample test data. Proceed?", {
+          title: "Load Test Data",
+          confirmText: "Overwrite",
+          variant: "danger"
+        });
+    
+        if (confirmed) {
+          try {
+            await db.importData(testData as any);
+            await db.saveCollection('profile', [testProfile]);
+            window.location.reload();
+          } catch (error) {
+            console.error("Failed to load test data:", error);
+            showToast("Failed to load test data.", 'info');
+          }
+        }
+    };
+
     return (
         <div className="space-y-6 animate-fade-in-fast">
-            <DataImportModal isOpen={isImportModalOpen} onClose={() => setIsImportModalOpen(false)} />
             <CheckpointsModal isOpen={isCheckpointsModalOpen} onClose={() => setIsCheckpointsModalOpen(false)} />
             
             {isPinModalOpen && (
@@ -910,7 +848,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 </div>
             </div>
 
-            {/* Install Prompt Banner - If Installable OR iOS (not installed) */}
+            {/* Install Prompt Banner */}
             {(isInstallable || (isIOS && !isInstalled)) && (
                 <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-down-fade mb-4">
                     <div className="flex items-center gap-3">
@@ -927,10 +865,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                             <p className="text-xs font-bold text-white">Tap <Share size={12} className="inline mx-1"/> then "Add to Home Screen"</p>
                         </div>
                     ) : (
-                        <button 
-                            onClick={install} 
-                            className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-gray-100 transition-colors whitespace-nowrap w-full sm:w-auto"
-                        >
+                        <button onClick={install} className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-gray-100 transition-colors whitespace-nowrap w-full sm:w-auto">
                             Install Now
                         </button>
                     )}
@@ -954,7 +889,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                         value={selectedMonth} 
                         onChange={(e) => setSelectedMonth(e.target.value)} 
                         className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
-                        aria-label="Select Month for Stats"
                     >
                         {monthOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
@@ -963,7 +897,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                         value={selectedYear} 
                         onChange={(e) => setSelectedYear(e.target.value)} 
                         className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
-                        aria-label="Select Year for Stats"
                     >
                         {getYears.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
@@ -971,50 +904,10 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                <MetricCard 
-                    icon={IndianRupee} 
-                    title="Sales" 
-                    value={stats.monthSalesTotal} 
-                    subValue={`${stats.salesCount} orders`}
-                    color="bg-primary/5 dark:bg-primary/10" 
-                    iconBgColor="bg-primary/20" 
-                    textColor="text-primary" 
-                    onClick={() => setCurrentPage('SALES')}
-                    delay={0}
-                />
-                 <MetricCard 
-                    icon={Package} 
-                    title="Purchases" 
-                    value={stats.monthPurchasesTotal} 
-                    subValue="Inventory cost"
-                    color="bg-blue-50 dark:bg-blue-900/20" 
-                    iconBgColor="bg-blue-100 dark:bg-blue-800" 
-                    textColor="text-blue-700 dark:text-blue-100" 
-                    onClick={() => setCurrentPage('PURCHASES')}
-                    delay={100}
-                />
-                <MetricCard 
-                    icon={User} 
-                    title="Cust. Dues" 
-                    value={stats.totalCustomerDues} 
-                    subValue="Total Receivable"
-                    color="bg-purple-50 dark:bg-purple-900/20" 
-                    iconBgColor="bg-purple-100 dark:bg-purple-800" 
-                    textColor="text-purple-700 dark:text-purple-100" 
-                    onClick={() => setCurrentPage('CUSTOMERS')}
-                    delay={200}
-                />
-                <MetricCard 
-                    icon={ShoppingCart} 
-                    title="My Payables" 
-                    value={stats.totalSupplierDues} 
-                    subValue="Total Payable"
-                    color="bg-amber-50 dark:bg-amber-900/20" 
-                    iconBgColor="bg-amber-100 dark:bg-amber-800" 
-                    textColor="text-amber-700 dark:text-amber-100" 
-                    onClick={() => setCurrentPage('PURCHASES')}
-                    delay={300}
-                />
+                <MetricCard icon={IndianRupee} title="Sales" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-primary/5 dark:bg-primary/10" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
+                <MetricCard icon={Package} title="Purchases" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-blue-50 dark:bg-blue-900/20" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
+                <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Total Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
+                <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Total Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1029,7 +922,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                         <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />
                         <div className="space-y-4 mt-4">
                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                Your data is stored locally on this device. Please create regular backups to prevent data loss.
+                                Your data is stored locally. Please create regular backups.
                             </p>
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <Button onClick={handleBackup} className="w-full" disabled={isGeneratingReport}>
@@ -1045,35 +938,12 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                                     className="hidden" 
                                     onChange={handleFileRestore} 
                                 />
-                                <Button onClick={() => runSecureAction(() => setIsImportModalOpen(true))} variant="secondary" className="w-full">
-                                    <Upload className="w-4 h-4 mr-2" /> Import Bulk Data from CSV
+                                <Button onClick={() => runSecureAction(handleLoadTestData)} variant="secondary" className="w-full bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800">
+                                    <TestTube2 className="w-4 h-4 mr-2" /> Load Test Data
                                 </Button>
-                                {state.devMode && (
-                                    <Button onClick={() => runSecureAction(handleLoadTestData)} className="w-full bg-purple-600 hover:bg-purple-700 focus:ring-purple-600" disabled={isGeneratingReport}>
-                                        <TestTube2 className="w-4 h-4 mr-2" /> Load Test Data
-                                    </Button>
-                                )}
-                            </div>
-                            
-                            {/* Checkpoints Section */}
-                            <div className="pt-4 border-t dark:border-slate-700">
-                                <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-2">
-                                    <History size={16} /> Local Checkpoints
-                                </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <Button onClick={handleCreateCheckpoint} className="w-full bg-indigo-600 hover:bg-indigo-700">
-                                        <Clock className="w-4 h-4 mr-2" /> Create Checkpoint
-                                    </Button>
-                                    <Button onClick={() => setIsCheckpointsModalOpen(true)} variant="secondary" className="w-full">
-                                        View Checkpoints
-                                    </Button>
-                                </div>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                                    Create instant restore points before making major changes.
-                                </p>
                             </div>
 
-                             <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md border border-yellow-200 dark:border-yellow-700">
+                             <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md border border-yellow-200 dark:border-yellow-700 mt-4">
                                 <div className="flex gap-2">
                                     <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
                                     <p className="text-xs text-yellow-700 dark:text-yellow-300">
