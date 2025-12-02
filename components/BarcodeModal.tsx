@@ -6,6 +6,7 @@ import Card from './Card';
 import Button from './Button';
 import { X, Download, Printer, LayoutGrid, File } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
+import { useDialog } from '../context/DialogContext';
 
 interface BarcodeModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface BarcodeModalProps {
 
 export const BarcodeModal: React.FC<BarcodeModalProps> = ({ isOpen, product, onClose, businessName }) => {
   const { showToast } = useAppContext();
+  const { showConfirm } = useDialog();
   const [numberOfCopies, setNumberOfCopies] = useState(1);
   const [paperType, setPaperType] = useState<'roll' | 'a4'>('roll');
   const labelPreviewCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -197,9 +199,10 @@ export const BarcodeModal: React.FC<BarcodeModalProps> = ({ isOpen, product, onC
     }
   };
 
-  const handlePrint = () => {
+  const handlePrint = async () => {
     if (paperType === 'a4') {
-        if(confirm("For A4 printing, it is recommended to Download PDF first for accurate grid alignment. Proceed to download?")) {
+        const confirmed = await showConfirm("For A4 printing, it is recommended to Download PDF first for accurate grid alignment. Proceed to download?", { confirmText: "Download PDF", cancelText: "Cancel" });
+        if(confirmed) {
             handleDownloadPDF();
             return;
         }

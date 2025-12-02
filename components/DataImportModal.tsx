@@ -6,6 +6,7 @@ import { StoreName } from '../utils/db';
 import { Customer, Supplier, Product, Purchase, PurchaseItem } from '../types';
 import Card from './Card';
 import Button from './Button';
+import { useDialog } from '../context/DialogContext';
 
 type Tab = 'customers' | 'suppliers' | 'products' | 'purchases';
 
@@ -63,6 +64,7 @@ interface DataImportModalProps {
 
 export const DataImportModal: React.FC<DataImportModalProps> = ({ isOpen, onClose }) => {
   const { dispatch, showToast } = useAppContext();
+  const { showConfirm } = useDialog();
   const [activeTab, setActiveTab] = useState<Tab>('customers');
   const [importStatus, setImportStatus] = useState<{ type: 'info' | 'success' | 'error', message: string } | null>(null);
 
@@ -103,11 +105,13 @@ export const DataImportModal: React.FC<DataImportModalProps> = ({ isOpen, onClos
     document.body.removeChild(link);
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>, storeName: StoreName) => {
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>, storeName: StoreName) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!window.confirm(`Are you sure you want to import ${storeName}? This will REPLACE all existing ${storeName} data (except for Purchases which might merge if IDs differ).`)) {
+    const confirmed = await showConfirm(`Are you sure you want to import ${storeName}? This will REPLACE all existing ${storeName} data (except for Purchases which might merge if IDs differ).`, { variant: 'danger', confirmText: 'Replace Data' });
+
+    if (!confirmed) {
       if (event.target) (event.target as HTMLInputElement).value = '';
       return;
     }

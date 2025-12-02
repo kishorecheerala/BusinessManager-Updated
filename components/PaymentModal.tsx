@@ -1,3 +1,4 @@
+
 import React from 'react';
 import Card from './Card';
 import Button from './Button';
@@ -31,7 +32,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setPaymentDetails,
     type = 'sale'
 }) => {
-    // Only needed for potentially adding toasts in local handlers, though currently validation is in parent
     const { showToast } = useAppContext();
 
     if (!isOpen) return null;
@@ -41,6 +41,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         { value: 'UPI', label: 'UPI' },
         { value: 'CHEQUE', label: 'Cheque' }
     ];
+
+    const handleSubmit = () => {
+        if (!paymentDetails.amount || parseFloat(paymentDetails.amount) <= 0) {
+            showToast("Please enter a valid amount.", 'error');
+            return;
+        }
+        onSubmit();
+    }
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[100] p-4 animate-fade-in-fast">
@@ -58,19 +66,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                     
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
                         <input 
                             type="number" 
                             placeholder="Enter amount" 
                             value={paymentDetails.amount} 
                             onChange={e => setPaymentDetails({ ...paymentDetails, amount: e.target.value })} 
-                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" 
+                            className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary" 
                             autoFocus
                         />
                     </div>
                     
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Method</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Method</label>
                          <Dropdown 
                             options={paymentMethodOptions}
                             value={paymentDetails.method}
@@ -85,18 +93,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     />
                     
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Reference (Optional)</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reference (Optional)</label>
                         <input 
                             type="text"
                             placeholder="e.g. UPI ID, Cheque No."
                             value={paymentDetails.reference}
                             onChange={e => setPaymentDetails({ ...paymentDetails, reference: e.target.value })}
-                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                            className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary"
                         />
                     </div>
                     
                     <div className="flex gap-2 pt-2">
-                       <Button onClick={onSubmit} className="w-full">Save Payment</Button>
+                       <Button onClick={handleSubmit} className="w-full">Save Payment</Button>
                        <Button onClick={onClose} variant="secondary" className="w-full">Cancel</Button>
                     </div>
                 </div>

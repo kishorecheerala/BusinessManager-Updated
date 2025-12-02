@@ -6,9 +6,11 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import { optimizeBase64 } from '../utils/imageUtils';
 import { Product } from '../types';
+import { useDialog } from '../context/DialogContext';
 
 const SystemOptimizerPage: React.FC = () => {
     const { state, dispatch, showToast } = useAppContext();
+    const { showConfirm } = useDialog();
     const [isOptimizing, setIsOptimizing] = useState(false);
     const [progress, setProgress] = useState(0);
     const [stats, setStats] = useState({
@@ -45,8 +47,9 @@ const SystemOptimizerPage: React.FC = () => {
     }, [state.products, state.notifications, state.audit_logs]);
 
     const handleOptimizeImages = async () => {
-        if (stats.heavyImages === 0 && !window.confirm("No heavy images detected. Optimize all images anyway?")) {
-            return;
+        if (stats.heavyImages === 0) {
+            const confirmed = await showConfirm("No heavy images detected. Optimize all images anyway?");
+            if (!confirmed) return;
         }
 
         setIsOptimizing(true);
@@ -99,8 +102,8 @@ const SystemOptimizerPage: React.FC = () => {
         processChunk(0);
     };
 
-    const handleCleanup = () => {
-        if (window.confirm("Remove old notifications and audit logs (older than 30 days)?")) {
+    const handleCleanup = async () => {
+        if (await showConfirm("Remove old notifications and audit logs (older than 30 days)?")) {
             dispatch({ type: 'CLEANUP_OLD_DATA' });
             showToast("Cleanup complete.");
         }

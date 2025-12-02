@@ -5,6 +5,7 @@ import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
 import { debugDriveState } from '../utils/googleDrive';
+import { useDialog } from '../context/DialogContext';
 
 interface CloudDebugModalProps {
   isOpen: boolean;
@@ -12,7 +13,8 @@ interface CloudDebugModalProps {
 }
 
 const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) => {
-  const { state, dispatch, googleSignIn } = useAppContext();
+  const { state, dispatch, googleSignIn, showToast } = useAppContext();
+  const { showConfirm, showAlert } = useDialog();
   const [logs, setLogs] = useState<string[]>([]);
   const [details, setDetails] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -46,7 +48,8 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
 
   const handleManualRestore = async (fileId: string) => {
     if (!state.googleUser?.accessToken) return;
-    if (!window.confirm("Force restore this file? It will overwrite local data.")) return;
+    const confirmed = await showConfirm("Force restore this file? It will overwrite local data.", { variant: 'danger', confirmText: 'Restore' });
+    if (!confirmed) return;
 
     setRestoringId(fileId);
     try {
@@ -55,10 +58,10 @@ const CloudDebugModal: React.FC<CloudDebugModalProps> = ({ isOpen, onClose }) =>
         if (restoreFn) {
             await restoreFn(fileId);
         } else {
-            alert("Restore function not available in context yet. Please refresh.");
+            showToast("Restore function not available in context yet. Please refresh.", 'error');
         }
     } catch (e) {
-        alert("Restore failed.");
+        showToast("Restore failed.", 'error');
     }
     setRestoringId(null);
     onClose();
