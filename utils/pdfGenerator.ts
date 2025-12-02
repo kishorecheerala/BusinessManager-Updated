@@ -109,7 +109,7 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     const spacing = templateConfig?.layout.elementSpacing || { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 };
     
     const widthFull = 80; 
-    const margin = templateConfig?.layout.margin ?? 3; // Use config margin or default 3
+    const margin = templateConfig?.layout.margin ?? 3; 
     const pageWidth = widthFull - (margin * 2);
     const centerX = widthFull / 2;
 
@@ -128,11 +128,18 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
     const hideRate = templateConfig?.layout.tableOptions?.hideRate || false;
     const headerAlign = templateConfig?.layout.headerAlignment || 'center';
     
-    // Absolute Positioning
+    // Logo Positioning
     const logoPos = templateConfig?.layout.logoPosition || 'center';
     const isAbsoluteLogo = templateConfig?.layout.logoPosX !== undefined && templateConfig?.layout.logoPosY !== undefined;
     const logoPosX = templateConfig?.layout.logoPosX ?? margin;
     const logoPosY = templateConfig?.layout.logoPosY ?? 5;
+
+    // QR Code Config
+    const qrSize = templateConfig?.layout.qrOverlaySize || 18;
+    const isAbsoluteQr = templateConfig?.layout.qrPosX !== undefined && templateConfig?.layout.qrPosY !== undefined;
+    const qrPosX = templateConfig?.layout.qrPosX || 0;
+    const qrPosY = templateConfig?.layout.qrPosY || 0;
+    const qrPosition = templateConfig?.layout.qrPosition || 'header-right';
 
     if (showQr) {
          qrCodeBase64 = await getQrCodeBase64(sale.id);
@@ -181,22 +188,24 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         doc.setFont(bodyFont, 'normal');
         doc.setFontSize(9);
 
-        // 3. Meta & QR
+        // 3. Meta & QR (Relative Top)
         const startMetaY = y;
-        const qrSize = 18;
         
         doc.text(`${labels.invoiceNo}: ${sale.id}`, margin, y);
         y += 4;
         doc.text(`${labels.date}: ${formatDate(sale.date, templateConfig?.dateFormat)}`, margin, y);
         y += 4;
 
-        if (qrCodeBase64) {
+        // Render relative QR (header-right or details-right) if NOT absolute
+        if (qrCodeBase64 && !isAbsoluteQr && (qrPosition === 'header-right' || qrPosition === 'details-right')) {
             try {
                 doc.addImage(qrCodeBase64, 'PNG', widthFull - margin - qrSize, startMetaY - 2, qrSize, qrSize);
             } catch(e) {}
+            // Adjust y to avoid overlap
+            y = Math.max(y, startMetaY + qrSize - 2) + 4;
+        } else {
+            y += 2;
         }
-        
-        y = Math.max(y, startMetaY + qrSize - 2) + 4;
 
         // 4. Billed To
         doc.setFont(bodyFont, 'bold');
@@ -217,7 +226,6 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         y += 5;
         doc.setFont(bodyFont, 'bold');
         doc.setFontSize(10);
-        // Using "Item" label or generic
         doc.text('Purchase Details', centerX, y, { align: 'center' });
         y += 2;
         doc.line(margin, y, widthFull - margin, y);
@@ -320,6 +328,24 @@ export const generateThermalInvoicePDF = async (sale: Sale, customer: Customer, 
         const footerLines = doc.splitTextToSize(footerText, pageWidth);
         doc.text(footerLines, centerX, y, { align: 'center' });
         y += (footerLines.length * 4);
+
+        // UPDATED: Render QR Relative (Footer position)
+        if (qrCodeBase64 && !isAbsoluteQr && (qrPosition === 'footer-left' || qrPosition === 'footer-right')) {
+             let fQrX = margin;
+             if (qrPosition === 'footer-right') fQrX = widthFull - margin - qrSize;
+             
+             try {
+                doc.addImage(qrCodeBase64, 'PNG', fQrX, y, qrSize, qrSize);
+             } catch(e) {}
+             y += qrSize + 5;
+        }
+
+        // UPDATED: Absolute QR Render
+        if (qrCodeBase64 && isAbsoluteQr) {
+            try {
+                doc.addImage(qrCodeBase64, 'PNG', qrPosX, qrPosY, qrSize, qrSize);
+            } catch(e) {}
+        }
         
         return y + 5;
     };
