@@ -37,6 +37,7 @@ import AppSkeletonLoader from './components/AppSkeletonLoader';
 import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
+import SignInModal from './components/SignInModal';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
@@ -161,6 +162,7 @@ const AppContent: React.FC = () => {
     const [isMobileQuickAddOpen, setIsMobileQuickAddOpen] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
+    const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
 
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const mobileQuickAddRef = useRef<HTMLDivElement>(null);
@@ -400,6 +402,7 @@ const AppContent: React.FC = () => {
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             <Toast />
             <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
+            <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
             
             {/* Header - Hidden on Invoice Designer to maximize space */}
             {currentPage !== 'INVOICE_DESIGNER' && (
@@ -439,7 +442,7 @@ const AppContent: React.FC = () => {
                         <button 
                             onClick={() => { 
                                 if (!state.googleUser) {
-                                    googleSignIn();
+                                    setIsSignInModalOpen(true);
                                 } else {
                                     // Always attempt to sync, even on error (Retry)
                                     syncData(); 
@@ -521,6 +524,7 @@ const AppContent: React.FC = () => {
                 onNavigate={handleNavigation}
                 onOpenDevTools={() => setIsDevToolsOpen(true)}
                 onOpenChangeLog={() => setIsChangeLogOpen(true)}
+                onOpenSignIn={() => setIsSignInModalOpen(true)}
             />
             <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
             <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />

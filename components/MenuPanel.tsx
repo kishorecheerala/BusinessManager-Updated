@@ -22,6 +22,7 @@ interface MenuPanelProps {
   onOpenDevTools: () => void;
   onLockApp?: () => void;
   onOpenChangeLog?: () => void;
+  onOpenSignIn?: () => void;
 }
 
 interface ThemeColor {
@@ -98,8 +99,8 @@ const getContrastColor = (hexColor: string) => {
     return (yiq >= 128) ? 'black' : 'white';
 };
 
-const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, onNavigate, onOpenDevTools, onLockApp, onOpenChangeLog }) => {
-    const { state, dispatch, googleSignIn, googleSignOut, syncData } = useAppContext();
+const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, onNavigate, onOpenDevTools, onLockApp, onOpenChangeLog, onOpenSignIn }) => {
+    const { state, dispatch, googleSignOut, syncData } = useAppContext();
     const { isInstallable, install } = usePWAInstall();
     
     const [isAuditOpen, setIsAuditOpen] = useState(false);
@@ -231,7 +232,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                                 <div>
                                     <p className="text-xs text-white/90 mb-3 font-medium">Sign in to backup your data.</p>
                                     <button
-                                        onClick={() => { googleSignIn(); onClose(); }}
+                                        onClick={() => { onOpenSignIn?.(); onClose(); }}
                                         className="w-full flex items-center justify-center gap-2 p-2.5 rounded-lg bg-white text-primary font-bold text-sm shadow-md hover:bg-gray-50 transition-all group"
                                     >
                                         <LogIn className="w-4 h-4 group-hover:scale-110 transition-transform" />
