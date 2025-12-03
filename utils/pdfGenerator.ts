@@ -887,11 +887,13 @@ export const generateGenericReportPDF = async (title: string, subtitle: string, 
     return doc;
 };
 
+// Returns the jsPDF object instead of saving immediately, allowing flexible usage (Sharing/Downloading)
 export const generateImagesToPDF = (images: string[], fileName: string) => {
+    // A4 size by default, adjust if needed
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
     const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 10;
+    const margin = 5; // Reduced margin for max image visibility
 
     images.forEach((imgData, index) => {
         if (index > 0) doc.addPage();
@@ -903,6 +905,7 @@ export const generateImagesToPDF = (images: string[], fileName: string) => {
             
             let finalWidth, finalHeight;
 
+            // Fit image within page margins while maintaining aspect ratio
             if (imgRatio > pageRatio) {
                 finalWidth = pageWidth - margin * 2;
                 finalHeight = finalWidth / imgRatio;
@@ -915,7 +918,7 @@ export const generateImagesToPDF = (images: string[], fileName: string) => {
             const y = (pageHeight - finalHeight) / 2;
 
             const format = getImageType(imgData);
-            doc.addImage(imgData, format, x, y, finalWidth, finalHeight);
+            doc.addImage(imgData, format, x, y, finalWidth, finalHeight, undefined, 'FAST'); // Use FAST compression for speed/compatibility
         } catch (e) {
             console.error("Error adding image to PDF", e);
             doc.setFontSize(12);
@@ -923,5 +926,5 @@ export const generateImagesToPDF = (images: string[], fileName: string) => {
         }
     });
     
-    doc.save(fileName);
+    return doc;
 };

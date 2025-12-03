@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -11,7 +11,7 @@ import AddSupplierModal from '../components/AddSupplierModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
-import { generateDebitNotePDF } from '../utils/pdfGenerator';
+import { generateDebitNotePDF, generateImagesToPDF } from '../utils/pdfGenerator';
 import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
 import { Html5Qrcode } from 'html5-qrcode';
@@ -220,6 +220,51 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         }
     };
 
+    // Share attached images as a compiled PDF
+    const handleSharePurchaseDocs = async (purchase: Purchase) => {
+        const images = (purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean) as string[];
+        if (images.length === 0) {
+            showToast("No invoice images attached to share.", 'info');
+            return;
+        }
+
+        showToast("Compiling document...", 'info');
+        const fileName = `Invoice_${purchase.id}_${getLocalDateString()}.pdf`;
+        
+        try {
+            const doc = generateImagesToPDF(images, fileName);
+            const pdfBlob = doc.output('blob');
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `Invoice ${purchase.id}`,
+                    text: `Invoice documents for purchase ${purchase.id}`
+                });
+            } else {
+                // Fallback to download
+                doc.save(fileName);
+                showToast("Sharing not supported, file downloaded instead.", 'info');
+            }
+        } catch (e) {
+            console.error("Share PDF failed", e);
+            showToast("Failed to generate shareable document.", 'error');
+        }
+    };
+
+    const sendPurchaseOrder = (purchase: Purchase) => {
+        const itemsText = purchase.items.map(i => `${i.productName} (x${i.quantity})`).join('\n');
+        const text = `New Order for ${selectedSupplier?.name || 'Supplier'}:\n\n${itemsText}\n\nTotal Est: Rs. ${purchase.totalAmount}`;
+        const phone = selectedSupplier?.phone?.replace(/\D/g, '') || '';
+        if (!phone) {
+            showToast("Supplier phone number missing.", 'error');
+            return;
+        }
+        const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
+        window.open(url, '_blank');
+    };
+
     const renderContent = () => {
         if (view === 'add_purchase' || view === 'edit_purchase') {
             return (
@@ -354,6 +399,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                     const dueAmount = Number(purchase.totalAmount) - amountPaid;
                                     const isPaid = dueAmount <= 0.01;
                                     const isEditingSchedule = editingScheduleId === purchase.id;
+                                    const hasImages = (purchase.invoiceImages && purchase.invoiceImages.length > 0) || !!purchase.invoiceUrl;
 
                                     return (
                                         <div key={purchase.id} className="border dark:border-slate-700 rounded-lg p-4 bg-gray-50 dark:bg-slate-700/30">
@@ -382,13 +428,15 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                             </div>
 
                                             {/* Attachments */}
-                                            {(purchase.invoiceImages?.length > 0 || purchase.invoiceUrl) && (
-                                                <div className="flex gap-2 mb-3 overflow-x-auto pb-1 custom-scrollbar">
-                                                    {(purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean).map((img, idx) => (
-                                                        <div key={idx} className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity" onClick={() => setViewImageModal(img!)}>
-                                                            <img src={img} alt="Invoice" className="h-full w-full object-cover" />
-                                                        </div>
-                                                    ))}
+                                            {hasImages && (
+                                                <div className="mb-3">
+                                                    <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                                                        {(purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean).map((img, idx) => (
+                                                            <div key={idx} className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity shadow-sm" onClick={() => setViewImageModal(img!)}>
+                                                                <img src={img} alt="Invoice" className="h-full w-full object-cover" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -442,14 +490,33 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                 </div>
                                             )}
 
-                                            <div className="flex flex-wrap gap-2 pt-2 border-t dark:border-slate-600">
+                                            <div className="flex flex-wrap gap-2 pt-2 border-t dark:border-slate-600 mt-2">
                                                 {!isPaid && (
-                                                    <Button onClick={() => setPaymentModalState({ isOpen: true, purchaseId: purchase.id })} className="text-xs h-8">
+                                                    <Button onClick={() => setPaymentModalState({ isOpen: true, purchaseId: purchase.id })} className="text-xs h-8 flex-grow sm:flex-grow-0">
                                                         Record Payment
                                                     </Button>
                                                 )}
-                                                <Button onClick={() => { setPurchaseToEdit(purchase); setView('edit_purchase'); }} variant="secondary" className="text-xs h-8">
-                                                    <Edit size={14} className="mr-1" /> Edit
+                                                {/* Solid Green Send Order Button */}
+                                                <button 
+                                                    onClick={() => sendPurchaseOrder(purchase)} 
+                                                    className="flex-grow sm:flex-grow-0 h-8 px-4 text-xs font-bold bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm transition-colors flex items-center justify-center"
+                                                >
+                                                    <MessageCircle size={14} className="mr-1.5" /> Send Order
+                                                </button>
+                                                
+                                                {/* New Share Docs Button */}
+                                                {hasImages && (
+                                                    <button 
+                                                        onClick={() => handleSharePurchaseDocs(purchase)}
+                                                        className="flex-grow sm:flex-grow-0 h-8 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm transition-colors flex items-center justify-center"
+                                                        title="Share PDF for GST"
+                                                    >
+                                                        <Share2 size={14} className="mr-1.5" /> Share Docs
+                                                    </button>
+                                                )}
+
+                                                <Button onClick={() => { setPurchaseToEdit(purchase); setView('edit_purchase'); }} variant="secondary" className="text-xs h-8 px-2 flex-grow sm:flex-grow-0">
+                                                    <Edit size={14} />
                                                 </Button>
                                                 <DeleteButton variant="delete" onClick={() => handleDeletePurchase(purchase.id)} />
                                             </div>
@@ -496,10 +563,28 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             <div className="space-y-4 animate-fade-in-fast">
                 {/* View Image Modal */}
                 {viewImageModal && (
-                    <div className="fixed inset-0 bg-black/80 z-[2000] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
-                        <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
-                            <button className="absolute -top-10 right-0 text-white p-2" onClick={() => setViewImageModal(null)}><X size={24}/></button>
-                            <img src={viewImageModal} alt="Invoice" className="max-w-full max-h-[90vh] rounded-lg shadow-2xl" />
+                    <div className="fixed inset-0 bg-black/95 z-[2000] flex flex-col items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
+                        {/* Header Toolbar */}
+                        <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/50 to-transparent" onClick={(e) => e.stopPropagation()}>
+                             <h3 className="text-white font-medium text-lg drop-shadow-md">Invoice Viewer</h3>
+                             <div className="flex gap-4">
+                                 <a 
+                                    href={viewImageModal} 
+                                    download={`Invoice_Original_${Date.now()}.jpg`}
+                                    className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md transition-colors flex items-center gap-2 px-4 shadow-lg border border-white/10"
+                                    title="Download Original High-Res"
+                                    onClick={(e) => e.stopPropagation()}
+                                 >
+                                    <Download size={20} /> <span className="hidden sm:inline font-bold text-sm">Download Original</span>
+                                 </a>
+                                 <button onClick={() => setViewImageModal(null)} className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md transition-colors shadow-lg border border-white/10">
+                                    <X size={24}/>
+                                 </button>
+                             </div>
+                        </div>
+                        
+                        <div className="relative w-full h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+                            <img src={viewImageModal} alt="Invoice" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
                         </div>
                     </div>
                 )}

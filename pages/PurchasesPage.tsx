@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Phone, CreditCard, ExternalLink, Shield, Building, MessageCircle } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, MessageCircle, Share2, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -11,13 +11,14 @@ import AddSupplierModal from '../components/AddSupplierModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
-import { generateDebitNotePDF } from '../utils/pdfGenerator';
+import { generateDebitNotePDF, generateImagesToPDF } from '../utils/pdfGenerator';
 import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PurchaseForm } from '../components/AddPurchaseView';
 import { getLocalDateString } from '../utils/dateUtils';
 import { createCalendarEvent } from '../utils/googleCalendar';
+import jsPDF from 'jspdf';
 
 interface PurchasesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -220,6 +221,38 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         }
     };
 
+    // New Function to Share/Download attached images as PDF
+    const handleSharePurchaseDocs = async (purchase: Purchase) => {
+        const images = (purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean) as string[];
+        if (images.length === 0) {
+            showToast("No invoice images attached to share.", 'info');
+            return;
+        }
+
+        const fileName = `Invoice_${purchase.id}_${getLocalDateString()}.pdf`;
+        
+        try {
+            const doc = generateImagesToPDF(images, fileName);
+            const pdfBlob = doc.output('blob');
+            const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    title: `Invoice ${purchase.id}`,
+                    text: `Invoice documents for purchase ${purchase.id}`
+                });
+            } else {
+                // Fallback to download
+                doc.save(fileName);
+                showToast("Sharing not supported, file downloaded instead.", 'info');
+            }
+        } catch (e) {
+            console.error("Share PDF failed", e);
+            showToast("Failed to generate shareable document.", 'error');
+        }
+    };
+
     const renderContent = () => {
         if (view === 'add_purchase' || view === 'edit_purchase') {
             return (
@@ -352,46 +385,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                 </div>
                                 <Button onClick={() => setView('edit_supplier')} variant="secondary" className="h-8 text-xs"><Edit size={14} className="mr-2"/> Edit Details</Button>
                             </div>
-                            
-                            {/* Actions Bar */}
-                            <div className="flex flex-wrap gap-2 pt-2 border-t dark:border-slate-700">
-                                <a 
-                                    href={`tel:${selectedSupplier.phone}`} 
-                                    className="flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors text-sm font-medium dark:bg-green-900/30 dark:border-green-800 dark:text-green-300"
-                                >
-                                    <Phone size={16} /> Call
-                                </a>
-                                <a 
-                                    href={`https://wa.me/${selectedSupplier.phone.replace(/\D/g, '')}`} 
-                                    target="_blank"
-                                    className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors text-sm font-medium dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-300"
-                                >
-                                    <MessageCircle size={16} /> WhatsApp
-                                </a>
-                                <a 
-                                    href={`truecaller://search_number?phoneNumber=${selectedSupplier.phone.replace(/\D/g, '')}`} 
-                                    className="flex items-center gap-2 px-3 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300"
-                                >
-                                    <Shield size={16} /> Identify
-                                </a>
-                                {selectedSupplier.gstNumber && (
-                                    <a 
-                                        href={`https://services.gst.gov.in/services/searchtp`} 
-                                        target="_blank"
-                                        className="flex items-center gap-2 px-3 py-2 bg-orange-50 text-orange-700 border border-orange-200 rounded-lg hover:bg-orange-100 transition-colors text-sm font-medium dark:bg-orange-900/30 dark:border-orange-800 dark:text-orange-300"
-                                    >
-                                        <Building size={16} /> Verify GST
-                                    </a>
-                                )}
-                                {selectedSupplier.upi && (
-                                    <a 
-                                        href={`upi://pay?pa=${selectedSupplier.upi}&pn=${encodeURIComponent(selectedSupplier.name)}&cu=INR`} 
-                                        className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition-colors text-sm font-medium dark:bg-indigo-900/30 dark:border-indigo-800 dark:text-indigo-300"
-                                    >
-                                        <CreditCard size={16} /> Pay UPI
-                                    </a>
-                                )}
-                            </div>
                         </div>
                     </Card>
 
@@ -403,6 +396,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                     const dueAmount = Number(purchase.totalAmount) - amountPaid;
                                     const isPaid = dueAmount <= 0.01;
                                     const isEditingSchedule = editingScheduleId === purchase.id;
+                                    const hasImages = (purchase.invoiceImages && purchase.invoiceImages.length > 0) || !!purchase.invoiceUrl;
 
                                     return (
                                         <div key={purchase.id} className="border dark:border-slate-700 rounded-lg p-4 bg-gray-50 dark:bg-slate-700/30">
@@ -431,13 +425,24 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                             </div>
 
                                             {/* Attachments */}
-                                            {(purchase.invoiceImages?.length > 0 || purchase.invoiceUrl) && (
-                                                <div className="flex gap-2 mb-3 overflow-x-auto pb-1 custom-scrollbar">
-                                                    {(purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean).map((img, idx) => (
-                                                        <div key={idx} className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity" onClick={() => setViewImageModal(img!)}>
-                                                            <img src={img} alt="Invoice" className="h-full w-full object-cover" />
-                                                        </div>
-                                                    ))}
+                                            {hasImages && (
+                                                <div className="mb-3">
+                                                    <div className="flex items-center justify-between mb-2">
+                                                        <p className="text-xs font-bold text-gray-500 uppercase">Attachments</p>
+                                                        <button 
+                                                            onClick={() => handleSharePurchaseDocs(purchase)}
+                                                            className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-semibold bg-blue-50 hover:bg-blue-100 px-2 py-1 rounded transition-colors dark:bg-blue-900/30 dark:text-blue-300"
+                                                        >
+                                                            <FileText size={12} /> Share/Download for GST
+                                                        </button>
+                                                    </div>
+                                                    <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                                                        {(purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean).map((img, idx) => (
+                                                            <div key={idx} className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity shadow-sm" onClick={() => setViewImageModal(img!)}>
+                                                                <img src={img} alt="Invoice" className="h-full w-full object-cover" />
+                                                            </div>
+                                                        ))}
+                                                    </div>
                                                 </div>
                                             )}
 
@@ -497,7 +502,10 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                         Record Payment
                                                     </Button>
                                                 )}
-                                                <Button onClick={() => sendPurchaseOrder(purchase)} variant="secondary" className="text-xs h-8 text-green-700 hover:bg-green-100 border-green-200">
+                                                <Button 
+                                                    onClick={() => sendPurchaseOrder(purchase)} 
+                                                    className="text-xs h-8 bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm border-transparent"
+                                                >
                                                     <MessageCircle size={14} className="mr-1" /> Send Order
                                                 </Button>
                                                 <Button onClick={() => { setPurchaseToEdit(purchase); setView('edit_purchase'); }} variant="secondary" className="text-xs h-8">
@@ -548,10 +556,23 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             <div className="space-y-4 animate-fade-in-fast">
                 {/* View Image Modal */}
                 {viewImageModal && (
-                    <div className="fixed inset-0 bg-black/80 z-[2000] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
-                        <div className="relative max-w-full max-h-full" onClick={(e) => e.stopPropagation()}>
-                            <button className="absolute -top-10 right-0 text-white p-2" onClick={() => setViewImageModal(null)}><X size={24}/></button>
-                            <img src={viewImageModal} alt="Invoice" className="max-w-full max-h-[90vh] rounded-lg shadow-2xl" />
+                    <div className="fixed inset-0 bg-black/90 z-[2000] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
+                        <div className="relative max-w-full max-h-full flex flex-col" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex justify-end gap-3 mb-2 absolute top-4 right-4 z-50">
+                                <a 
+                                    href={viewImageModal} 
+                                    download={`Invoice-Image-${Date.now()}.jpg`} 
+                                    className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white p-2 rounded-full transition-colors"
+                                    title="Download Original"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <Download size={24} />
+                                </a>
+                                <button className="bg-white/20 hover:bg-white/30 backdrop-blur-md text-white p-2 rounded-full transition-colors" onClick={() => setViewImageModal(null)}>
+                                    <X size={24}/>
+                                </button>
+                            </div>
+                            <img src={viewImageModal} alt="Invoice" className="max-w-full max-h-[90vh] rounded-lg shadow-2xl object-contain" />
                         </div>
                     </div>
                 )}
