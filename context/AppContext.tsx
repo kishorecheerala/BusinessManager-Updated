@@ -712,7 +712,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             // If DB didn't have preference, and localStorage doesn't either, use Default Oceanic
             if (loadedGradient === undefined) {
                const lsGradient = safeGetItem('themeGradient');
-               loadedGradient = lsGradient || initialState.themeGradient;
+               if (lsGradient === 'none') {
+                   loadedGradient = ''; // User explicitly set no gradient
+               } else {
+                   loadedGradient = lsGradient || initialState.themeGradient;
+               }
             }
 
             dispatch({
@@ -1063,4 +1067,3 @@ export const useAppContext = () => {
   }
   return context;
 };
-    

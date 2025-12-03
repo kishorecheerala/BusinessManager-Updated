@@ -4,7 +4,7 @@ import {
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download
+  X, Download, Sun, Moon, CalendarClock
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -37,6 +37,7 @@ import AppSkeletonLoader from './components/AppSkeletonLoader';
 import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
+import SignInModal from './components/SignInModal';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
@@ -122,12 +123,37 @@ const AppContent: React.FC = () => {
 
         try {
             const saved = localStorage.getItem('business_manager_last_page');
-            if (saved && Object.keys(ICON_MAP).includes(saved)) {
+            // Exclude admin/utility pages from auto-restore to prevent getting stuck
+            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER'];
+            if (saved && Object.keys(ICON_MAP).includes(saved) && !excludedPages.includes(saved)) {
                 return saved as Page;
             }
         } catch(e) {}
         return 'DASHBOARD';
     });
+
+    // --- Global Timer for Header ---
+    const [currentDateTime, setCurrentDateTime] = useState(new Date());
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const getTimeBasedGreeting = () => {
+        const hour = currentDateTime.getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 17) return 'Good Afternoon';
+        return 'Good Evening';
+    };
+
+    const getGreetingIcon = () => {
+        const hour = currentDateTime.getHours();
+        // Day time: 6 AM to 6 PM (18:00)
+        if (hour >= 6 && hour < 18) {
+            return <Sun className="w-4 h-4 text-yellow-300 animate-[spin_10s_linear_infinite]" />;
+        }
+        return <Moon className="w-4 h-4 text-blue-200 animate-pulse" />;
+    };
 
     // Handle PWA shortcut actions on mount (e.g., opening modals)
     useEffect(() => {
@@ -135,8 +161,14 @@ const AppContent: React.FC = () => {
         const action = params.get('action');
         if (action === 'new_customer') {
             dispatch({ type: 'SET_SELECTION', payload: { page: 'CUSTOMERS', id: 'new' } });
-            // Clean URL
-            window.history.replaceState({}, '', '/');
+            // Clean URL safely
+            try {
+                // Use replaceState with current path to remove query params if possible, otherwise ignore
+                const newUrl = window.location.pathname;
+                window.history.replaceState({}, '', newUrl);
+            } catch (e) {
+                console.warn('Could not clean URL history', e);
+            }
         }
     }, [dispatch]);
 
@@ -153,6 +185,7 @@ const AppContent: React.FC = () => {
     const [isMobileQuickAddOpen, setIsMobileQuickAddOpen] = useState(false);
     const [isDirty, setIsDirty] = useState(false);
     const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
+    const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
 
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const mobileQuickAddRef = useRef<HTMLDivElement>(null);
@@ -196,8 +229,18 @@ const AppContent: React.FC = () => {
 
     // Double Back to Exit Logic
     useEffect(() => {
+        // Wrapper for safer history manipulation (avoids crashes in restricted frames/blobs)
+        const safePushState = (data: any, title: string, url?: string | null) => {
+            try {
+                window.history.pushState(data, title, url);
+            } catch (e) {
+                console.debug('History pushState restricted');
+            }
+        };
+
         // Push a dummy state initially so 'back' event is captured by popstate
-        window.history.pushState(null, '', window.location.pathname);
+        // Passing null for URL respects current location (safer for blobs)
+        safePushState(null, '', null); 
 
         let backPressCount = 0;
         let backPressTimer: any;
@@ -213,7 +256,7 @@ const AppContent: React.FC = () => {
                 // First press: Show warning and stay in app
                 showToast("Press back again to exit", "info");
                 // Push state again so next back press triggers popstate again
-                window.history.pushState(null, '', window.location.pathname);
+                safePushState(null, '', null);
                 
                 // Reset counter after 2 seconds
                 backPressTimer = setTimeout(() => {
@@ -272,7 +315,8 @@ const AppContent: React.FC = () => {
         if (state.themeGradient) {
             localStorage.setItem('themeGradient', state.themeGradient);
         } else {
-            localStorage.removeItem('themeGradient');
+            // Save 'none' to indicate explicit solid preference, distinguishing from "new user" (null)
+            localStorage.setItem('themeGradient', 'none');
         }
 
         // 5. Dynamic Icons (Favicon, Apple Touch, Manifest)
@@ -374,105 +418,112 @@ const AppContent: React.FC = () => {
     // Main Content Class Logic
     // If INVOICE_DESIGNER: Fixed full height, internal scrolling.
     // Standard Pages: Native body scrolling (min-h-screen).
+    // Increased top padding to accommodate the taller header + banner
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
-        : `min-h-screen pt-16`;
+        : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             <Toast />
             <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
+            <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
             
             {/* Header - Hidden on Invoice Designer to maximize space */}
             {currentPage !== 'INVOICE_DESIGNER' && (
-                <header className="fixed top-0 left-0 right-0 h-16 bg-theme text-white shadow-lg z-40 px-3 sm:px-4 flex items-center justify-between transition-all duration-300">
+                <header className="fixed top-0 left-0 right-0 z-40 bg-theme shadow-lg transition-all duration-300">
                     
-                    {/* Left: Menu & Search */}
-                    <div className="flex items-center gap-1 sm:gap-2 z-20">
-                        <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Menu (Ctrl+M)">
-                            <Menu size={24} />
-                        </button>
-                        <button onClick={() => setIsSearchOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Search (Ctrl+K)">
-                            <Search size={20} />
-                        </button>
-                    </div>
-
-                    {/* Center: Title - Absolutely Centered */}
-                    <div className="absolute left-0 right-0 flex justify-center pointer-events-none z-10">
-                        <button 
-                            onClick={() => handleNavigation('DASHBOARD')}
-                            className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-80 transition-opacity py-1"
-                        >
-                            <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight">
-                                {state.profile?.name || 'Business Manager'}
-                            </h1>
-                            {state.googleUser && (
-                                <span className="text-[10px] font-medium text-white/80 leading-none mt-0.5 flex items-center gap-1">
-                                    {state.googleUser.name.split(' ')[0]} • {state.syncStatus === 'syncing' ? 'Syncing...' : (state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : 'Unsynced')}
-                                </span>
-                            )}
-                        </button>
-                    </div>
-
-                    {/* Right: Actions */}
-                    <div className="flex items-center gap-1 sm:gap-2 z-20">
-                        
-                        {/* Cloud Sync / Sign In Button */}
-                        <button 
-                            onClick={() => { 
-                                if (!state.googleUser) {
-                                    googleSignIn();
-                                } else {
-                                    // Always attempt to sync, even on error (Retry)
-                                    syncData(); 
-                                }
-                            }} 
-                            onContextMenu={(e) => {
-                                // Right click to open diagnostics
-                                e.preventDefault();
-                                setIsCloudDebugOpen(true);
-                            }}
-                            className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
-                            title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Retry)' : state.syncStatus === 'syncing' ? 'Auto-Sync in progress...' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Not synced yet'}`}
-                        >
-                            {state.syncStatus === 'syncing' ? (
-                                <RefreshCw size={20} className="animate-spin" />
-                            ) : state.syncStatus === 'error' ? (
-                                <CloudOff size={20} className="text-red-300" />
-                            ) : (
-                                <Cloud size={20} className={!state.googleUser ? "opacity-70" : ""} />
-                            )}
-                            
-                            {/* Status Dot - Only visible if user is logged in */}
-                            {state.googleUser && state.syncStatus !== 'syncing' && (
-                                <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white/20 ${
-                                    state.syncStatus === 'success' ? 'bg-green-400' : 
-                                    state.syncStatus === 'error' ? 'bg-red-500' : 
-                                    'bg-gray-300'
-                                }`}></span>
-                            )}
-                        </button>
-
-                        {/* AI Button - Always visible */}
-                        <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
-                            <Sparkles size={20} />
-                        </button>
-
-                        {/* Notifications */}
-                        <div className="relative" ref={notificationsRef}>
-                            <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="p-2 hover:bg-white/20 rounded-full transition-colors relative">
-                                <Bell size={20} />
-                                {state.notifications.some(n => !n.read) && (
-                                    <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
-                                )}
+                    {/* Top Row: Navigation & Actions (h-16) */}
+                    <div className="h-16 px-3 sm:px-4 flex items-center justify-between text-white relative">
+                        {/* Left: Menu & Search */}
+                        <div className="flex items-center gap-1 sm:gap-2 z-20">
+                            <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Menu (Ctrl+M)">
+                                <Menu size={24} />
                             </button>
-                            <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
+                            <button onClick={() => setIsSearchOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Search (Ctrl+K)">
+                                <Search size={20} />
+                            </button>
                         </div>
 
-                        {/* Help Button - Hidden on small mobile */}
-                        <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
-                            <HelpCircle size={20} />
-                        </button>
+                        {/* Center: Title - Absolutely Centered */}
+                        <div className="absolute left-0 right-0 flex justify-center pointer-events-none z-10">
+                            <button 
+                                onClick={() => handleNavigation('DASHBOARD')}
+                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-80 transition-opacity py-1"
+                            >
+                                <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight">
+                                    {state.profile?.name || 'Business Manager'}
+                                </h1>
+                            </button>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-1 sm:gap-2 z-20">
+                            {/* Cloud Sync / Sign In Button */}
+                            <button 
+                                onClick={() => { 
+                                    if (!state.googleUser) {
+                                        setIsSignInModalOpen(true);
+                                    } else {
+                                        syncData(); 
+                                    }
+                                }} 
+                                onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setIsCloudDebugOpen(true);
+                                }}
+                                className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
+                                title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Retry)' : state.syncStatus === 'syncing' ? 'Auto-Sync in progress...' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString() : 'Not synced yet'}`}
+                            >
+                                {state.syncStatus === 'syncing' ? (
+                                    <RefreshCw size={20} className="animate-spin" />
+                                ) : state.syncStatus === 'error' ? (
+                                    <CloudOff size={20} className="text-red-300" />
+                                ) : (
+                                    <Cloud size={20} className={!state.googleUser ? "opacity-70" : ""} />
+                                )}
+                                {state.googleUser && state.syncStatus !== 'syncing' && (
+                                    <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white/20 ${
+                                        state.syncStatus === 'success' ? 'bg-green-400' : 
+                                        state.syncStatus === 'error' ? 'bg-red-500' : 
+                                        'bg-gray-300'
+                                    }`}></span>
+                                )}
+                            </button>
+
+                            {/* AI Button - Always visible */}
+                            <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                                <Sparkles size={20} />
+                            </button>
+
+                            {/* Notifications */}
+                            <div className="relative" ref={notificationsRef}>
+                                <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="p-2 hover:bg-white/20 rounded-full transition-colors relative">
+                                    <Bell size={20} />
+                                    {state.notifications.some(n => !n.read) && (
+                                        <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
+                                    )}
+                                </button>
+                                <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
+                            </div>
+
+                            {/* Help Button - Hidden on small mobile */}
+                            <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
+                                <HelpCircle size={20} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Bottom Row: Info Banner (h-10) */}
+                    <div className="h-10 bg-white/10 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-4 text-white text-xs sm:text-sm font-medium">
+                        <div className="flex-1 text-left opacity-90 truncate pr-2 flex items-center gap-2">
+                            {getGreetingIcon()}
+                            <span>{getTimeBasedGreeting()}, <span className="font-bold">{state.profile?.ownerName || 'Owner'}</span></span>
+                        </div>
+                        <div className="flex-1 text-right opacity-90 truncate pl-2 flex items-center justify-end gap-2">
+                            <CalendarClock className="w-4 h-4 text-white/80" />
+                            {currentDateTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} {currentDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                        </div>
                     </div>
                 </header>
             )}
@@ -503,6 +554,7 @@ const AppContent: React.FC = () => {
                 onNavigate={handleNavigation}
                 onOpenDevTools={() => setIsDevToolsOpen(true)}
                 onOpenChangeLog={() => setIsChangeLogOpen(true)}
+                onOpenSignIn={() => setIsSignInModalOpen(true)}
             />
             <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
             <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />

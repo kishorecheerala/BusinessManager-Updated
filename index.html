@@ -44,10 +44,13 @@
           
           // 2. Handle Custom Theme Color with Adaptive Contrast
           var savedColor = localStorage.getItem('themeColor') || '#0d9488'; // Default Teal
-          // DEFAULT GRADIENT (Oceanic) if not set
+          
+          // DEFAULT GRADIENT (Oceanic) if not set. 'none' means user explicitly chose solid.
           var savedGradient = localStorage.getItem('themeGradient');
           if (savedGradient === null) {
              savedGradient = 'linear-gradient(135deg, #0d9488 0%, #2563eb 100%)';
+          } else if (savedGradient === 'none') {
+             savedGradient = ''; // Explicitly no gradient (solid mode)
           }
           
           var r = parseInt(savedColor.slice(1, 3), 16);
@@ -75,6 +78,7 @@
               document.documentElement.style.setProperty('--theme-gradient', savedGradient);
           } else {
               document.documentElement.style.setProperty('--header-bg', 'rgb(' + r + ' ' + g + ' ' + b + ')');
+              document.documentElement.style.removeProperty('--theme-gradient');
           }
 
           // 3. Dynamic Icon Generation
