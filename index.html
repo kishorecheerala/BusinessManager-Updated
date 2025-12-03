@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -184,7 +183,7 @@
         border-bottom: 1px solid rgba(255, 255, 255, 0.05);
       }
 
-      /* Pre-React loader styles - Matches App Icon Style */
+      /* Pre-React loader styles - Modified: No Box, Just Text */
       .pre-loader-container {
         display: flex;
         justify-content: center;
@@ -200,20 +199,16 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        width: 120px;
-        height: 120px;
-        background-color: rgb(var(--primary-color));
-        color: white;
-        border-radius: 22.5px; /* Matches roughly 18% radius of svg */
-        font-size: 4rem;
+        background-color: transparent;
+        color: rgb(var(--primary-color));
+        font-size: 10rem;
         font-family: serif;
         font-weight: bold;
-        box-shadow: 0 10px 25px rgba(var(--primary-color), 0.4);
         animation: pulse-om 2s infinite ease-in-out;
       }
       @keyframes pulse-om {
         0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.05); opacity: 0.9; box-shadow: 0 15px 35px rgba(var(--primary-color), 0.6); }
+        50% { transform: scale(1.1); opacity: 0.8; }
       }
     </style>
 

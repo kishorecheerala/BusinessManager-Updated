@@ -444,14 +444,34 @@ const AppContent: React.FC = () => {
                         </div>
 
                         {/* Center: Title - Absolutely Centered */}
-                        <div className="absolute left-0 right-0 flex justify-center pointer-events-none z-10">
+                        <div className="absolute left-0 right-0 top-0 bottom-0 flex flex-col justify-center items-center pointer-events-none z-10 px-16">
                             <button 
                                 onClick={() => handleNavigation('DASHBOARD')}
-                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-80 transition-opacity py-1"
+                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity"
                             >
-                                <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight">
+                                <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
                                     {state.profile?.name || 'Business Manager'}
                                 </h1>
+                                {state.googleUser && (
+                                    <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
+                                        <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">
+                                            {state.googleUser.name}
+                                        </span>
+                                        
+                                        {/* Status Dot */}
+                                        <div className="relative flex h-2 w-2 shrink-0">
+                                          {state.syncStatus === 'syncing' && (
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                          )}
+                                          <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'error' ? 'bg-red-500' : 'bg-green-400'} shadow-sm`}></span>
+                                        </div>
+
+                                        {/* Sync Time */}
+                                        <span className="text-[9px] sm:text-[10px] font-mono text-white/80 font-medium tracking-wide">
+                                            {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true}) : 'Connected'}
+                                        </span>
+                                    </div>
+                                )}
                             </button>
                         </div>
 
