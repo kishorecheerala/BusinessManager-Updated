@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -454,6 +453,24 @@ const AppContent: React.FC = () => {
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight">
                                     {state.profile?.name || 'Business Manager'}
                                 </h1>
+                                
+                                {/* Google Account Info under Business Name */}
+                                {state.googleUser && (
+                                    <div className="flex items-center gap-1.5 text-[10px] sm:text-xs font-medium text-white/90 mt-0.5">
+                                        <span className="truncate max-w-[120px] sm:max-w-[200px]">{state.googleUser.name}</span>
+                                        {state.syncStatus === 'success' ? (
+                                            <div className="relative flex h-2 w-2">
+                                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-400"></span>
+                                            </div>
+                                        ) : (
+                                            <div className="h-1.5 w-1.5 rounded-full bg-white/50"></div>
+                                        )}
+                                        <span>
+                                            {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true}) : ''}
+                                        </span>
+                                    </div>
+                                )}
                             </button>
                         </div>
 

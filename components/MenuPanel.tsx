@@ -215,16 +215,21 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                             </h3>
                             
                             {state.googleUser ? (
-                                <div className="flex items-center gap-3 p-2 bg-white/20 rounded-lg backdrop-blur-md border border-white/30">
-                                    <img src={state.googleUser.picture} alt="User" className="w-10 h-10 rounded-full border-2 border-white/50" />
-                                    <div className="overflow-hidden min-w-0">
-                                        <p className="text-sm font-bold truncate">{state.googleUser.name}</p>
-                                        <p className="text-[10px] text-white/80 truncate">{state.googleUser.email}</p>
+                                <div className="flex items-center gap-3 p-3 bg-white/20 rounded-xl backdrop-blur-md border border-white/30 shadow-inner">
+                                    <img src={state.googleUser.picture} alt="User" className="w-12 h-12 rounded-full border-2 border-white/70 shadow-sm" />
+                                    <div className="overflow-hidden min-w-0 flex-1">
+                                        <p className="text-sm font-bold leading-tight break-words text-white drop-shadow-sm">{state.googleUser.name}</p>
+                                        <p className="text-[10px] text-white/80 truncate mb-1">{state.googleUser.email}</p>
                                         {state.lastSyncTime && (
-                                            <p className="text-[9px] text-white/90 mt-0.5 font-medium flex items-center gap-1">
-                                                <RefreshCw size={8} />
-                                                Last Synced: {new Date(state.lastSyncTime).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <span className="relative flex h-2 w-2">
+                                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                </span>
+                                                <p className="text-[10px] text-white/90 font-medium">
+                                                    {new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true})}
+                                                </p>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
