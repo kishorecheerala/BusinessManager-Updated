@@ -1,10 +1,11 @@
 {
-  "name": "Business Manager",
-  "short_name": "Business Mgr",
-  "description": "Sales & inventory management",
-  "display": "standalone",
-  "scope": "/",
+  "short_name": "Business Manager",
+  "name": "Business Manager Pro",
+  "description": "Offline-first PWA for sales and inventory management",
   "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
   "theme_color": "#2563eb",
   "background_color": "#ffffff",
   "icons": [
