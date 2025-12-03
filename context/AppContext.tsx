@@ -783,6 +783,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, []); // Run once on mount
 
     const googleSignIn = (options?: { forceConsent?: boolean }) => {
+        // Enforce prompt: 'select_account' to ensure the account chooser is always displayed
+        // If forceConsent is true, we also request consent (for scopes)
         const prompt = options?.forceConsent ? 'consent select_account' : 'select_account';
         
         // Optimistic sync call if client is ready (prevents popup blocker)
