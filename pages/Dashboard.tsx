@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, XCircle, CheckCircle, Info, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, ArrowRight, Zap, BrainCircuit, TrendingDown, Wallet, CalendarClock, Tag, Undo2, Crown, Calendar, Receipt, MessageCircle, Clock, History, PenTool, FileText, Loader2, RotateCw, Share, Volume2, StopCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -16,6 +15,13 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 interface DashboardProps {
     setCurrentPage: (page: Page) => void;
 }
+
+const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+};
 
 const MetricCard: React.FC<{
     icon: React.ElementType;
@@ -821,6 +827,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 />
             )}
             
+            {/* Header Section */}
+            <div className="flex flex-row items-center justify-center gap-2 relative mb-6">
+                <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
+                    Dashboard
+                </h1>
+            </div>
+
             {/* Install Prompt Banner */}
             {(isInstallable || (isIOS && !isInstalled)) && (
                 <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-down-fade mb-4">

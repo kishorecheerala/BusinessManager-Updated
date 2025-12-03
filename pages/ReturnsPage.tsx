@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Undo2, Users, Package, Plus, Trash2, Share2, Edit, Download } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -203,8 +204,11 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
         <div className="space-y-6">
              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                        <Undo2 className="w-6 h-6" />
+                    </div>
                      <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
-                        <Undo2 /> Returns Management
+                        Returns Management
                     </h1>
                     <DatePill />
                 </div>

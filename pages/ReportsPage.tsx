@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { Download, XCircle, Users, Package, AlertTriangle, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Download, XCircle, Users, Package, AlertTriangle, FileSpreadsheet, Loader2, BarChart3 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
@@ -420,7 +420,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     };
 
     const SheetButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
-        <Button onClick={onClick} variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 border-emerald-200" disabled={isExporting}>
+        <Button onClick={onClick} variant="secondary" className="bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 dark:hover:bg-emerald-900/50 border-emerald-200">
             {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
             Sheets
         </Button>
@@ -428,6 +428,12 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
 
     return (
         <div className="space-y-6">
+            <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <BarChart3 className="w-6 h-6" />
+                </div>
+                <h1 className="text-2xl font-bold text-primary">Reports</h1>
+            </div>
             <div className="border-b dark:border-slate-700">
                 <nav className="-mb-px flex space-x-6 overflow-x-auto">
                     <button 
@@ -503,31 +509,27 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                             <SheetButton onClick={exportDuesToSheets} />
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-gray-600 bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
                                     <tr>
-                                        <th className="p-2">Name</th><th className="p-2">Area</th><th className="p-2">Last Paid Date</th><th className="p-2 text-right">Due Amount</th>
+                                        <th className="px-4 py-3">Customer</th>
+                                        <th className="px-4 py-3">Area</th>
+                                        <th className="px-4 py-3">Last Paid</th>
+                                        <th className="px-4 py-3 text-right">Due Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody className="dark:text-slate-300">
-                                    {customerDues.length > 0 ? customerDues.map(c => (
-                                        <tr key={c.id} className="border-b dark:border-slate-700">
-                                            <td className="p-2 font-semibold">
-                                                <button 
-                                                    onClick={() => handleCustomerClick(c.id)}
-                                                    className="text-primary hover:underline text-left"
-                                                >
-                                                    {c.name}
-                                                </button>
-                                            </td>
-                                            <td className="p-2">{c.area}</td><td className="p-2">{c.lastPaidDate || 'N/A'}</td><td className="p-2 text-right font-semibold text-red-600 dark:text-red-400">Rs. {c.dueAmount.toLocaleString('en-IN')}</td>
+                                <tbody>
+                                    {customerDues.map(c => (
+                                        <tr key={c.id} onClick={() => handleCustomerClick(c.id)} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer">
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{c.name}</td>
+                                            <td className="px-4 py-3">{c.area}</td>
+                                            <td className="px-4 py-3">{c.lastPaidDate || '-'}</td>
+                                            <td className="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400">₹{c.dueAmount.toLocaleString('en-IN')}</td>
                                         </tr>
-                                    )) : <tr><td colSpan={4} className="p-4 text-center text-gray-500">No data found matching filters.</td></tr>}
+                                    ))}
+                                    {customerDues.length === 0 && <tr><td colSpan={4} className="px-4 py-3 text-center text-gray-500">No dues found matching filters.</td></tr>}
                                 </tbody>
                             </table>
-                        </div>
-                        <div className="mt-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900 rounded-lg text-right">
-                            <span className="font-bold text-red-800 dark:text-red-200">Total Outstanding: Rs. {totalDuesFiltered.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                         </div>
                     </Card>
 
@@ -538,19 +540,22 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                             <SheetButton onClick={exportCustomerSummaryToSheets} />
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-gray-600 bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
                                     <tr>
-                                        <th className="p-2">Name</th><th className="p-2 text-right">Total Billed</th><th className="p-2 text-right">Total Paid</th><th className="p-2 text-right">Balance</th>
+                                        <th className="px-4 py-3">Customer</th>
+                                        <th className="px-4 py-3 text-right">Total Billed</th>
+                                        <th className="px-4 py-3 text-right">Total Paid</th>
+                                        <th className="px-4 py-3 text-right">Balance</th>
                                     </tr>
                                 </thead>
-                                <tbody className="dark:text-slate-300">
-                                    {customerAccountSummary.map((s, i) => (
-                                        <tr key={i} className="border-b dark:border-slate-700">
-                                            <td className="p-2">{s.customer.name}</td>
-                                            <td className="p-2 text-right">Rs. {s.totalPurchased.toLocaleString('en-IN')}</td>
-                                            <td className="p-2 text-right text-green-600 dark:text-green-400">Rs. {s.totalPaid.toLocaleString('en-IN')}</td>
-                                            <td className={`p-2 text-right font-bold ${s.outstandingDue > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>Rs. {s.outstandingDue.toLocaleString('en-IN')}</td>
+                                <tbody>
+                                    {customerAccountSummary.map(c => (
+                                        <tr key={c.customer.id} onClick={() => handleCustomerClick(c.customer.id)} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700 hover:bg-gray-50 dark:hover:bg-slate-700 cursor-pointer">
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{c.customer.name}</td>
+                                            <td className="px-4 py-3 text-right">₹{c.totalPurchased.toLocaleString('en-IN')}</td>
+                                            <td className="px-4 py-3 text-right text-green-600">₹{c.totalPaid.toLocaleString('en-IN')}</td>
+                                            <td className={`px-4 py-3 text-right font-bold ${c.outstandingDue > 0 ? 'text-red-600' : 'text-gray-600'}`}>₹{c.outstandingDue.toLocaleString('en-IN')}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -562,44 +567,47 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
 
             {activeTab === 'supplier' && (
                 <div className="animate-fade-in-fast space-y-6">
-                    <Card title="Supplier Filters">
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Supplier</label>
-                        <div className="mt-1">
-                            <Dropdown 
-                                options={[{value: 'all', label: 'All Suppliers'}, ...uniqueSuppliers.map(s => ({ value: s.id, label: s.name }))]}
-                                value={supplierFilter}
-                                onChange={setSupplierFilter}
-                                searchable={true}
-                                icon="search"
-                            />
-                        </div>
-                        <div className="text-right mt-2">
-                            <Button onClick={() => setSupplierFilter('all')} variant="secondary" className="text-xs">Clear Filter</Button>
+                    <Card title="Filters">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Supplier</label>
+                            <div className="mt-1">
+                                <Dropdown 
+                                    options={[{value: 'all', label: 'All Suppliers'}, ...uniqueSuppliers.map(s => ({ value: s.id, label: s.name }))]}
+                                    value={supplierFilter}
+                                    onChange={setSupplierFilter}
+                                    searchable={true}
+                                />
+                            </div>
                         </div>
                     </Card>
 
-                    <Card title="Supplier Dues Report">
+                    <Card title="Supplier Payables (Dues)">
                         <div className="flex gap-2 mb-4">
                             <Button onClick={generateSupplierDuesPDF}><Download className="w-4 h-4 mr-2" /> PDF</Button>
                             <Button onClick={generateSupplierDuesCSV} variant="secondary"><Download className="w-4 h-4 mr-2" /> CSV</Button>
                             <SheetButton onClick={exportSupplierDuesToSheets} />
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-gray-600 bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
                                     <tr>
-                                        <th className="p-2">Supplier</th><th className="p-2">Invoice ID</th><th className="p-2">Next Due Date</th><th className="p-2 text-right">Amount Due</th>
+                                        <th className="px-4 py-3">Supplier</th>
+                                        <th className="px-4 py-3">Invoice / Next Due</th>
+                                        <th className="px-4 py-3 text-right">Due Amount</th>
                                     </tr>
                                 </thead>
-                                <tbody className="dark:text-slate-300">
-                                    {supplierDues.length > 0 ? supplierDues.map((p, i) => (
-                                        <tr key={i} className="border-b dark:border-slate-700">
-                                            <td className="p-2 font-semibold">{p.supplierName}</td>
-                                            <td className="p-2">{p.id}</td>
-                                            <td className="p-2">{p.nextDueDate}</td>
-                                            <td className="p-2 text-right font-bold text-red-600 dark:text-red-400">Rs. {p.dueAmount.toLocaleString('en-IN')}</td>
+                                <tbody>
+                                    {supplierDues.map((p, idx) => (
+                                        <tr key={idx} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700">
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{p.supplierName}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="text-xs text-gray-500">Inv: {p.id}</div>
+                                                <div>{p.nextDueDate || 'No Schedule'}</div>
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-bold text-red-600 dark:text-red-400">₹{p.dueAmount.toLocaleString('en-IN')}</td>
                                         </tr>
-                                    )) : <tr><td colSpan={4} className="p-4 text-center text-gray-500">No outstanding supplier dues.</td></tr>}
+                                    ))}
+                                    {supplierDues.length === 0 && <tr><td colSpan={3} className="px-4 py-3 text-center text-gray-500">No supplier dues found.</td></tr>}
                                 </tbody>
                             </table>
                         </div>
@@ -612,19 +620,22 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                             <SheetButton onClick={exportSupplierSummaryToSheets} />
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-gray-600 bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
                                     <tr>
-                                        <th className="p-2">Supplier Name</th><th className="p-2 text-right">Total Purchased</th><th className="p-2 text-right">Total Paid</th><th className="p-2 text-right">Balance</th>
+                                        <th className="px-4 py-3">Supplier</th>
+                                        <th className="px-4 py-3 text-right">Total Purchased</th>
+                                        <th className="px-4 py-3 text-right">Total Paid</th>
+                                        <th className="px-4 py-3 text-right">Balance</th>
                                     </tr>
                                 </thead>
-                                <tbody className="dark:text-slate-300">
-                                    {supplierAccountSummary.map((s, i) => (
-                                        <tr key={i} className="border-b dark:border-slate-700">
-                                            <td className="p-2">{s.supplier.name}</td>
-                                            <td className="p-2 text-right">Rs. {s.totalPurchased.toLocaleString('en-IN')}</td>
-                                            <td className="p-2 text-right text-green-600 dark:text-green-400">Rs. {s.totalPaid.toLocaleString('en-IN')}</td>
-                                            <td className={`p-2 text-right font-bold ${s.outstandingDue > 0 ? 'text-red-600 dark:text-red-400' : 'text-gray-600 dark:text-gray-400'}`}>Rs. {s.outstandingDue.toLocaleString('en-IN')}</td>
+                                <tbody>
+                                    {supplierAccountSummary.map(s => (
+                                        <tr key={s.supplier.id} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700">
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{s.supplier.name}</td>
+                                            <td className="px-4 py-3 text-right">₹{s.totalPurchased.toLocaleString('en-IN')}</td>
+                                            <td className="px-4 py-3 text-right text-green-600">₹{s.totalPaid.toLocaleString('en-IN')}</td>
+                                            <td className={`px-4 py-3 text-right font-bold ${s.outstandingDue > 0 ? 'text-red-600' : 'text-gray-600'}`}>₹{s.outstandingDue.toLocaleString('en-IN')}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -636,26 +647,29 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
 
             {activeTab === 'stock' && (
                 <div className="animate-fade-in-fast space-y-6">
-                    <Card title="Low Stock Reorder Report">
+                    <Card title="Low Stock Report (Reorder)">
                         <div className="flex gap-2 mb-4">
                             <Button onClick={generateLowStockPDF}><Download className="w-4 h-4 mr-2" /> PDF</Button>
                             <SheetButton onClick={exportLowStockToSheets} />
                         </div>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="text-left text-gray-600 bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
+                            <table className="w-full text-sm text-left">
+                                <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-slate-700 dark:text-gray-300">
                                     <tr>
-                                        <th className="p-2">Product Name</th><th className="p-2 text-center">Current Stock</th><th className="p-2 text-right">Last Purchase Cost</th>
+                                        <th className="px-4 py-3">Product Name</th>
+                                        <th className="px-4 py-3 text-center">Current Stock</th>
+                                        <th className="px-4 py-3 text-right">Last Purchase Price</th>
                                     </tr>
                                 </thead>
-                                <tbody className="dark:text-slate-300">
-                                    {lowStockItems.length > 0 ? lowStockItems.map((p, i) => (
-                                        <tr key={i} className="border-b dark:border-slate-700">
-                                            <td className="p-2 font-semibold">{p.name}</td>
-                                            <td className="p-2 text-center text-red-600 font-bold">{p.quantity}</td>
-                                            <td className="p-2 text-right">Rs. {p.purchasePrice.toLocaleString('en-IN')}</td>
+                                <tbody>
+                                    {lowStockItems.map(p => (
+                                        <tr key={p.id} className="bg-white border-b dark:bg-slate-800 dark:border-slate-700">
+                                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">{p.name}</td>
+                                            <td className="px-4 py-3 text-center font-bold text-red-600">{p.quantity}</td>
+                                            <td className="px-4 py-3 text-right">₹{p.purchasePrice.toLocaleString('en-IN')}</td>
                                         </tr>
-                                    )) : <tr><td colSpan={3} className="p-4 text-center text-green-600">All stock levels are healthy!</td></tr>}
+                                    ))}
+                                    {lowStockItems.length === 0 && <tr><td colSpan={3} className="px-4 py-3 text-center text-gray-500">Stock is healthy (No items &lt; 5).</td></tr>}
                                 </tbody>
                             </table>
                         </div>

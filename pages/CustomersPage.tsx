@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, Crown, ShieldAlert, BadgeCheck, MessageCircle, Map, Mail, Shield, Send } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, Crown, ShieldAlert, BadgeCheck, Users, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Payment, Sale, Page } from '../types';
 import Card from '../components/Card';
@@ -411,7 +410,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                         href={`truecaller://search_number?phoneNumber=${selectedCustomer.phone.replace(/\D/g, '')}`} 
                                         className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium dark:bg-blue-900/30 dark:border-blue-800 dark:text-blue-300"
                                     >
-                                        <Shield size={14} /> Truecaller
+                                        {/* Using Shield icon here for Truecaller as requested before, keeping consistent */}
+                                        <ShieldAlert size={14} /> Truecaller 
                                     </a>
                                 </div>
                              </div>
@@ -423,7 +423,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                     className="p-1 bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
                                     title="View on Google Maps"
                                 >
-                                    <Map size={14} />
+                                    <MapPin size={14} />
                                 </button>
                             </div>
                             <p><strong>Area:</strong> {selectedCustomer.area}</p>
@@ -577,8 +577,14 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                 />
             )}
 
-            <div className="flex justify-between items-center">
-                <Button onClick={() => setIsAdding(!isAdding)} className="w-full">
+            <div className="flex justify-between items-center mb-6">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                        <Users className="w-6 h-6" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-primary">Customers</h1>
+                </div>
+                <Button onClick={() => setIsAdding(!isAdding)}>
                     <Plus className="w-4 h-4 mr-2" />
                     {isAdding ? 'Cancel' : 'Add Customer'}
                 </Button>
@@ -626,7 +632,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                                 className="p-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded hover:bg-green-200 dark:hover:bg-green-800 transition-colors"
                                                 title="View on Google Maps"
                                             >
-                                                <Map size={14} />
+                                                <MapPin size={14} />
                                             </button>
                                         </div>
                                     </div>

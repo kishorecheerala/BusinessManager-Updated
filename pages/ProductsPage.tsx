@@ -28,6 +28,7 @@ const initialProductState: Product = {
     additionalImages: []
 };
 
+// ... (ProductDetailsModal remains same) ...
 const ProductDetailsModal: React.FC<{
     product: Product;
     onClose: () => void;
@@ -305,6 +306,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 )}
 
                 <div className="flex justify-between items-center flex-wrap gap-2">
+                    <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
+                        <Package /> Inventory
+                    </h1>
                     <div className="flex gap-2">
                         <div className="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
                             <button 
@@ -465,6 +469,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             </div>
 
             <Card>
+                {/* ... (Form Content Remains Unchanged) ... */}
                 <div className="space-y-4">
                     {/* Images Section */}
                     <div>

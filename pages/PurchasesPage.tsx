@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, ShoppingBag } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -12,6 +12,7 @@ import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
 import { generateDebitNotePDF, generateImagesToPDF } from '../utils/pdfGenerator';
+import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PurchaseForm } from '../components/AddPurchaseView';
@@ -598,8 +599,14 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                     />
                 )}
 
-                <div className="flex justify-between items-center">
-                    <Button onClick={() => setView('add_purchase')} className="w-full">
+                <div className="flex justify-between items-center mb-6">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                            <ShoppingBag className="w-6 h-6" />
+                        </div>
+                        <h1 className="text-2xl font-bold text-primary">Purchases</h1>
+                    </div>
+                    <Button onClick={() => setView('add_purchase')}>
                         <Plus size={16} className="mr-2"/> Create Purchase
                     </Button>
                 </div>

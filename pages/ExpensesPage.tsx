@@ -7,7 +7,6 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import DeleteButton from '../components/DeleteButton';
 import DateInput from '../components/DateInput';
-import DatePill from '../components/DatePill';
 import Dropdown from '../components/Dropdown';
 import { compressImage } from '../utils/imageUtils';
 import { useDialog } from '../context/DialogContext';
@@ -161,7 +160,6 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                     <h1 className="text-2xl font-bold text-primary flex items-center gap-2">
                         <Receipt /> Expenses
                     </h1>
-                    <DatePill />
                 </div>
                 <Button onClick={() => setIsAdding(!isAdding)}>
                     {isAdding ? <><X size={16} className="mr-2"/> Cancel</> : <><Plus size={16} className="mr-2"/> Add Expense</>}

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, ShoppingCart } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -393,7 +393,12 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
-            <h1 className="text-xl font-bold text-primary">{pageTitle}</h1>
+            <div className="flex items-center gap-3 mb-2">
+                <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                    <ShoppingCart className="w-6 h-6" />
+                </div>
+                <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
+            </div>
             
             <Card>
                 <div className="space-y-4">

@@ -9,7 +9,6 @@ import DateInput from '../components/DateInput';
 import Dropdown from '../components/Dropdown';
 import DeleteButton from '../components/DeleteButton';
 import { generateEstimatePDF } from '../utils/pdfGenerator';
-import DatePill from '../components/DatePill';
 import { Html5Qrcode } from 'html5-qrcode';
 import { useOnClickOutside } from '../hooks/useOnClickOutside';
 import { useDialog } from '../context/DialogContext';
@@ -267,7 +266,6 @@ const QuotationsPage: React.FC = () => {
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-primary">Estimates</h1>
-                        <DatePill />
                     </div>
                     <Button onClick={() => setView('create')}>
                         <Plus size={16} className="mr-2" /> New Estimate

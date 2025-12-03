@@ -1,10 +1,9 @@
-
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download
+  X, Download, Sun, Moon, CalendarClock
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -144,6 +143,15 @@ const AppContent: React.FC = () => {
         if (hour < 12) return 'Good Morning';
         if (hour < 17) return 'Good Afternoon';
         return 'Good Evening';
+    };
+
+    const getGreetingIcon = () => {
+        const hour = currentDateTime.getHours();
+        // Day time: 6 AM to 6 PM (18:00)
+        if (hour >= 6 && hour < 18) {
+            return <Sun className="w-4 h-4 text-yellow-300 animate-[spin_10s_linear_infinite]" />;
+        }
+        return <Moon className="w-4 h-4 text-blue-200 animate-pulse" />;
     };
 
     // Handle PWA shortcut actions on mount (e.g., opening modals)
@@ -506,13 +514,12 @@ const AppContent: React.FC = () => {
 
                     {/* Bottom Row: Info Banner (h-10) */}
                     <div className="h-10 bg-white/10 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-4 text-white text-xs sm:text-sm font-medium">
-                        <div className="flex-1 text-left opacity-90 truncate pr-2">
-                            {getTimeBasedGreeting()}, <span className="font-bold">{state.profile?.ownerName || 'Owner'}</span>
+                        <div className="flex-1 text-left opacity-90 truncate pr-2 flex items-center gap-2">
+                            {getGreetingIcon()}
+                            <span>{getTimeBasedGreeting()}, <span className="font-bold">{state.profile?.ownerName || 'Owner'}</span></span>
                         </div>
-                        <div className="flex-shrink-0 text-center font-bold uppercase tracking-wider px-3 py-0.5 bg-white/10 rounded-full text-[10px] sm:text-xs">
-                            {LABEL_MAP[currentPage]}
-                        </div>
-                        <div className="flex-1 text-right opacity-90 truncate pl-2">
+                        <div className="flex-1 text-right opacity-90 truncate pl-2 flex items-center justify-end gap-2">
+                            <CalendarClock className="w-4 h-4 text-white/80" />
                             {currentDateTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} {currentDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                     </div>
