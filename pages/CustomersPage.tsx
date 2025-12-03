@@ -203,7 +203,6 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
     };
 
-    // Updated Handlers for PDF Generation
     const handleDownloadThermalReceipt = async (sale: Sale) => {
         if (!selectedCustomer) return;
         try {
@@ -336,7 +335,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         const dueAmountForSelected = selectedSaleForPayment ? Number(selectedSaleForPayment.totalAmount) - amountPaidForSelected : 0;
 
         return (
-            <div className="space-y-4">
+            <div className="space-y-4 animate-fade-in-fast">
                 <ConfirmationModal
                     isOpen={confirmModalState.isOpen}
                     onClose={() => setConfirmModalState({ isOpen: false, saleIdToDelete: null })}

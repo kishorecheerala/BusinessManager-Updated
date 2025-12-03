@@ -160,7 +160,7 @@ const PRESETS: Record<string, any> = {
 
 // --- PDF Canvas Preview Component (PDF.js Based) ---
 const PDFCanvasPreview: React.FC<{ 
-    config: ExtendedLayoutConfig; 
+    config: InvoiceTemplateConfig; 
     profile: ProfileData | null;
     docType: DocumentType;
     customFonts: CustomFont[];
@@ -405,6 +405,12 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
             }
         };
 
+        // Enforce smart defaults for receipts if they seem off (e.g. A4 margins on narrow paper)
+        if (type === 'RECEIPT') {
+            if (config.layout.margin > 5) config.layout.margin = 2;
+            if (config.layout.logoSize > 20) config.layout.logoSize = 15;
+        }
+
         return config;
     };
 
@@ -556,6 +562,13 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
         if (preset) {
             let layoutUpdate = { ...preset.layout };
             
+            // Smart Preset Logic for Receipts
+            if (docType === 'RECEIPT') {
+                layoutUpdate.margin = 2; // Narrow margins
+                layoutUpdate.logoSize = Math.min(layoutUpdate.logoSize, 18);
+                layoutUpdate.paperSize = undefined; // Force custom size calc
+            }
+
             const current = configRef.current as InvoiceTemplateConfig;
             const newConfig = {
                 ...current,

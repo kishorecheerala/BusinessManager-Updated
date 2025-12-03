@@ -749,7 +749,7 @@ const _generateConfigurablePDF = async (
         doc.setFontSize(40);
         doc.setFont('helvetica', 'bold');
         doc.saveGraphicsState();
-        doc.setGState(new doc.GState({ opacity: 0.3 }));
+        doc.setGState(new (doc as any).GState({ opacity: 0.3 }));
         doc.text(stampText, pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 });
         doc.restoreGraphicsState();
     }

@@ -767,22 +767,39 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    const googleSignIn = (options?: { forceConsent?: boolean }) => {
-        loadGoogleScript().then(() => {
-            // Initialize token client if not exists
-            if (!tokenClientRef.current) {
-                tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
+    // Pre-initialize Google Client to avoid popup blocker on user click
+    useEffect(() => {
+        const init = async () => {
+            try {
+                await loadGoogleScript();
+                if (!tokenClientRef.current) {
+                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
+                }
+            } catch (e) {
+                console.error("Google script preload failed", e);
             }
-            
-            // Force account selection every time to avoid getting stuck on "Unverified App" screen with wrong account
-            const prompt = options?.forceConsent ? 'consent select_account' : 'select_account';
-            
-            // @ts-ignore
+        };
+        init();
+    }, []); // Run once on mount
+
+    const googleSignIn = (options?: { forceConsent?: boolean }) => {
+        const prompt = options?.forceConsent ? 'consent select_account' : 'select_account';
+        
+        // Optimistic sync call if client is ready (prevents popup blocker)
+        if (tokenClientRef.current) {
             tokenClientRef.current.requestAccessToken({ prompt });
-        }).catch(err => {
-            console.error("Google Script Load Error:", err);
-            showToast("Failed to load Google Sign-In", 'error');
-        });
+        } else {
+            // Fallback for lazy loading (might trigger popup blocker but necessary if not loaded)
+            loadGoogleScript().then(() => {
+                if (!tokenClientRef.current) {
+                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
+                }
+                tokenClientRef.current.requestAccessToken({ prompt });
+            }).catch(err => {
+                console.error("Google Script Load Error:", err);
+                showToast("Failed to load Google Sign-In", 'error');
+            });
+        }
     };
 
     const googleSignOut = () => {
