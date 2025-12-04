@@ -155,6 +155,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                     purchasePrice: Number(item.price),
                     salePrice: Number(item.saleValue),
                     gstPercent: Number(item.gstPercent),
+                    reason: 'Purchase',
+                    referenceId: purchaseData.id
                 }
             });
         });
@@ -599,10 +601,12 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                     />
                 )}
 
-                <div className="flex justify-between items-center">
+                <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg text-primary">
+                            <DatePill />
+                        </div>
                         <h1 className="text-2xl font-bold text-primary">Purchases</h1>
-                        <DatePill />
                     </div>
                     <Button onClick={() => setView('add_purchase')}>
                         <Plus size={16} className="mr-2"/> Create Purchase

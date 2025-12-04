@@ -1,3 +1,4 @@
+
 // Production-ready service worker with proper error handling
 const CACHE_VERSION = 'bm-v1.6.0-' + new Date().getTime();
 const CACHE_NAME = `business-manager-${CACHE_VERSION}`;

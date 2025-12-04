@@ -37,10 +37,12 @@ import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
 import SignInModal from './components/SignInModal';
+import FoldableDetector from './components/FoldableDetector';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
 import { APP_VERSION } from './utils/changelogData';
+import { networkManager } from './utils/network-manager';
 
 // Icon Map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -344,7 +346,7 @@ const AppContent: React.FC = () => {
             if (manifestLink) {
                 const dynamicManifest = {
                     name: "Business Manager Prod",
-                    short_name: "Business Manager",
+                    short_name: "Business Mgr",
                     id: "/?source=pwa",
                     start_url: "./index.html",
                     scope: ".",
@@ -424,6 +426,7 @@ const AppContent: React.FC = () => {
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             <Toast />
+            <FoldableDetector />
             <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
             <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
             
@@ -444,15 +447,14 @@ const AppContent: React.FC = () => {
                         </div>
 
                         {/* Center: Title - Absolutely Centered */}
-                        <div className="absolute left-0 right-0 top-0 h-16 flex items-center justify-center pointer-events-none z-10 px-16">
+                        <div className="absolute left-0 right-0 top-0 bottom-0 flex flex-col justify-center items-center pointer-events-none z-10 px-16">
                             <button 
                                 onClick={() => handleNavigation('DASHBOARD')}
-                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity h-full py-1"
+                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity"
                             >
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
-                                    {state.profile?.name || 'Business Manager Prod'}
+                                    {state.profile?.name || 'Business Manager'}
                                 </h1>
-                                
                                 {state.googleUser && (
                                     <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
                                         <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">

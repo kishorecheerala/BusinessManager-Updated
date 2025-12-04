@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, CheckSquare, Square, Filter } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -18,6 +18,8 @@ import ProductSearchModal from '../components/ProductSearchModal';
 import QRScannerModal from '../components/QRScannerModal';
 import DateInput from '../components/DateInput';
 import { generateA4InvoicePdf, generateReceiptPDF } from '../utils/pdfGenerator';
+import { useBatchOperations } from '../hooks/useBatchOperations';
+import { BatchActionsToolbar } from '../components/BatchActionsToolbar';
 
 const fetchImageAsBase64 = (url: string): Promise<string> =>
   fetch(url)
@@ -60,6 +62,9 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
     const customerDropdownRef = useRef<HTMLDivElement>(null);
+
+    // Batch Operations Hook
+    const batchOps = useBatchOperations();
     
     useOnClickOutside(customerDropdownRef, () => {
         if (isCustomerDropdownOpen) {
@@ -225,8 +230,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        // FIX: Use locally scoped variables for whatsAppText instead of calculations from component state to ensure data consistency.
-        const subTotal = calculations.subTotal; // Approximation using current calc, ideally recalc from sale object
+        const subTotal = calculations.subTotal; 
         const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
 
         const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmountOnSale.toLocaleString('en-IN')}\nDue: Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
@@ -292,7 +296,15 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             };
             dispatch({ type: 'ADD_SALE', payload: newSale });
             items.forEach(item => {
-                dispatch({ type: 'UPDATE_PRODUCT_STOCK', payload: { productId: item.productId, change: -Number(item.quantity) } });
+                dispatch({ 
+                    type: 'UPDATE_PRODUCT_STOCK', 
+                    payload: { 
+                        productId: item.productId, 
+                        change: -Number(item.quantity),
+                        reason: 'Sale',
+                        referenceId: newSale.id
+                    } 
+                });
             });
             showToast('Sale created successfully!');
             await generateAndSharePDF(newSale, customer, paidAmount);
@@ -366,10 +378,30 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         resetForm();
     };
 
+    const handleEditSale = (sale: Sale) => {
+         setSaleToEdit(sale);
+         setMode('edit');
+         setCustomerId(sale.customerId);
+         setItems(sale.items.map(item => ({...item})));
+         setDiscount(sale.discount.toString());
+         setSaleDate(getLocalDateString(new Date(sale.date)));
+         setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
+         
+         // Scroll to top to edit
+         window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     const canCreateSale = customerId && items.length > 0 && mode === 'add';
     const canUpdateSale = customerId && items.length > 0 && mode === 'edit';
     const canRecordPayment = customerId && items.length === 0 && parseFloat(paymentDetails.amount || '0') > 0 && customerTotalDue != null && customerTotalDue > 0.01 && mode === 'add';
     const pageTitle = mode === 'edit' ? `Edit Sale: ${saleToEdit?.id}` : 'New Sale / Payment';
+
+    // Recent Sales for Batch Ops (Last 20)
+    const recentSales = useMemo(() => {
+        return state.sales
+            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            .slice(0, 20);
+    }, [state.sales]);
 
     return (
         <div className="space-y-4 animate-fade-in-fast">
@@ -613,6 +645,54 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     {mode === 'edit' ? 'Cancel Edit' : 'Clear Form'}
                 </Button>
             </div>
+            
+            {/* Recent Sales & Batch Actions */}
+            {mode === 'add' && (
+                <>
+                    <Card title="Recent Invoices">
+                        <div className="space-y-3">
+                            {recentSales.map(sale => {
+                                const customer = state.customers.find(c => c.id === sale.customerId);
+                                const paid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                                const due = Number(sale.totalAmount) - paid;
+                                const isSelected = batchOps.selectedItems.has(sale.id);
+                                
+                                return (
+                                    <div key={sale.id} className={`flex items-center p-3 bg-white dark:bg-slate-800 border ${isSelected ? 'border-primary bg-primary/5' : 'border-gray-200 dark:border-slate-700'} rounded-lg shadow-sm transition-all`}>
+                                        <div className="pr-3 border-r border-gray-100 dark:border-slate-700 mr-3 flex items-center">
+                                            <button onClick={() => batchOps.toggleSelection(sale.id)}>
+                                                {isSelected ? <CheckSquare className="text-primary" /> : <Square className="text-gray-400" />}
+                                            </button>
+                                        </div>
+                                        <div className="flex-grow min-w-0">
+                                            <div className="flex justify-between">
+                                                <p className="font-bold text-sm truncate text-slate-800 dark:text-slate-200">{customer?.name || 'Unknown'}</p>
+                                                <span className="text-xs text-gray-500">{new Date(sale.date).toLocaleDateString()}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center mt-1">
+                                                <p className="text-xs text-gray-500 font-mono">{sale.id}</p>
+                                                <div className="text-right">
+                                                    <span className="font-bold text-sm text-primary">₹{Number(sale.totalAmount).toLocaleString()}</span>
+                                                    {due > 0.01 && <span className="text-[10px] text-red-500 ml-2 font-bold">Due: ₹{due.toLocaleString()}</span>}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="ml-3 pl-3 border-l border-gray-100 dark:border-slate-700 flex flex-col gap-2">
+                                            <button onClick={() => handleEditSale(sale)} className="p-1.5 text-blue-600 bg-blue-50 dark:bg-blue-900/20 rounded hover:bg-blue-100 transition-colors">
+                                                <Edit size={14} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {recentSales.length === 0 && (
+                                <p className="text-center text-gray-500 py-4 text-sm">No recent sales found.</p>
+                            )}
+                        </div>
+                    </Card>
+                    <BatchActionsToolbar batchOps={batchOps} totalItems={state.sales.length} />
+                </>
+            )}
         </div>
     );
 };
