@@ -11,7 +11,7 @@ export const useInvoiceReminders = () => {
     const loadReminders = async () => {
       try {
         const result = await apiClient.get('/api/invoices/reminders');
-        setReminders(result.data);
+        setReminders(result.data as any[]);
       } catch (err) {
         console.error('[Reminders] Failed:', err);
       } finally {

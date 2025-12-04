@@ -22,7 +22,7 @@ export const useAdvancedSearch = (initialFilters = {}) => {
       });
 
       const result = await apiClient.get(`/api/search?${params.toString()}`);
-      setResults(result.data);
+      setResults(result.data as any[]);
     } catch (err) {
       console.error('[Search] Failed:', err);
     } finally {

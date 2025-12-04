@@ -1,6 +1,7 @@
 
 // Production-ready service worker with proper error handling
-const CACHE_VERSION = 'bm-v1.6.0-' + new Date().getTime();
+// PWA Lock Removed - Version bumped
+const CACHE_VERSION = 'bm-v1.6.1-' + new Date().getTime();
 const CACHE_NAME = `business-manager-${CACHE_VERSION}`;
 
 // Files that MUST be cached for offline functionality

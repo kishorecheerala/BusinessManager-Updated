@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -839,7 +838,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             )}
             
             {/* Header Section */}
-            <div className="flex items-center justify-center mb-6">
+            <div className="flex flex-row items-center justify-center gap-2 relative mb-6">
                 <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
                     Dashboard
                 </h1>

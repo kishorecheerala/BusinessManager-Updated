@@ -3,27 +3,6 @@
 
 A comprehensive, offline-first Progressive Web App (PWA) designed to streamline sales, purchase, and customer management for a small business. This application empowers users to track dues, manage stock, and generate reports directly from their device, without needing a constant internet connection.
 
-## 🛡️ PWA Implementation - Critical Files
-
-The following files are production PWA implementations and are **NOT** to be regenerated or heavily modified by AI code generators:
-
-- `public/service-worker.js` - Production service worker with cache-busting and lifecycle management.
-- `src/utils/pwa-register.ts` - PWA Manager singleton class.
-- `public/manifest.json` - Web app manifest with all required PWA fields.
-- `vercel.json` - Server headers for correct caching behavior.
-
-**Why?** These files contain essential error handling, retry logic, and browser quirk workarounds (especially for iOS and Android).
-
-**If modification is needed:**
-1. Edit manually in code editor.
-2. Run `node scripts/verify-pwa.js` to validate.
-3. Test on a real device.
-
-**If accidentally regenerated:**
-```bash
-git checkout main -- public/service-worker.js src/utils/pwa-register.ts public/manifest.json
-```
-
 ## ✨ Key Features
 
 - **📊 Dashboard:** Get an at-a-glance overview of total sales, purchases, outstanding customer dues, and purchase dues. Now features a **Smart Analyst AI** that predicts revenue, monitors cash flow, and alerts you about dead stock.
