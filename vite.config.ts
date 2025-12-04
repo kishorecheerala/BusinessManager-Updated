@@ -7,4 +7,18 @@ export default defineConfig({
     react(),
   ],
   base: './', 
+  server: {
+    // Force file change detection in containerized environments
+    watch: {
+      usePolling: true,
+    },
+    // Prevent caching during development
+    headers: {
+      'Cache-Control': 'no-store',
+    },
+  },
+  build: {
+    // Ensure fresh builds
+    emptyOutDir: true,
+  }
 })

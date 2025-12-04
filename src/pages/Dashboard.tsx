@@ -757,19 +757,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         }
     };
 
-    const handleCreateCheckpoint = async () => {
-        const name = prompt("Enter a name for this checkpoint:", `Backup ${new Date().toLocaleTimeString()}`);
-        if (name) {
-            try {
-                await db.createSnapshot(name);
-                showToast("Checkpoint created successfully.", 'success');
-            } catch (e) {
-                console.error(e);
-                showToast("Failed to create checkpoint.", 'error');
-            }
-        }
-    };
-
     const handleNavigate = (page: Page, id: string) => {
         dispatch({ type: 'SET_SELECTION', payload: { page, id } });
         setCurrentPage(page);
@@ -839,9 +826,11 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             
             {/* Header Section */}
             <div className="flex flex-row items-center justify-center gap-2 relative mb-6">
-                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
-                    Dashboard
-                </h1>
+                <div className="text-center">
+                    <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
+                        Dashboard
+                    </h1>
+                </div>
             </div>
 
             {/* Install Prompt Banner - Shows if installable AND NOT dismissed this session */}

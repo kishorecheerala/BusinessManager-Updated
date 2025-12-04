@@ -1,3 +1,4 @@
+
 /**
  * Production-ready PWA registration utility
  * Handles all edge cases and common failures
@@ -57,12 +58,21 @@ export class PWAManager {
 
     try {
       // Unregister any old 'sw.js' if it exists to avoid conflicts
-      const regs = await navigator.serviceWorker.getRegistrations();
-      for (const reg of regs) {
-          if (reg.active && reg.active.scriptURL.endsWith('/sw.js')) {
-              console.log('[PWA] Unregistering legacy sw.js');
-              await reg.unregister();
-          }
+      try {
+        // Some restricted environments throw synchronously on getRegistrations access
+        if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) {
+                if (reg.active && reg.active.scriptURL.endsWith('/sw.js')) {
+                    console.log('[PWA] Unregistering legacy sw.js');
+                    await reg.unregister();
+                }
+            }
+        }
+      } catch (e) {
+        // Only warn, don't block the main registration if getting registrations fails
+        // This happens in some restrictive iframe/webview environments
+        console.warn("[PWA] Could not check existing registrations (restricted env):", e);
       }
 
       this.swRegistration = await navigator.serviceWorker.register(

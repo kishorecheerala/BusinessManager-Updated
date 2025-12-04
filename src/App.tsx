@@ -3,7 +3,7 @@ import {
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download
+  X, Download, Sun, Moon, CalendarClock
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -37,12 +37,10 @@ import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
 import SignInModal from './components/SignInModal';
-import FoldableDetector from './components/FoldableDetector';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
 import { APP_VERSION } from './utils/changelogData';
-import { networkManager } from './utils/network-manager';
 
 // Icon Map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -132,6 +130,29 @@ const AppContent: React.FC = () => {
         } catch(e) {}
         return 'DASHBOARD';
     });
+
+    // --- Global Timer for Header ---
+    const [currentDateTime, setCurrentDateTime] = useState(new Date());
+    useEffect(() => {
+        const timer = setInterval(() => setCurrentDateTime(new Date()), 1000);
+        return () => clearInterval(timer);
+    }, []);
+
+    const getTimeBasedGreeting = () => {
+        const hour = currentDateTime.getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 17) return 'Good Afternoon';
+        return 'Good Evening';
+    };
+
+    const getGreetingIcon = () => {
+        const hour = currentDateTime.getHours();
+        // Day time: 6 AM to 6 PM (18:00)
+        if (hour >= 6 && hour < 18) {
+            return <Sun className="w-4 h-4 text-yellow-300 animate-[spin_10s_linear_infinite]" />;
+        }
+        return <Moon className="w-4 h-4 text-blue-200 animate-pulse" />;
+    };
 
     // Handle PWA shortcut actions on mount (e.g., opening modals)
     useEffect(() => {
@@ -322,7 +343,7 @@ const AppContent: React.FC = () => {
             const manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
             if (manifestLink) {
                 const dynamicManifest = {
-                    name: "Business Manager Prod",
+                    name: "Business Manager Pro",
                     short_name: "Business Mgr",
                     id: "/?source=pwa",
                     start_url: "./index.html",
@@ -398,12 +419,11 @@ const AppContent: React.FC = () => {
     // Increased top padding to accommodate the taller header + banner
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
-        : `min-h-screen pt-16`; // Adjusted padding since banner is removed
+        : `min-h-screen pt-16`; 
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             <Toast />
-            <FoldableDetector />
             <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
             <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
             
@@ -505,10 +525,22 @@ const AppContent: React.FC = () => {
                                 <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
                             </div>
 
-                            {/* Help Button - Hidden on small mobile */}
-                            <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
+                            {/* Help Button - Always visible */}
+                            <button onClick={() => setIsHelpOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Help">
                                 <HelpCircle size={20} />
                             </button>
+                        </div>
+                    </div>
+
+                    {/* Bottom Row: Info Banner (h-10) */}
+                    <div className="h-10 bg-white/10 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-4 text-white text-xs sm:text-sm font-medium">
+                        <div className="flex-1 text-left opacity-90 truncate pr-2 flex items-center gap-2">
+                            {getGreetingIcon()}
+                            <span>{getTimeBasedGreeting()}, <span className="font-bold">{state.profile?.ownerName || 'Owner'}</span></span>
+                        </div>
+                        <div className="flex-1 text-right opacity-90 truncate pl-2 flex items-center justify-end gap-2">
+                            <CalendarClock className="w-4 h-4 text-white/80" />
+                            {currentDateTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} {currentDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                         </div>
                     </div>
                 </header>

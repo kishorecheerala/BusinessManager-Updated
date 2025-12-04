@@ -1,7 +1,7 @@
 
 // Production-ready service worker with proper error handling
-// PWA Lock Removed - Version bumped
-const CACHE_VERSION = 'bm-v1.6.1-' + new Date().getTime();
+// PWA Lock Removed - Version bumped to force update
+const CACHE_VERSION = 'bm-v1.9.0-FORCE-REFRESH-' + new Date().getTime();
 const CACHE_NAME = `business-manager-${CACHE_VERSION}`;
 
 // Files that MUST be cached for offline functionality
@@ -15,16 +15,14 @@ const CRITICAL_ASSETS = [
 // Install event - cache critical assets
 self.addEventListener('install', (event) => {
   console.log('[Service Worker] Installing v' + CACHE_VERSION);
+  // Force the waiting service worker to become the active service worker
+  self.skipWaiting();
   
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
         console.log('[Service Worker] Cache opened:', CACHE_NAME);
         return cache.addAll(CRITICAL_ASSETS);
-      })
-      .then(() => {
-        // Force new SW to take over immediately
-        return self.skipWaiting();
       })
       .catch((err) => {
         console.error('[Service Worker] Install failed:', err);
@@ -34,17 +32,19 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean old caches
 self.addEventListener('activate', (event) => {
-  console.log('[Service Worker] Activating');
+  console.log('[Service Worker] Activating and cleaning old caches');
   
   event.waitUntil(
     caches.keys()
       .then((cacheNames) => {
         return Promise.all(
           cacheNames
-            .filter((name) => name !== CACHE_NAME && name.startsWith('business-manager-'))
             .map((name) => {
-              console.log('[Service Worker] Deleting old cache:', name);
-              return caches.delete(name);
+              // Delete ALL old caches that don't match current version
+              if (name !== CACHE_NAME) {
+                  console.log('[Service Worker] Deleting old cache:', name);
+                  return caches.delete(name);
+              }
             })
         );
       })
@@ -58,8 +58,6 @@ self.addEventListener('activate', (event) => {
 // Fetch event - network first, fallback to cache
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  const url = new URL(request.url);
-
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
@@ -68,7 +66,7 @@ self.addEventListener('fetch', (event) => {
       return;
   }
 
-  // Network First Strategy for HTML (Navigations)
+  // Network First Strategy for HTML (Navigations) to ensure fresh content
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -96,6 +94,8 @@ self.addEventListener('fetch', (event) => {
             });
         }
         return networkResponse;
+      }).catch(() => {
+         // Network failed, return nothing (let cache handle it if it exists)
       });
       return cachedResponse || fetchPromise;
     })

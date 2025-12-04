@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { X, Database, Terminal, CloudLightning, Zap, Trash2, RefreshCw, HardDrive, Save, AlertTriangle, Bell, Bug, History, RotateCcw, PlusCircle, Globe, Cpu } from 'lucide-react';
 import Card from './Card';
@@ -22,6 +23,7 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false);
   const [swStatus, setSwStatus] = useState<string>('Checking...');
+  const [systemInfo, setSystemInfo] = useState({ ua: '', platform: '' });
 
   useEffect(() => {
     if (isOpen) {
@@ -30,8 +32,12 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
                 if (estimate.usage !== undefined && estimate.quota !== undefined) {
                 setStorageEstimate({ usage: estimate.usage, quota: estimate.quota });
                 }
-            });
+            }).catch(e => console.warn("Storage estimate failed", e));
         }
+        setSystemInfo({
+            ua: navigator.userAgent,
+            platform: navigator.platform
+        });
         loadSnapshots();
         checkSwStatus();
     }
@@ -39,11 +45,17 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
 
   const checkSwStatus = async () => {
       if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          if (regs.length > 0) {
-              setSwStatus(`Active (${regs[0].scope})`);
-          } else {
-              setSwStatus('Inactive (Dev Mode)');
+          try {
+            // Wrap in try-catch to handle "The document is in an invalid state"
+            const regs = await navigator.serviceWorker.getRegistrations();
+            if (regs.length > 0) {
+                setSwStatus(`Active (${regs[0].scope})`);
+            } else {
+                setSwStatus('Inactive (Dev Mode)');
+            }
+          } catch (e) {
+            console.warn('SW Check Error:', e);
+            setSwStatus('Error checking status (Restricted Env)');
           }
       } else {
           setSwStatus('Not Supported');
@@ -230,6 +242,8 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
                                     <p><span className="text-slate-400">Type:</span> {isLocal ? <span className="text-amber-600 font-bold">Development</span> : <span className="text-green-600 font-bold">Production</span>}</p>
                                     <p><span className="text-slate-400">PWA Service Worker:</span> {swStatus}</p>
                                     <p><span className="text-slate-400">Online:</span> {navigator.onLine ? 'Yes' : 'No'}</p>
+                                    <p className="truncate" title={systemInfo.platform}><span className="text-slate-400">Platform:</span> {systemInfo.platform}</p>
+                                    <p className="truncate max-w-[200px]" title={systemInfo.ua}><span className="text-slate-400">UA:</span> {systemInfo.ua}</p>
                                 </div>
                             </div>
                             <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border dark:border-slate-700">
