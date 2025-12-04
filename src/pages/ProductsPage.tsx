@@ -283,7 +283,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                         isOpen={isBarcodeModalOpen}
                         onClose={() => setIsBarcodeModalOpen(false)}
                         product={selectedProductForBarcode}
-                        businessName={state.profile?.name || 'Business Manager'}
+                        businessName={state.profile?.name || 'Business Manager Prod'}
                     />
                 )}
                 

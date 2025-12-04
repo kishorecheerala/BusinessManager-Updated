@@ -343,8 +343,8 @@ const AppContent: React.FC = () => {
             const manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
             if (manifestLink) {
                 const dynamicManifest = {
-                    name: "Business Manager Pro",
-                    short_name: "Business Mgr",
+                    name: "Business Manager Prod",
+                    short_name: "Business Manager",
                     id: "/?source=pwa",
                     start_url: "./index.html",
                     scope: ".",
@@ -450,7 +450,7 @@ const AppContent: React.FC = () => {
                                 className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity h-full py-1"
                             >
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
-                                    {state.profile?.name || 'Business Manager'}
+                                    {state.profile?.name || 'Business Manager Prod'}
                                 </h1>
                                 
                                 {state.googleUser && (

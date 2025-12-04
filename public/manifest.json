@@ -1,6 +1,6 @@
 {
-  "name": "Business Manager Pro",
-  "short_name": "Business Mgr",
+  "name": "Business Manager Prod",
+  "short_name": "Business Manager",
   "id": "/?source=pwa",
   "start_url": "./index.html",
   "scope": "./",
