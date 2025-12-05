@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, Eye } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, Eye, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -40,6 +40,14 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
     const [isBatchBarcodeModalOpen, setIsBatchBarcodeModalOpen] = useState(false);
     const [lastPurchase, setLastPurchase] = useState<Purchase | null>(null);
     const [viewImageModal, setViewImageModal] = useState<string | null>(null);
+
+    // Image Viewer State
+    const [viewerZoom, setViewerZoom] = useState(1);
+    const [viewerPan, setViewerPan] = useState({ x: 0, y: 0 });
+    const [isViewerDragging, setIsViewerDragging] = useState(false);
+    const viewerDragStart = useRef({ x: 0, y: 0 });
+    const pinchStartDist = useRef<number | null>(null);
+    const startZoom = useRef(1);
 
     const isDirtyRef = useRef(false);
 
@@ -82,6 +90,14 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
             }
         }
     }, [selectedSupplier?.id, state.suppliers]);
+
+    // Reset Viewer on Open
+    useEffect(() => {
+        if (viewImageModal) {
+            setViewerZoom(1);
+            setViewerPan({ x: 0, y: 0 });
+        }
+    }, [viewImageModal]);
     
     const handleAddSupplier = (newSupplier: Supplier) => {
         dispatch({ type: 'ADD_SUPPLIER', payload: newSupplier });
@@ -265,30 +281,110 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         window.open(url, '_blank');
     };
 
+    // --- Image Viewer Handlers ---
+    const handleViewerTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 2) {
+            const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            pinchStartDist.current = dist;
+            startZoom.current = viewerZoom;
+        } else if (e.touches.length === 1) {
+            setIsViewerDragging(true);
+            viewerDragStart.current = { x: e.touches[0].clientX - viewerPan.x, y: e.touches[0].clientY - viewerPan.y };
+        }
+    };
+
+    const handleViewerTouchMove = (e: React.TouchEvent) => {
+        if (e.touches.length === 2 && pinchStartDist.current) {
+            const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+            const newZoom = startZoom.current * (dist / pinchStartDist.current);
+            setViewerZoom(Math.max(0.5, Math.min(newZoom, 5)));
+        } else if (e.touches.length === 1 && isViewerDragging) {
+            e.preventDefault(); // Prevent scroll
+            setViewerPan({
+                x: e.touches[0].clientX - viewerDragStart.current.x,
+                y: e.touches[0].clientY - viewerDragStart.current.y
+            });
+        }
+    };
+
+    const handleViewerTouchEnd = () => {
+        setIsViewerDragging(false);
+        pinchStartDist.current = null;
+    };
+
+    const handleViewerMouseDown = (e: React.MouseEvent) => {
+        setIsViewerDragging(true);
+        viewerDragStart.current = { x: e.clientX - viewerPan.x, y: e.clientY - viewerPan.y };
+    };
+    
+    const handleViewerMouseMove = (e: React.MouseEvent) => {
+        if (isViewerDragging) {
+            e.preventDefault();
+            setViewerPan({
+                x: e.clientX - viewerDragStart.current.x,
+                y: e.clientY - viewerDragStart.current.y
+            });
+        }
+    };
+
+    const handleViewerMouseUp = () => setIsViewerDragging(false);
+
     // Define the Image Viewer Modal JSX here to use in multiple places
     const imageViewerModal = viewImageModal ? (
-        <div className="fixed inset-0 bg-black/95 z-[10000] flex flex-col items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
-            {/* Header Toolbar */}
-            <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/50 to-transparent" onClick={(e) => e.stopPropagation()}>
-                    <h3 className="text-white font-medium text-lg drop-shadow-md">Invoice Viewer</h3>
-                    <div className="flex gap-4">
-                        <a 
-                        href={viewImageModal} 
-                        download={`Invoice_Original_${Date.now()}.jpg`}
-                        className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md transition-colors flex items-center gap-2 px-4 shadow-lg border border-white/10"
-                        title="Download Original High-Res"
-                        onClick={(e) => e.stopPropagation()}
-                        >
-                        <Download size={20} /> <span className="hidden sm:inline font-bold text-sm">Download Original</span>
-                        </a>
-                        <button onClick={() => setViewImageModal(null)} className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md transition-colors shadow-lg border border-white/10">
-                        <X size={24}/>
-                        </button>
-                    </div>
-            </div>
-            
-            <div className="relative w-full h-full flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
-                <img src={viewImageModal} alt="Invoice" className="max-w-full max-h-full object-contain rounded-lg shadow-2xl" />
+        <div className="fixed inset-0 bg-black/80 z-[10000] flex items-center justify-center p-4 animate-fade-in-fast backdrop-blur-sm" onClick={() => setViewImageModal(null)}>
+            <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-xl shadow-2xl flex flex-col overflow-hidden h-[70vh] relative animate-scale-in border border-white/10" onClick={(e) => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="flex justify-between items-center p-3 border-b dark:border-slate-800 z-20 bg-white dark:bg-slate-900 shrink-0">
+                     <h3 className="font-bold text-gray-800 dark:text-white flex items-center gap-2">
+                        <ImageIcon size={18} className="text-primary"/> Invoice Viewer
+                     </h3>
+                     <div className="flex gap-2">
+                         <a 
+                            href={viewImageModal} 
+                            download={`Invoice_${Date.now()}.jpg`}
+                            className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 rounded-lg transition-colors"
+                            title="Download"
+                         >
+                            <Download size={18} />
+                         </a>
+                         <button onClick={() => setViewImageModal(null)} className="p-2 bg-gray-100 hover:bg-gray-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-gray-700 dark:text-gray-200 rounded-lg transition-colors">
+                            <X size={18}/>
+                         </button>
+                     </div>
+                </div>
+
+                {/* Image Area */}
+                <div 
+                    className="flex-1 overflow-hidden relative bg-slate-100 dark:bg-black touch-none flex items-center justify-center cursor-move"
+                    onTouchStart={handleViewerTouchStart}
+                    onTouchMove={handleViewerTouchMove}
+                    onTouchEnd={handleViewerTouchEnd}
+                    onMouseDown={handleViewerMouseDown}
+                    onMouseMove={handleViewerMouseMove}
+                    onMouseUp={handleViewerMouseUp}
+                    onMouseLeave={handleViewerMouseUp}
+                >
+                    <img 
+                        src={viewImageModal} 
+                        alt="Invoice"
+                        style={{ 
+                            transform: `translate(${viewerPan.x}px, ${viewerPan.y}px) scale(${viewerZoom})`,
+                            maxWidth: viewerZoom === 1 ? '100%' : 'none',
+                            maxHeight: viewerZoom === 1 ? '100%' : 'none'
+                        }}
+                        className="transition-transform duration-75 ease-out select-none" 
+                        draggable={false}
+                    />
+                </div>
+
+                {/* Footer Controls */}
+                <div className="p-3 border-t dark:border-slate-800 bg-white dark:bg-slate-900 flex justify-center items-center gap-6 z-20 shrink-0">
+                     <button onClick={() => setViewerZoom(z => Math.max(0.5, z - 0.2))} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800"><ZoomOut size={20} /></button>
+                     <span className="text-sm font-mono font-bold w-12 text-center">{Math.round(viewerZoom * 100)}%</span>
+                     <button onClick={() => setViewerZoom(z => Math.min(5, z + 0.2))} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800"><ZoomIn size={20} /></button>
+                     <button onClick={() => { setViewerZoom(1); setViewerPan({x:0, y:0}); }} className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-800 ml-4" title="Reset View"><RotateCcw size={20} /></button>
+                </div>
             </div>
         </div>
     ) : null;
