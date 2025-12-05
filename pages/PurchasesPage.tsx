@@ -267,7 +267,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
 
     // Define the Image Viewer Modal JSX here to use in multiple places
     const imageViewerModal = viewImageModal ? (
-        <div className="fixed inset-0 bg-black/95 z-[2000] flex flex-col items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
+        <div className="fixed inset-0 bg-black/95 z-[10000] flex flex-col items-center justify-center p-4 animate-fade-in-fast" onClick={() => setViewImageModal(null)}>
             {/* Header Toolbar */}
             <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/50 to-transparent" onClick={(e) => e.stopPropagation()}>
                     <h3 className="text-white font-medium text-lg drop-shadow-md">Invoice Viewer</h3>
@@ -611,7 +611,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                         isOpen={isBatchBarcodeModalOpen} 
                         onClose={() => { setIsBatchBarcodeModalOpen(false); setView('list'); setPurchaseToEdit(null); }} 
                         purchaseItems={lastPurchase.items} 
-                        businessName={state.profile?.name || ''}
+                        businessName={state.profile?.name || ''} 
                         title="Bulk Barcode Print"
                     />
                 )}
