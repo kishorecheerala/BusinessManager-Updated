@@ -2,6 +2,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Purchase, Supplier, Product, PurchaseItem, Payment } from '../types';
 import { Plus, Info, X, Camera, Image as ImageIcon, IndianRupee, Save, Sparkles, Loader2, ScanLine, Download, Trash2 } from 'lucide-react';
@@ -159,9 +161,13 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
               if (!apiKey) throw new Error("API Key not found");
 
               const ai = new GoogleGenAI({ apiKey });
+              // Updated prompt to ask for supplier contact details
               const prompt = `Analyze this invoice image. Return a valid JSON object with these fields:
               {
                 "supplierName": string,
+                "supplierAddress": string,
+                "supplierPhone": string,
+                "supplierGst": string,
                 "invoiceNumber": string,
                 "date": string (YYYY-MM-DD),
                 "items": [{ "name": string, "qty": number, "price": number, "gst": number }],
@@ -194,18 +200,33 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
               if (data.date) setPurchaseDate(data.date);
               if (data.discount) setDiscount(data.discount.toString());
 
-              // 2. Try to match Supplier
+              // 2. Try to match Supplier OR Create New
               if (data.supplierName) {
                   const normalizedScanned = data.supplierName.toLowerCase();
                   const matchedSupplier = suppliers.find(s => 
                       s.name.toLowerCase().includes(normalizedScanned) || 
                       normalizedScanned.includes(s.name.toLowerCase())
                   );
+                  
                   if (matchedSupplier) {
                       setSupplierId(matchedSupplier.id);
-                      showToast(`Matched supplier: ${matchedSupplier.name}`, 'success');
+                      showToast(`Matched existing supplier: ${matchedSupplier.name}`, 'success');
                   } else {
-                      showToast(`Supplier "${data.supplierName}" not found. Please add or select manually.`, 'info');
+                      // Create new supplier
+                      const newSupplierId = `SUPP-${Date.now()}`;
+                      const newSupplier: Supplier = {
+                          id: newSupplierId,
+                          name: data.supplierName,
+                          // Use extracted details or defaults
+                          location: data.supplierAddress || 'Unknown Location',
+                          phone: data.supplierPhone || '',
+                          gstNumber: data.supplierGst || '',
+                          reference: 'Auto-created from Scan'
+                      };
+                      
+                      dispatch({ type: 'ADD_SUPPLIER', payload: newSupplier });
+                      setSupplierId(newSupplierId);
+                      showToast(`Created new supplier: ${newSupplier.name}`, 'success');
                   }
               }
 
