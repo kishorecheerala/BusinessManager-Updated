@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, History, PlusCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -30,19 +31,19 @@ const MetricCard: React.FC<{
 }> = ({ icon: Icon, title, value, color, iconBgColor, textColor, unit = '₹', subValue, onClick, delay }) => (
     <div
         onClick={onClick}
-        className={`rounded-lg shadow-sm p-4 flex items-center transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group border border-transparent hover:border-current/10`}
+        className={`rounded-lg shadow-sm p-3 flex items-center transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group border border-transparent hover:border-current/10`}
         style={{ animationDelay: `${delay || 0}ms` }}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
     >
-        <div className={`p-3 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
-            <Icon className={`w-6 h-6 ${textColor}`} />
+        <div className={`p-2 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
+            <Icon className={`w-5 h-5 ${textColor}`} />
         </div>
-        <div className="ml-4 flex-grow">
-            <p className={`font-bold text-sm ${textColor} uppercase tracking-wide opacity-80`}>{title}</p>
-            <p className={`text-2xl font-extrabold ${textColor} break-all mt-0.5`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
-            {subValue && <p className={`text-xs font-medium mt-0.5 opacity-75 ${textColor}`}>{subValue}</p>}
+        <div className="ml-3 flex-grow min-w-0">
+            <p className={`font-bold text-xs ${textColor} uppercase tracking-wide opacity-80 truncate`}>{title}</p>
+            <p className={`text-xl font-extrabold ${textColor} break-all mt-0.5 leading-tight`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
+            {subValue && <p className={`text-[10px] font-medium mt-0.5 opacity-75 ${textColor} truncate`}>{subValue}</p>}
         </div>
     </div>
 );
@@ -277,17 +278,17 @@ const SmartAnalystCard: React.FC<{
         : staticInsights;
 
     return (
-        <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-md border border-primary/10 dark:border-slate-700 transition-all hover:shadow-lg animate-slide-up-fade group">
+        <div className="relative overflow-hidden rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-primary/10 dark:border-slate-700 transition-all hover:shadow-md animate-slide-up-fade group">
             <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
-            <div className="p-4">
-                <div className="flex justify-between items-start mb-3">
+            <div className="p-3">
+                <div className="flex justify-between items-start mb-2">
                     <div className="flex items-center gap-2">
-                        <div className="p-1.5 bg-primary/10 rounded-full animate-pulse">
-                            <BrainCircuit className="w-5 h-5 text-primary transition-transform duration-700 group-hover:rotate-12" />
+                        <div className="p-1 bg-primary/10 rounded-full animate-pulse">
+                            <BrainCircuit className="w-4 h-4 text-primary transition-transform duration-700 group-hover:rotate-12" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-lg text-gray-800 dark:text-white">Smart Analyst</h3>
-                            <span className="text-[10px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full border border-primary/20">AI Powered</span>
+                            <h3 className="font-bold text-sm text-gray-800 dark:text-white">Smart Analyst</h3>
+                            <span className="text-[9px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full border border-primary/20">AI</span>
                         </div>
                     </div>
                     <div className="flex gap-1.5">
@@ -296,7 +297,7 @@ const SmartAnalystCard: React.FC<{
                             className={`p-1.5 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500'}`}
                             title={isPlaying ? "Stop Briefing" : "Listen to Briefing"}
                         >
-                            {isPlaying ? <StopCircle size={16} /> : <Volume2 size={16} />}
+                            {isPlaying ? <StopCircle size={14} /> : <Volume2 size={14} />}
                         </button>
                         <button 
                             onClick={handleGenerateBriefing} 
@@ -304,20 +305,20 @@ const SmartAnalystCard: React.FC<{
                             className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors"
                             title="Refresh AI Insights"
                         >
-                            {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
+                            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <RotateCw size={14} />}
                         </button>
                     </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     {displayInsights.map((insight, idx) => (
-                        <div key={idx} className="flex gap-2.5 p-2.5 rounded-lg bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade group/item" style={{ animationDelay: `${idx * 100}ms` }}>
+                        <div key={idx} className="flex gap-2 p-2 rounded bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade group/item" style={{ animationDelay: `${idx * 100}ms` }}>
                             <div className="mt-0.5 flex-shrink-0 transition-transform group-hover/item:scale-110 duration-300">
-                                <insight.icon className={`w-4 h-4 ${insight.color}`} />
+                                <insight.icon className={`w-3.5 h-3.5 ${insight.color}`} />
                             </div>
                             <div>
-                                <p className={`text-[10px] font-bold uppercase mb-0.5 ${insight.color}`}>{insight.type}</p>
-                                <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+                                <p className={`text-[9px] font-bold uppercase mb-0.5 ${insight.color}`}>{insight.type}</p>
+                                <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
                                     {insight.text}
                                 </p>
                             </div>
@@ -396,11 +397,11 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime:
     const Icon = current.icon;
 
     return (
-        <div className={`flex items-center p-3 rounded-lg border ${current.classes} mb-4 group`}>
-            <Icon className={`w-5 h-5 mr-3 flex-shrink-0 ${current.iconColor} transition-transform group-hover:scale-110`} />
-            <div>
-                <h4 className="font-bold text-xs uppercase tracking-wide mb-0">{current.title}</h4>
-                <p className="text-xs opacity-90">{current.message}</p>
+        <div className={`flex items-center p-2 rounded-lg border ${current.classes} mb-3 group`}>
+            <Icon className={`w-4 h-4 mr-2 flex-shrink-0 ${current.iconColor} transition-transform group-hover:scale-110`} />
+            <div className="flex-grow flex justify-between items-center">
+                <h4 className="font-bold text-xs uppercase tracking-wide">{current.title}</h4>
+                <p className="text-[10px] opacity-90">{current.message}</p>
             </div>
         </div>
     );
@@ -455,12 +456,12 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
 
     if (overdueCustomersArray.length === 0) {
         return (
-            <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
+            <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 p-3">
                 <div className="flex items-center">
-                    <ShieldCheck className="w-6 h-6 text-green-600 dark:text-green-400 mr-3" />
+                    <ShieldCheck className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
                     <div>
                         <p className="font-bold text-sm text-green-800 dark:text-green-200">No Overdue Dues</p>
-                        <p className="text-xs text-green-700 dark:text-green-300">All >30 day payments settled.</p>
+                        <p className="text-[10px] text-green-700 dark:text-green-300">All &gt;30 day payments settled.</p>
                     </div>
                 </div>
             </Card>
@@ -468,31 +469,31 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
     }
 
     return (
-        <Card className="border-l-4 border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-600">
-            <div className="flex items-center mb-3">
-                <AlertTriangle className="w-5 h-5 text-rose-600 dark:text-rose-400 mr-2" />
-                <h2 className="text-base font-bold text-rose-800 dark:text-rose-200">Overdue Dues Alert</h2>
+        <Card className="border-l-4 border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-600 p-3">
+            <div className="flex items-center mb-2">
+                <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 mr-2" />
+                <h2 className="text-sm font-bold text-rose-800 dark:text-rose-200">Overdue Dues Alert</h2>
             </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                 {overdueCustomersArray.sort((a, b) => b.totalOverdue - a.totalOverdue).map(({ customer, totalOverdue, oldestOverdueDate }) => (
                     <div
                         key={customer.id}
-                        className="p-2 bg-white dark:bg-slate-800 rounded shadow-sm cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors flex justify-between items-center border dark:border-slate-700"
+                        className="p-1.5 bg-white dark:bg-slate-800 rounded shadow-sm cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors flex justify-between items-center border dark:border-slate-700"
                         onClick={() => onNavigate(customer.id)}
                         role="button"
                         tabIndex={0}
                     >
                         <div className="flex items-center gap-2 overflow-hidden">
-                            <User className="w-4 h-4 text-rose-700 dark:text-rose-400 flex-shrink-0" />
+                            <User className="w-3 h-3 text-rose-700 dark:text-rose-400 flex-shrink-0" />
                             <div className="min-w-0">
-                                <p className="font-bold text-sm text-rose-900 dark:text-rose-100 truncate">{customer.name}</p>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{customer.area}</p>
+                                <p className="font-bold text-xs text-rose-900 dark:text-rose-100 truncate">{customer.name}</p>
+                                <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate">{customer.area}</p>
                             </div>
                         </div>
                         <div className="text-right flex-shrink-0 ml-2">
-                            <p className="font-bold text-sm text-red-600 dark:text-red-400">₹{totalOverdue.toLocaleString('en-IN')}</p>
+                            <p className="font-bold text-xs text-red-600 dark:text-red-400">₹{totalOverdue.toLocaleString('en-IN')}</p>
                             <div className="flex items-center justify-end gap-1">
-                                <p className="text-[10px] text-gray-500 dark:text-gray-400">{Math.floor((new Date().getTime() - new Date(oldestOverdueDate).getTime()) / (1000 * 60 * 60 * 24))}d</p>
+                                <p className="text-[9px] text-gray-500 dark:text-gray-400">{Math.floor((new Date().getTime() - new Date(oldestOverdueDate).getTime()) / (1000 * 60 * 60 * 24))}d</p>
                                 <button onClick={(e) => sendWhatsAppReminder(e, customer, totalOverdue)} className="bg-green-500 text-white p-0.5 rounded-full hover:scale-110 transition-transform" title="Send Reminder"><MessageCircle size={10} /></button>
                             </div>
                         </div>
@@ -538,38 +539,38 @@ const UpcomingPurchaseDuesCard: React.FC<{
     }, [purchases, suppliers]);
 
     if (upcomingDues.length === 0) return (
-        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
+        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 p-3">
             <div className="flex items-center">
-                <PackageCheck className="w-6 h-6 text-green-600 dark:text-green-400 mr-3" />
+                <PackageCheck className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
                 <div>
-                    <p className="font-bold text-sm text-green-800 dark:text-green-200">No Upcoming Purchase Dues</p>
-                    <p className="text-xs text-green-700 dark:text-green-300">No supplier payments due in 30 days.</p>
+                    <p className="font-bold text-sm text-green-800 dark:text-green-200">No Purchase Dues</p>
+                    <p className="text-[10px] text-green-700 dark:text-green-300">No supplier payments in 30 days.</p>
                 </div>
             </div>
         </Card>
     );
 
     return (
-        <Card className="border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600">
-            <div className="flex items-center mb-3">
-                <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 mr-2" />
-                <h2 className="text-base font-bold text-amber-800 dark:text-amber-200">Upcoming Purchase Dues</h2>
+        <Card className="border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600 p-3">
+            <div className="flex items-center mb-2">
+                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mr-2" />
+                <h2 className="text-sm font-bold text-amber-800 dark:text-amber-200">Purchase Dues</h2>
             </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                 {upcomingDues.map((due) => {
                     const countdownText = due.daysRemaining === 0 ? "Due today" : `${due.daysRemaining} days`;
                     return (
-                        <div key={`${due.purchaseId}-${due.dueDate.toISOString()}`} className="p-2 bg-white dark:bg-slate-800 rounded shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex justify-between items-center border dark:border-slate-700" onClick={() => onNavigate(due.supplier.id)}>
+                        <div key={`${due.purchaseId}-${due.dueDate.toISOString()}`} className="p-1.5 bg-white dark:bg-slate-800 rounded shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex justify-between items-center border dark:border-slate-700" onClick={() => onNavigate(due.supplier.id)}>
                             <div className="flex items-center gap-2 overflow-hidden">
-                                <Package className="w-4 h-4 text-amber-700 dark:text-amber-400 flex-shrink-0" />
+                                <Package className="w-3 h-3 text-amber-700 dark:text-amber-400 flex-shrink-0" />
                                 <div className="min-w-0">
-                                    <p className="font-bold text-sm text-amber-900 dark:text-amber-100 truncate">{due.supplier.name}</p>
-                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">Inv: {due.purchaseId}</p>
+                                    <p className="font-bold text-xs text-amber-900 dark:text-amber-100 truncate">{due.supplier.name}</p>
+                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate">Inv: {due.purchaseId}</p>
                                 </div>
                             </div>
                             <div className="text-right flex-shrink-0 ml-2">
-                                <p className="font-bold text-sm text-amber-600 dark:text-amber-400">{countdownText}</p>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-400">{due.dueDate.toLocaleDateString()}</p>
+                                <p className="font-bold text-xs text-amber-600 dark:text-amber-400">{countdownText}</p>
+                                <p className="text-[9px] text-gray-500 dark:text-gray-400">{due.dueDate.toLocaleDateString()}</p>
                             </div>
                         </div>
                     );
@@ -585,31 +586,31 @@ const LowStockCard: React.FC<{ products: Product[]; onNavigate: (id: string) => 
     }, [products]);
 
     if (lowStockProducts.length === 0) return (
-        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
+        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 p-3">
             <div className="flex items-center">
-                <PackageCheck className="w-6 h-6 text-green-600 dark:text-green-400 mr-3" />
+                <PackageCheck className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
                 <div>
                     <p className="font-bold text-sm text-green-800 dark:text-green-200">Stock Healthy</p>
-                    <p className="text-xs text-green-700 dark:text-green-300">All products have sufficient stock (5+).</p>
+                    <p className="text-[10px] text-green-700 dark:text-green-300">All products have sufficient stock (5+).</p>
                 </div>
             </div>
         </Card>
     );
 
     return (
-        <Card className="border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-600">
-            <div className="flex items-center mb-3">
-                <AlertTriangle className="w-5 h-5 text-orange-600 dark:text-orange-400 mr-2" />
-                <h2 className="text-base font-bold text-orange-800 dark:text-orange-200">Low Stock Alert</h2>
+        <Card className="border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-600 p-3">
+            <div className="flex items-center mb-2">
+                <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 mr-2" />
+                <h2 className="text-sm font-bold text-orange-800 dark:text-orange-200">Low Stock Alert</h2>
             </div>
-            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
                 {lowStockProducts.map(product => (
-                    <div key={product.id} className="p-2 bg-white dark:bg-slate-800 rounded shadow-sm flex justify-between items-center cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border dark:border-slate-700" onClick={() => onNavigate(product.id)}>
+                    <div key={product.id} className="p-1.5 bg-white dark:bg-slate-800 rounded shadow-sm flex justify-between items-center cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border dark:border-slate-700" onClick={() => onNavigate(product.id)}>
                         <div className="min-w-0">
-                            <p className="font-semibold text-sm dark:text-slate-200 truncate">{product.name}</p>
-                            <p className="text-[10px] text-gray-500 dark:text-gray-400 truncate">{product.id}</p>
+                            <p className="font-semibold text-xs dark:text-slate-200 truncate">{product.name}</p>
+                            <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate">{product.id}</p>
                         </div>
-                        <span className="font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded text-xs flex-shrink-0 ml-2">
+                        <span className="font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded text-[10px] flex-shrink-0 ml-2">
                             {product.quantity} left
                         </span>
                     </div>
@@ -833,18 +834,18 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             )}
             
             {/* Header Section */}
-            <div className="mb-4 mt-2 text-center">
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600 tracking-tight drop-shadow-sm mb-1">
+            <div className="mb-2 mt-1 text-center">
+                <h1 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600 tracking-tight drop-shadow-sm mb-0.5">
                     Dashboard
                 </h1>
-                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-medium">
+                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium">
                     Overview & Analytics
                 </p>
             </div>
 
             {/* Install Prompt Banner - Shows if installable AND NOT dismissed this session */}
             {(isInstallable || (isIOS && !isInstalled)) && !bannerDismissed && (
-                <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-lg p-3 shadow-md flex flex-col sm:flex-row items-center justify-between gap-2 animate-slide-down-fade mb-3 relative">
+                <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-lg p-2 shadow-md flex flex-col sm:flex-row items-center justify-between gap-2 animate-slide-down-fade mb-2 relative">
                     {/* Close Button */}
                     <button 
                         onClick={handleDismissBanner}
@@ -854,13 +855,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                         <X size={14} />
                     </button>
 
-                    <div className="flex items-center gap-3 pr-6">
+                    <div className="flex items-center gap-2 pr-6">
                         <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
-                            <Download size={18} />
+                            <Download size={16} />
                         </div>
                         <div>
-                            <h3 className="font-bold text-sm">Install App</h3>
-                            <p className="text-[10px] opacity-90">Better offline experience.</p>
+                            <h3 className="font-bold text-xs">Install App</h3>
+                            <p className="text-[9px] opacity-90">Better offline experience.</p>
                         </div>
                     </div>
                     {isIOS ? (
@@ -868,7 +869,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                             <p className="text-[10px] font-bold text-white">Tap <Share size={10} className="inline mx-0.5"/> then "Add to Home Screen"</p>
                         </div>
                     ) : (
-                        <button onClick={install} className="bg-white text-indigo-600 px-3 py-1.5 rounded font-bold text-xs shadow hover:bg-gray-100 transition-colors whitespace-nowrap w-full sm:w-auto">
+                        <button onClick={install} className="bg-white text-indigo-600 px-3 py-1 rounded font-bold text-xs shadow hover:bg-gray-100 transition-colors whitespace-nowrap w-full sm:w-auto">
                             Install
                         </button>
                     )}
@@ -913,17 +914,17 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                 <OverdueDuesCard sales={sales} customers={customers} onNavigate={(id) => handleNavigate('CUSTOMERS', id)} />
                 <UpcomingPurchaseDuesCard purchases={purchases} suppliers={suppliers} onNavigate={(id) => handleNavigate('PURCHASES', id)} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                  <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
-                 <div className="space-y-4">
-                    <Card title="Data Management">
+                 <div className="space-y-3">
+                    <Card title="Data Management" className="p-3">
                         <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />
-                        <div className="space-y-3 mt-3">
+                        <div className="space-y-2 mt-2">
                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 <Button onClick={handleBackup} className="w-full text-xs h-9" disabled={isGeneratingReport}>
                                     <Download className="w-3 h-3 mr-1.5" /> {isGeneratingReport ? 'Preparing...' : 'Backup'}
@@ -943,7 +944,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                                 </Button>
                             </div>
                             
-                            <div className="mt-3 pt-3 border-t dark:border-slate-700 grid grid-cols-2 gap-2">
+                            <div className="mt-2 pt-2 border-t dark:border-slate-700 grid grid-cols-2 gap-2">
                                 <Button onClick={() => setIsCheckpointsModalOpen(true)} variant="secondary" className="w-full text-xs h-9">
                                     <History className="w-3 h-3 mr-1.5" /> History
                                 </Button>
