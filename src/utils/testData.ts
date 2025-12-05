@@ -123,7 +123,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   navOrder: [
     'DASHBOARD', 'CUSTOMERS', 'SALES', 'PURCHASES', 
     'INSIGHTS', 'REPORTS', 'PRODUCTS', 'EXPENSES', 
-    'RETURNS', 'QUOTATIONS', 'INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER'
+    'RETURNS', 'QUOTATIONS', 'INVOICE_DESIGNER'
   ],
   quickActions: [
     'add_sale', 'add_customer', 'add_expense', 'add_purchase', 'add_quote', 'add_return'

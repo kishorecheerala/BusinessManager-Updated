@@ -1,5 +1,5 @@
 
-export const APP_VERSION = '1.6.1';
+export const APP_VERSION = '1.6.4';
 
 export interface Release {
     version: string;
@@ -10,10 +10,44 @@ export interface Release {
 
 export const releases: Release[] = [
     {
-        version: '1.6.1',
+        version: '1.6.4',
         date: new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
         features: [
-            '🔧 System Update: Forced cache refresh to ensure latest features are visible.',
+            '🛡️ PWA Compatibility: Improved support for restricted preview environments.',
+        ],
+        fixes: [
+            'Fixed Service Worker registration origin mismatch errors.',
+            'Handled app installation checks in iframes gracefully.'
+        ]
+    },
+    {
+        version: '1.6.3',
+        date: 'Previous Release',
+        features: [
+            '🔧 Enhanced Developer Mode: Fixed caching issues in local development.',
+            '🚀 PWA Update: Service Worker now smartly detects environment to prevent stale updates.'
+        ],
+        fixes: [
+            'Fixed Android Studio preview not updating.',
+            'Resolved aggressive caching blocking live development.'
+        ]
+    },
+    {
+        version: '1.6.2',
+        date: 'Previous Release',
+        features: [
+            '🔥 Hotfix: Aggressive cache clearing for Preview Mode.',
+            '🛠️ Developer Tools: Added logic to prevent stale UI in Studio environments.'
+        ],
+        fixes: [
+            'Fixed persistent "changes not showing" issue by nuking old caches on load.'
+        ]
+    },
+    {
+        version: '1.6.1',
+        date: 'Previous Release',
+        features: [
+            '🔧 System Update: Forced cache refresh.',
             '🚀 PWA Optimization: Improved development mode detection.'
         ],
         fixes: [
@@ -33,18 +67,6 @@ export const releases: Release[] = [
         fixes: [
             'Improved Google Drive sync reliability.',
             'Enhanced PDF generation performance for large invoices.'
-        ]
-    },
-    {
-        version: '1.5.1',
-        date: '15 February 2025',
-        features: [
-            '🎨 Improved Invoice Designer with precise positioning controls.',
-            '🔧 Fixed issue with QR code and Logo absolute position adjustments.',
-            '✨ Added absolute positioning customization for Logo.'
-        ],
-        fixes: [
-            'Resolved state update conflict in nudge controls.'
         ]
     }
 ];

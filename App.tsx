@@ -59,7 +59,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 const LABEL_MAP: Record<string, string> = {
-    'DASHBOARD': 'Dashboard',
+    'DASHBOARD': 'Home',
     'CUSTOMERS': 'Customers',
     'SALES': 'Sales',
     'PURCHASES': 'Purchases',

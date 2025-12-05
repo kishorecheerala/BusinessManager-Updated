@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -59,7 +60,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 const LABEL_MAP: Record<string, string> = {
-    'DASHBOARD': 'Dashboard',
+    'DASHBOARD': 'Home',
     'CUSTOMERS': 'Customers',
     'SALES': 'Sales',
     'PURCHASES': 'Purchases',
@@ -390,7 +391,8 @@ const AppContent: React.FC = () => {
 
     // Calculate Navigation Layout based on user preference order
     const { mainNavItems, pinnedItems, mobileMoreItems } = useMemo(() => {
-        const order = state.navOrder || [];
+        // Filter out SYSTEM_OPTIMIZER explicitly from nav bar
+        const order = (state.navOrder || []).filter(id => id !== 'SYSTEM_OPTIMIZER');
         
         const allDesktopItems = order.map(id => ({
             page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
@@ -419,7 +421,7 @@ const AppContent: React.FC = () => {
     // Increased top padding to accommodate the taller header + banner
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
-        : `min-h-screen pt-16`; 
+        : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
@@ -525,8 +527,8 @@ const AppContent: React.FC = () => {
                                 <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
                             </div>
 
-                            {/* Help Button - Always visible */}
-                            <button onClick={() => setIsHelpOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Help">
+                            {/* Help Button - Hidden on small mobile */}
+                            <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
                                 <HelpCircle size={20} />
                             </button>
                         </div>
