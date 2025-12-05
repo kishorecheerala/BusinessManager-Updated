@@ -114,6 +114,8 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   customFonts: [],
   theme: 'light',
   themeColor: '#8b5cf6',
+  headerColor: '',
+  font: 'Inter',
   themeGradient: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)',
   lastLocalUpdate: 0,
   lastSyncTime: null,

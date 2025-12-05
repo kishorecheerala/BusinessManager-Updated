@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -512,6 +513,55 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
     );
 };
 
+const TopProductsCard: React.FC<{ sales: Sale[] }> = ({ sales }) => {
+    const topProducts = useMemo(() => {
+        const productMap: Record<string, { name: string, quantity: number, revenue: number }> = {};
+        
+        sales.forEach(sale => {
+            sale.items.forEach(item => {
+                if (!productMap[item.productId]) {
+                    productMap[item.productId] = { 
+                        name: item.productName, 
+                        quantity: 0,
+                        revenue: 0 
+                    };
+                }
+                productMap[item.productId].quantity += item.quantity;
+                productMap[item.productId].revenue += (item.quantity * item.price);
+            });
+        });
+
+        return Object.values(productMap)
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 3);
+    }, [sales]);
+
+    if (topProducts.length === 0) return null;
+
+    return (
+        <Card className="border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-600">
+            <div className="flex items-center mb-4">
+                <Award className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mr-3" />
+                <h2 className="text-lg font-bold text-indigo-800 dark:text-indigo-200">Top Selling Products</h2>
+            </div>
+            <div className="space-y-3">
+                {topProducts.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 bg-white dark:bg-slate-800 rounded shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <span className="font-bold text-lg text-indigo-300 w-4">{idx + 1}</span>
+                            <div>
+                                <p className="font-bold text-sm text-gray-800 dark:text-gray-200">{p.name}</p>
+                                <p className="text-xs text-gray-500">{p.quantity} units sold</p>
+                            </div>
+                        </div>
+                        <p className="font-bold text-indigo-600 dark:text-indigo-400">₹{p.revenue.toLocaleString('en-IN')}</p>
+                    </div>
+                ))}
+            </div>
+        </Card>
+    );
+};
+
 const UpcomingPurchaseDuesCard: React.FC<{ 
     purchases: Purchase[]; 
     suppliers: Supplier[]; 
@@ -939,7 +989,10 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
+                 <div className="flex flex-col gap-6">
+                    <TopProductsCard sales={sales} />
+                    <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
+                 </div>
                  <div className="space-y-6">
                     <Card title="Data Management">
                         <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />

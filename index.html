@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -12,6 +13,11 @@
     <link rel="manifest" href="./manifest.json" />
     <link rel="apple-touch-icon" href="./vite.svg">
     
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;500;600&family=Roboto:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
     <script>
       // Capture PWA install prompt early to prevent missing it before React loads
       window.deferredPrompt = null;
@@ -43,6 +49,8 @@
           
           // 2. Handle Custom Theme Color with Adaptive Contrast
           var savedColor = localStorage.getItem('themeColor') || '#8b5cf6'; // Default Nebula (Violet)
+          var savedHeaderColor = localStorage.getItem('headerColor');
+          var savedFont = localStorage.getItem('font') || 'Inter';
           
           // DEFAULT GRADIENT (Nebula) if not set. 'none' means user explicitly chose solid.
           var savedGradient = localStorage.getItem('themeGradient');
@@ -70,18 +78,21 @@
           }
           
           document.documentElement.style.setProperty('--primary-color', r + ' ' + g + ' ' + b);
+          document.documentElement.style.setProperty('--app-font', savedFont);
           
-          // Set Header Background (Gradient or Solid)
+          // Set Header Background (Gradient > HeaderColor > PrimaryColor)
           if (savedGradient) {
               document.documentElement.style.setProperty('--header-bg', savedGradient);
               document.documentElement.style.setProperty('--theme-gradient', savedGradient);
+          } else if (savedHeaderColor) {
+              document.documentElement.style.setProperty('--header-bg', savedHeaderColor);
+              document.documentElement.style.removeProperty('--theme-gradient');
           } else {
               document.documentElement.style.setProperty('--header-bg', 'rgb(' + r + ' ' + g + ' ' + b + ')');
               document.documentElement.style.removeProperty('--theme-gradient');
           }
 
           // 3. Dynamic Icon Generation (For Tab Icon Only)
-          // Generates the SVG string with the saved theme color
           var svgIcon = '<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" rx="96" fill="' + savedColor + '"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="280" font-family="serif" fill="#ffffff" font-weight="bold">ॐ</text></svg>';
           var iconDataUrl = 'data:image/svg+xml,' + encodeURIComponent(svgIcon);
           
@@ -107,10 +118,6 @@
           var metaTheme = document.querySelector("meta[name='theme-color']");
           if (metaTheme) metaTheme.content = savedColor;
           
-          // NOTE: We DO NOT update the manifest link here anymore. 
-          // Injecting a Blob URL into the manifest link breaks Android WebAPK generation (App Install)
-          // because Google's servers cannot fetch the icon from a local Blob URL.
-          
         } catch (e) {
           console.error("Theme setup error", e);
         }
@@ -118,12 +125,11 @@
     </script>
 
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-
       :root {
         /* Fallback if JS fails, though JS runs first */
         --primary-color: 139 92 246; 
         --header-bg: rgb(139, 92, 246);
+        --app-font: 'Inter';
       }
 
       html {
@@ -133,7 +139,7 @@
 
       /* Clean Background for Light Mode */
       body {
-        font-family: 'Inter', sans-serif;
+        font-family: var(--app-font), sans-serif;
         background-color: #f8fafc;
         /* Subtle Tint based on Primary Color using mix-blend-mode logic simulation */
         background-image: radial-gradient(circle at top left, rgba(var(--primary-color), 0.05), transparent 40%);
@@ -223,7 +229,7 @@
         theme: {
           extend: {
             fontFamily: {
-              sans: ['Inter', 'sans-serif'],
+              sans: ['var(--app-font)', 'sans-serif'],
             },
             colors: {
               // Dynamic primary color using CSS variable with alpha channel support

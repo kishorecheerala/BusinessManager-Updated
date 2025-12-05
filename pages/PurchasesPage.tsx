@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, ShoppingBag } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -263,6 +263,27 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         }
         const url = `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
         window.open(url, '_blank');
+    };
+
+    const handleExportCSV = () => {
+        const headers = ['Purchase ID', 'Date', 'Supplier Name', 'Invoice Ref', 'Total Amount', 'Paid', 'Due'];
+        const rows = state.purchases.map(p => {
+            const supplier = state.suppliers.find(s => s.id === p.supplierId);
+            const amountPaid = p.payments.reduce((sum, pay) => sum + Number(pay.amount), 0);
+            const due = Number(p.totalAmount) - amountPaid;
+            
+            return `"${p.id}","${new Date(p.date).toLocaleDateString()}","${supplier?.name || 'Unknown'}","${p.supplierInvoiceId || ''}",${p.totalAmount},${amountPaid},${due}`;
+        });
+        
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `purchases_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const renderContent = () => {
@@ -602,13 +623,18 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                 <div className="flex justify-between items-center mb-6">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                            <ShoppingBag className="w-6 h-6" />
+                            <h1 className="text-2xl font-bold">Purchases</h1>
                         </div>
-                        <h1 className="text-2xl font-bold text-primary">Purchases</h1>
+                        <DatePill />
                     </div>
-                    <Button onClick={() => setView('add_purchase')}>
-                        <Plus size={16} className="mr-2"/> Create Purchase
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button onClick={handleExportCSV} variant="secondary" className="px-3" title="Export CSV">
+                            <FileSpreadsheet size={18} />
+                        </Button>
+                        <Button onClick={() => setView('add_purchase')}>
+                            <Plus size={16} className="mr-2"/> Create Purchase
+                        </Button>
+                    </div>
                 </div>
 
                 <div>

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -28,6 +28,14 @@ const fetchImageAsBase64 = (url: string): Promise<string> =>
         reader.onerror = reject;
         reader.readAsDataURL(blob);
     }));
+
+// Interface for Draft/Parked Sales
+interface ParkedSale {
+    id: string;
+    customerId: string;
+    items: SaleItem[];
+    date: number;
+}
 
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -61,11 +69,27 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
     const customerDropdownRef = useRef<HTMLDivElement>(null);
     
+    // Parked Sales State
+    const [parkedSales, setParkedSales] = useState<ParkedSale[]>([]);
+    const [isDraftsOpen, setIsDraftsOpen] = useState(false);
+    
     useOnClickOutside(customerDropdownRef, () => {
         if (isCustomerDropdownOpen) {
             setIsCustomerDropdownOpen(false);
         }
     });
+
+    // Load Parked Sales from LocalStorage on mount
+    useEffect(() => {
+        const savedDrafts = localStorage.getItem('parked_sales');
+        if (savedDrafts) {
+            try {
+                setParkedSales(JSON.parse(savedDrafts));
+            } catch(e) {
+                console.error("Failed to load drafts");
+            }
+        }
+    }, []);
 
     // Effect to handle switching to edit mode from another page
     useEffect(() => {
@@ -118,6 +142,47 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         setSaleToEdit(null);
     };
     
+    // --- Park/Draft Functions ---
+    const handleParkSale = () => {
+        if (items.length === 0 && !customerId) {
+            showToast("Cannot park an empty sale.", 'error');
+            return;
+        }
+
+        const newDraft: ParkedSale = {
+            id: `DRAFT-${Date.now()}`,
+            customerId,
+            items,
+            date: Date.now()
+        };
+
+        const updatedDrafts = [newDraft, ...parkedSales];
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+        
+        showToast("Sale parked successfully.", 'success');
+        resetForm();
+    };
+
+    const handleResumeDraft = (draft: ParkedSale) => {
+        setCustomerId(draft.customerId);
+        setItems(draft.items);
+        
+        // Remove from drafts
+        const updatedDrafts = parkedSales.filter(d => d.id !== draft.id);
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+        
+        setIsDraftsOpen(false);
+        showToast("Draft resumed.", 'success');
+    };
+
+    const handleDeleteDraft = (draftId: string) => {
+        const updatedDrafts = parkedSales.filter(d => d.id !== draftId);
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+    };
+
     const handleSelectProduct = (product: Product) => {
         const newItem = {
             productId: product.id,
@@ -189,6 +254,23 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     }, [items, discount, state.products]);
 
     const selectedCustomer = useMemo(() => customerId ? state.customers.find(c => c.id === customerId) : null, [customerId, state.customers]);
+
+    // --- Last Purchase Information for Selected Customer ---
+    const lastPurchaseInfo = useMemo(() => {
+        if (!customerId) return null;
+        const customerSales = state.sales.filter(s => s.customerId === customerId);
+        if (customerSales.length === 0) return null;
+        
+        // Sort by date desc
+        const lastSale = customerSales.reduce((latest, current) => {
+            return new Date(current.date) > new Date(latest.date) ? current : latest;
+        });
+        
+        return {
+            date: new Date(lastSale.date).toLocaleDateString(),
+            amount: lastSale.totalAmount
+        };
+    }, [customerId, state.sales]);
 
     const filteredCustomers = useMemo(() => 
         state.customers.filter(c => 
@@ -372,7 +454,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const pageTitle = mode === 'edit' ? `Edit Sale: ${saleToEdit?.id}` : 'New Sale / Payment';
 
     return (
-        <div className="space-y-4 animate-fade-in-fast">
+        <div className="space-y-4 animate-fade-in-fast relative">
             {isAddingCustomer && 
                 <AddCustomerModal 
                     isOpen={isAddingCustomer}
@@ -394,7 +476,66 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
-            <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
+            
+            {/* Drafts Modal */}
+            {isDraftsOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150] p-4 animate-fade-in-fast backdrop-blur-sm">
+                    <Card title="Parked Sales (Drafts)" className="w-full max-w-md animate-scale-in max-h-[80vh] flex flex-col">
+                        <div className="flex-grow overflow-y-auto pr-1 space-y-3">
+                            {parkedSales.length === 0 ? (
+                                <p className="text-gray-500 text-center py-4">No parked sales.</p>
+                            ) : (
+                                parkedSales.map(draft => {
+                                    const customer = state.customers.find(c => c.id === draft.customerId);
+                                    const total = draft.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                                    return (
+                                        <div key={draft.id} className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg flex justify-between items-center border dark:border-slate-600">
+                                            <div>
+                                                <p className="font-bold text-sm dark:text-white">{customer?.name || 'Unknown'}</p>
+                                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                    <Clock size={10} /> {new Date(draft.date).toLocaleString()}
+                                                </p>
+                                                <p className="text-xs font-semibold mt-1">{draft.items.length} items • ₹{total.toLocaleString()}</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button onClick={() => handleResumeDraft(draft)} className="h-8 text-xs px-2 bg-emerald-600 hover:bg-emerald-700">
+                                                    <PlayCircle size={14} className="mr-1"/> Resume
+                                                </Button>
+                                                <DeleteButton variant="delete" onClick={() => handleDeleteDraft(draft.id)} />
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            )}
+                        </div>
+                        <div className="pt-4 mt-2 border-t dark:border-slate-700">
+                            <Button onClick={() => setIsDraftsOpen(false)} variant="secondary" className="w-full">Close</Button>
+                        </div>
+                    </Card>
+                </div>
+            )}
+
+            <div className="flex justify-between items-center">
+                <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
+                
+                {/* Drafts Controls */}
+                <div className="flex gap-2">
+                    {mode === 'add' && (items.length > 0 || customerId) && (
+                        <Button onClick={handleParkSale} variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800">
+                            <PauseCircle size={16} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Park</span>
+                        </Button>
+                    )}
+                    <Button onClick={() => setIsDraftsOpen(true)} variant="secondary" className="relative">
+                        <Clock size={16} className="mr-1 sm:mr-2" /> 
+                        <span className="hidden sm:inline">Drafts</span>
+                        {parkedSales.length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                                {parkedSales.length}
+                            </span>
+                        )}
+                    </Button>
+                </div>
+            </div>
             
             <Card>
                 <div className="space-y-4">
@@ -473,6 +614,14 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         onChange={e => setSaleDate(e.target.value)}
                         disabled={mode === 'edit'}
                     />
+
+                    {/* Customer Last Purchase Context */}
+                    {lastPurchaseInfo && mode === 'add' && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800 flex items-center justify-between">
+                            <span>Last Order: <strong>{lastPurchaseInfo.date}</strong></span>
+                            <span>Amount: <strong>₹{lastPurchaseInfo.amount.toLocaleString('en-IN')}</strong></span>
+                        </div>
+                    )}
 
                     {customerId && customerTotalDue !== null && mode === 'add' && (
                         <div className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg text-center border dark:border-slate-700">

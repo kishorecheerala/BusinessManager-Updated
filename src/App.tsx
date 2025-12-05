@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -37,6 +38,7 @@ import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
 import SignInModal from './components/SignInModal';
+import PinModal from './components/PinModal';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
@@ -59,7 +61,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 const LABEL_MAP: Record<string, string> = {
-    'DASHBOARD': 'Dashboard',
+    'DASHBOARD': 'Home',
     'CUSTOMERS': 'Customers',
     'SALES': 'Sales',
     'PURCHASES': 'Purchases',
@@ -185,6 +187,7 @@ const AppContent: React.FC = () => {
     const [isDirty, setIsDirty] = useState(false);
     const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
 
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const mobileQuickAddRef = useRef<HTMLDivElement>(null);
@@ -317,7 +320,7 @@ const AppContent: React.FC = () => {
             localStorage.removeItem('themeGradient');
         }
 
-        // 5. Dynamic Icons (Favicon, Apple Touch, Manifest)
+        // 5. Dynamic Icons (Favicon, Apple Touch ONLY)
         const updateIcons = () => {
             const bg = state.themeColor;
             const fill = '#ffffff'; 
@@ -338,34 +341,8 @@ const AppContent: React.FC = () => {
             const metaTheme = document.querySelector("meta[name='theme-color']");
             if (metaTheme) metaTheme.setAttribute("content", bg);
 
-            // Dynamic Manifest Update (Blob URL)
-            // This allows the PWA install prompt to potentially pick up the new icon/color on some browsers
-            const manifestLink = document.querySelector("link[rel='manifest']") as HTMLLinkElement;
-            if (manifestLink) {
-                const dynamicManifest = {
-                    name: "Business Manager Pro",
-                    short_name: "Business Mgr",
-                    id: "/?source=pwa",
-                    start_url: "./index.html",
-                    scope: ".",
-                    background_color: "#f8fafc",
-                    display: "standalone",
-                    orientation: "portrait",
-                    theme_color: bg,
-                    description: "A comprehensive sales, purchase, and customer management application.",
-                    icons: [
-                        { src: dataUrl, sizes: "192x192", type: "image/svg+xml", purpose: "any" },
-                        { src: dataUrl, sizes: "512x512", type: "image/svg+xml", purpose: "any" },
-                        { src: dataUrl, sizes: "512x512", type: "image/svg+xml", purpose: "maskable" }
-                    ]
-                };
-                
-                const stringManifest = JSON.stringify(dynamicManifest);
-                const blob = new Blob([stringManifest], {type: 'application/json'});
-                const manifestURL = URL.createObjectURL(blob);
-                
-                manifestLink.href = manifestURL;
-            }
+            // IMPORTANT: Do NOT update manifest link dynamically. 
+            // WebAPKs require a static manifest URL to install correctly on Android.
         };
         updateIcons();
 
@@ -408,21 +385,38 @@ const AppContent: React.FC = () => {
 
     const isMoreBtnActive = mobileMoreItems.some(item => item.page === currentPage);
 
-    // Swipe Navigation Removed to prevent accidental closure
-    // The user requested to disable single swipe closure, relying on double-back button logic instead.
+    // Lock App Handler
+    const handleLockApp = () => {
+        setIsLocked(true);
+        setIsMenuOpen(false);
+    };
+
+    const toggleTheme = () => {
+        const newTheme = state.theme === 'light' ? 'dark' : 'light';
+        dispatch({ type: 'SET_THEME', payload: newTheme });
+    };
 
     if (!isDbLoaded) return <AppSkeletonLoader />;
 
     // Main Content Class Logic
-    // If INVOICE_DESIGNER: Fixed full height, internal scrolling.
-    // Standard Pages: Native body scrolling (min-h-screen).
-    // Increased top padding to accommodate the taller header + banner
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
         : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
+            {/* Lock Screen Overlay */}
+            {isLocked && (
+                <div className="fixed inset-0 z-[1000] bg-background dark:bg-slate-950 flex items-center justify-center">
+                    <PinModal 
+                        mode="enter" 
+                        correctPin={state.pin} 
+                        onCorrectPin={() => setIsLocked(false)}
+                        // No onCancel prop = no back button = forced lock
+                    />
+                </div>
+            )}
+
             <Toast />
             <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
             <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
@@ -444,15 +438,14 @@ const AppContent: React.FC = () => {
                         </div>
 
                         {/* Center: Title - Absolutely Centered */}
-                        <div className="absolute left-0 right-0 top-0 h-16 flex items-center justify-center pointer-events-none z-10 px-16">
+                        <div className="absolute left-0 right-0 top-0 bottom-0 flex flex-col justify-center items-center pointer-events-none z-10 px-16">
                             <button 
                                 onClick={() => handleNavigation('DASHBOARD')}
-                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity h-full py-1"
+                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity"
                             >
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
                                     {state.profile?.name || 'Business Manager'}
                                 </h1>
-                                
                                 {state.googleUser && (
                                     <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
                                         <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">
@@ -478,6 +471,15 @@ const AppContent: React.FC = () => {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-1 sm:gap-2 z-20">
+                            {/* Theme Toggle Button - New */}
+                            <button 
+                                onClick={toggleTheme}
+                                className="p-2 hover:bg-white/20 rounded-full transition-colors hidden sm:block"
+                                title="Toggle Theme"
+                            >
+                                {state.theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+
                             {/* Cloud Sync / Sign In Button */}
                             <button 
                                 onClick={() => { 
@@ -574,6 +576,7 @@ const AppContent: React.FC = () => {
                 onOpenDevTools={() => setIsDevToolsOpen(true)}
                 onOpenChangeLog={() => setIsChangeLogOpen(true)}
                 onOpenSignIn={() => setIsSignInModalOpen(true)}
+                onLockApp={handleLockApp}
             />
             <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
             <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />

@@ -40,7 +40,9 @@ export interface AppState {
   pin: string | null;
   theme: Theme;
   themeColor: string;
+  headerColor: string; // New: Explicit header color (override)
   themeGradient: string;
+  font: string; // New: App Font
   googleUser: GoogleUser | null;
   syncStatus: SyncStatus;
   lastSyncTime: number | null;
@@ -81,7 +83,9 @@ type Action =
   | { type: 'SET_PROFILE'; payload: ProfileData }
   | { type: 'SET_THEME'; payload: Theme }
   | { type: 'SET_THEME_COLOR'; payload: string }
+  | { type: 'SET_HEADER_COLOR'; payload: string }
   | { type: 'SET_THEME_GRADIENT'; payload: string }
+  | { type: 'SET_FONT'; payload: string }
   | { type: 'UPDATE_UI_PREFERENCES'; payload: Partial<AppMetadataUIPreferences> }
   | { type: 'SET_PIN'; payload: string }
   | { type: 'SET_SELECTION'; payload: { page: Page; id: string; action?: 'edit' | 'new' } | null }
@@ -155,7 +159,9 @@ const initialState: AppState = {
     pin: null,
     theme: 'light',
     themeColor: '#8b5cf6',
+    headerColor: '',
     themeGradient: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)', // Default Nebula Gradient
+    font: 'Inter',
     googleUser: null,
     syncStatus: 'idle',
     lastSyncTime: null,
@@ -483,7 +489,9 @@ const appReducer = (state: AppState, action: Action): AppState => {
             id: 'themeSettings',
             theme: action.payload,
             color: state.themeColor,
-            gradient: state.themeGradient
+            headerColor: state.headerColor,
+            gradient: state.themeGradient,
+            font: state.font
         };
         const metaWithoutTheme = state.app_metadata.filter(m => m.id !== 'themeSettings');
         db.saveCollection('app_metadata', [...metaWithoutTheme, themeMeta]);
@@ -494,22 +502,52 @@ const appReducer = (state: AppState, action: Action): AppState => {
             id: 'themeSettings',
             theme: state.theme,
             color: action.payload,
-            gradient: state.themeGradient
+            headerColor: state.headerColor,
+            gradient: state.themeGradient,
+            font: state.font
         };
         const metaWithoutThemeColor = state.app_metadata.filter(m => m.id !== 'themeSettings');
         db.saveCollection('app_metadata', [...metaWithoutThemeColor, themeMetaColor]);
         return { ...state, themeColor: action.payload, app_metadata: [...metaWithoutThemeColor, themeMetaColor], ...touch };
+
+    case 'SET_HEADER_COLOR':
+        const themeMetaHeader: AppMetadataTheme = {
+            id: 'themeSettings',
+            theme: state.theme,
+            color: state.themeColor,
+            headerColor: action.payload,
+            gradient: state.themeGradient,
+            font: state.font
+        };
+        const metaWithoutThemeHeader = state.app_metadata.filter(m => m.id !== 'themeSettings');
+        db.saveCollection('app_metadata', [...metaWithoutThemeHeader, themeMetaHeader]);
+        return { ...state, headerColor: action.payload, app_metadata: [...metaWithoutThemeHeader, themeMetaHeader], ...touch };
 
     case 'SET_THEME_GRADIENT':
         const themeMetaGrad: AppMetadataTheme = {
             id: 'themeSettings',
             theme: state.theme,
             color: state.themeColor,
-            gradient: action.payload
+            headerColor: state.headerColor,
+            gradient: action.payload,
+            font: state.font
         };
         const metaWithoutThemeGrad = state.app_metadata.filter(m => m.id !== 'themeSettings');
         db.saveCollection('app_metadata', [...metaWithoutThemeGrad, themeMetaGrad]);
         return { ...state, themeGradient: action.payload, app_metadata: [...metaWithoutThemeGrad, themeMetaGrad], ...touch };
+
+    case 'SET_FONT':
+        const themeMetaFont: AppMetadataTheme = {
+            id: 'themeSettings',
+            theme: state.theme,
+            color: state.themeColor,
+            headerColor: state.headerColor,
+            gradient: state.themeGradient,
+            font: action.payload
+        };
+        const metaWithoutThemeFont = state.app_metadata.filter(m => m.id !== 'themeSettings');
+        db.saveCollection('app_metadata', [...metaWithoutThemeFont, themeMetaFont]);
+        return { ...state, font: action.payload, app_metadata: [...metaWithoutThemeFont, themeMetaFont], ...touch };
 
     case 'UPDATE_UI_PREFERENCES':
         const newPrefs = { ...state.uiPreferences, ...action.payload };
@@ -704,9 +742,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             } catch(e) { console.error("Failed to parse last sync time", e); }
 
             // Theme Preferences: Prioritize metadata from DB (cloud sync), fall back to localStorage/initial
-            // BUT ensure gradient default if null
             const loadedTheme = themeMeta?.theme || state.theme;
             const loadedColor = themeMeta?.color || state.themeColor;
+            const loadedHeaderColor = themeMeta?.headerColor || state.headerColor;
+            const loadedFont = themeMeta?.font || state.font;
             let loadedGradient = themeMeta?.gradient;
             
             // If DB didn't have preference, and localStorage doesn't either, use Default Nebula
@@ -734,7 +773,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     googleUser, lastSyncTime,
                     theme: loadedTheme,
                     themeColor: loadedColor,
-                    themeGradient: loadedGradient
+                    headerColor: loadedHeaderColor,
+                    themeGradient: loadedGradient,
+                    font: loadedFont
                 }
             });
             setIsDbLoaded(true);
@@ -880,21 +921,21 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const syncData = useCallback(async () => {
         // 1. Check Auth & Refresh if needed
-        let accessToken = state.googleUser?.accessToken;
+        let accessToken = stateRef.current.googleUser?.accessToken;
         
         if (!accessToken) {
             // If user data exists but token is missing, try refresh flow
-            if (state.googleUser) {
+            if (stateRef.current.googleUser) {
                  accessToken = (await ensureValidToken()) || undefined;
             }
             
             if (!accessToken) {
-                showToast("Please sign in to Google first.", 'info');
+                // Silent fail for auto-sync if logged out
                 return;
             }
         } else {
             // Check expiration
-            if (state.googleUser?.expiresAt && Date.now() > (state.googleUser.expiresAt - 300000)) {
+            if (stateRef.current.googleUser?.expiresAt && Date.now() > (stateRef.current.googleUser.expiresAt - 300000)) {
                  dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' }); // Show spinner
                  const newToken = await ensureValidToken();
                  if (!newToken) {
@@ -953,7 +994,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 if (themeMeta) {
                     payload.theme = themeMeta.theme;
                     payload.themeColor = themeMeta.color;
+                    payload.headerColor = themeMeta.headerColor;
                     payload.themeGradient = themeMeta.gradient;
+                    payload.font = themeMeta.font;
                 }
                 if (invSettings) payload.invoiceSettings = invSettings;
                 if (uiPrefsMeta) payload.uiPreferences = uiPrefsMeta;
@@ -981,7 +1024,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
             dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
             
-            if (state.syncStatus !== 'syncing') {
+            // Only show toast if it was a manual action or first sync
+            if (!stateRef.current.lastSyncTime) {
                  showToast("Sync Complete!", 'success'); 
             }
         } catch (error: any) {
@@ -989,21 +1033,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             
             // Handle 401/403 specifically
             if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
-                showToast("Authentication invalid. Attempting refresh...", 'info');
-                // One retry attempt
-                const newToken = await ensureValidToken();
-                if(newToken) {
-                    // Retry sync recursively once
-                    // (Simplification: In prod code, use a retry counter)
-                } else {
-                    dispatch({ type: 'SET_GOOGLE_USER', payload: null }); // Force logout
-                }
-            } else {
-                showToast("Sync Failed. Check connection.", 'error');
+                // Silent retry handled by ensureValidToken usually, but if we got here, it really failed
+                dispatch({ type: 'SET_GOOGLE_USER', payload: null }); 
             }
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
         }
-    }, [state.googleUser]);
+    }, []);
     
     // Exposed function for manual restore from Debug Modal
     const restoreFromFileId = async (fileId: string) => {
@@ -1026,13 +1061,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, [state.googleUser]);
 
     // --- AUTO SYNC LOGIC ---
+    
+    // 1. Initial Sync on Load (if logged in)
+    useEffect(() => {
+        if (isDbLoaded && state.googleUser && state.syncStatus === 'idle' && !state.lastSyncTime) {
+            console.log("Initial App Sync Triggered");
+            syncData();
+        }
+    }, [isDbLoaded, state.googleUser]);
+
+    // 2. Debounced Sync on Changes
     useEffect(() => {
         // Auto-sync if user is logged in and data has changed locally
         if (state.googleUser && state.lastLocalUpdate > 0 && state.syncStatus !== 'syncing') {
             const timer = setTimeout(() => {
                 console.log("Auto-sync triggered due to local changes");
                 syncData();
-            }, 5000); // 5-second debounce
+            }, 2000); // 2-second debounce for faster sync
 
             return () => clearTimeout(timer);
         }

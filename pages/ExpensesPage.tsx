@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Plus, Trash2, Filter, Receipt, DollarSign, X, Camera, Image as ImageIcon } from 'lucide-react';
+import { Plus, Trash2, Filter, Receipt, DollarSign, X, Camera, Image as ImageIcon, ScanLine, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Expense, ExpenseCategory } from '../types';
 import Card from '../components/Card';
@@ -11,6 +11,7 @@ import Dropdown from '../components/Dropdown';
 import { compressImage } from '../utils/imageUtils';
 import { useDialog } from '../context/DialogContext';
 import { getLocalDateString } from '../utils/dateUtils';
+import { GoogleGenAI } from "@google/genai";
 
 interface ExpensesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -43,6 +44,7 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
     const [paymentMethod, setPaymentMethod] = useState<'CASH'|'UPI'|'CHEQUE'>('CASH');
     const [isAdding, setIsAdding] = useState(false);
     const [receiptImage, setReceiptImage] = useState<string | null>(null);
+    const [isScanning, setIsScanning] = useState(false);
     
     const [filterCategory, setFilterCategory] = useState<string>('all');
     const [filterMonth, setFilterMonth] = useState(new Date().getMonth().toString());
@@ -51,6 +53,7 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
 
     const isDirtyRef = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const scanInputRef = useRef<HTMLInputElement>(null);
 
     // Auto-open add form if navigated via Quick Action
     useEffect(() => {
@@ -83,6 +86,63 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                 showToast("Error processing image.", 'error');
             } finally {
                 if (fileInputRef.current) fileInputRef.current.value = '';
+            }
+        }
+    };
+
+    const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setIsScanning(true);
+            try {
+                const file = e.target.files[0];
+                const base64 = await compressImage(file, 1024, 0.8);
+                setReceiptImage(base64);
+
+                const apiKey = process.env.API_KEY || localStorage.getItem('gemini_api_key');
+                if (!apiKey) throw new Error("API Key required for scanning.");
+
+                const ai = new GoogleGenAI({ apiKey });
+                const prompt = `
+                    Analyze this receipt image. Extract the following details:
+                    - Total Amount (number)
+                    - Date (YYYY-MM-DD)
+                    - Merchant Name (string)
+                    - Category (choose one best fit from: Rent, Salary, Electricity, Transport, Maintenance, Marketing, Food, Other)
+                    
+                    Return JSON: { "amount": number, "date": string, "merchant": string, "category": string }
+                `;
+
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: [
+                        { inlineData: { mimeType: 'image/jpeg', data: base64.split(',')[1] } },
+                        { text: prompt }
+                    ],
+                    config: { responseMimeType: "application/json" }
+                });
+
+                const text = response.text;
+                if (!text) throw new Error("No data returned");
+                
+                const data = JSON.parse(text);
+                
+                if (data.amount) setAmount(data.amount.toString());
+                if (data.date) setDate(data.date);
+                if (data.merchant) setNote(data.merchant);
+                if (data.category && EXPENSE_CATEGORIES.some(c => c.value === data.category)) {
+                    setCategory(data.category as ExpenseCategory);
+                } else {
+                    setCategory('Other');
+                }
+
+                showToast("Receipt scanned successfully!", 'success');
+
+            } catch (error: any) {
+                console.error("Scan Error", error);
+                showToast("Failed to scan receipt. Please enter details manually.", 'error');
+            } finally {
+                setIsScanning(false);
+                if (scanInputRef.current) scanInputRef.current.value = '';
             }
         }
     };
@@ -177,7 +237,7 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                                     <ImageIcon className="text-indigo-600 dark:text-indigo-300" size={18} />
                                 </div>
                                 <span className="text-sm font-medium text-indigo-900 dark:text-indigo-100">
-                                    {receiptImage ? 'Receipt Attached' : 'Attach Receipt Photo'}
+                                    {receiptImage ? 'Receipt Attached' : 'Attach Receipt'}
                                 </span>
                             </div>
                             
@@ -192,9 +252,17 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                                 )}
                                 <button 
                                     onClick={() => fileInputRef.current?.click()}
+                                    className="text-xs bg-white dark:bg-slate-700 border hover:bg-gray-50 text-gray-700 dark:text-white px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors shadow-sm font-bold"
+                                >
+                                    <Camera size={14} /> {receiptImage ? 'Change' : 'Photo'}
+                                </button>
+                                <button 
+                                    onClick={() => scanInputRef.current?.click()}
+                                    disabled={isScanning}
                                     className="text-xs bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors shadow-sm font-bold"
                                 >
-                                    <Camera size={14} /> {receiptImage ? 'Change' : 'Camera'}
+                                    {isScanning ? <Loader2 size={14} className="animate-spin" /> : <ScanLine size={14} />} 
+                                    {isScanning ? 'Scanning...' : 'Auto-Scan'}
                                 </button>
                             </div>
                             <input 
@@ -204,6 +272,14 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                                 ref={fileInputRef} 
                                 className="hidden" 
                                 onChange={handleImageUpload}
+                            />
+                            <input 
+                                type="file" 
+                                accept="image/*" 
+                                capture="environment" 
+                                ref={scanInputRef} 
+                                className="hidden" 
+                                onChange={handleScanReceipt}
                             />
                         </div>
 
@@ -264,7 +340,7 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                                 value={note} 
                                 onChange={e => setNote(e.target.value)} 
                                 className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                                placeholder="Description..."
+                                placeholder="Merchant / Description..."
                             />
                         </div>
 

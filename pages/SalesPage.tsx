@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, ShoppingCart } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, Calendar, FileSpreadsheet } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -18,6 +18,7 @@ import ProductSearchModal from '../components/ProductSearchModal';
 import QRScannerModal from '../components/QRScannerModal';
 import DateInput from '../components/DateInput';
 import { generateA4InvoicePdf, generateReceiptPDF } from '../utils/pdfGenerator';
+import { createCalendarEvent } from '../utils/googleCalendar';
 
 const fetchImageAsBase64 = (url: string): Promise<string> =>
   fetch(url)
@@ -28,6 +29,14 @@ const fetchImageAsBase64 = (url: string): Promise<string> =>
         reader.onerror = reject;
         reader.readAsDataURL(blob);
     }));
+
+// Interface for Draft/Parked Sales
+interface ParkedSale {
+    id: string;
+    customerId: string;
+    items: SaleItem[];
+    date: number;
+}
 
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -61,11 +70,27 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
     const customerDropdownRef = useRef<HTMLDivElement>(null);
     
+    // Parked Sales State
+    const [parkedSales, setParkedSales] = useState<ParkedSale[]>([]);
+    const [isDraftsOpen, setIsDraftsOpen] = useState(false);
+    
     useOnClickOutside(customerDropdownRef, () => {
         if (isCustomerDropdownOpen) {
             setIsCustomerDropdownOpen(false);
         }
     });
+
+    // Load Parked Sales from LocalStorage on mount
+    useEffect(() => {
+        const savedDrafts = localStorage.getItem('parked_sales');
+        if (savedDrafts) {
+            try {
+                setParkedSales(JSON.parse(savedDrafts));
+            } catch(e) {
+                console.error("Failed to load drafts");
+            }
+        }
+    }, []);
 
     // Effect to handle switching to edit mode from another page
     useEffect(() => {
@@ -118,6 +143,47 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         setSaleToEdit(null);
     };
     
+    // --- Park/Draft Functions ---
+    const handleParkSale = () => {
+        if (items.length === 0 && !customerId) {
+            showToast("Cannot park an empty sale.", 'error');
+            return;
+        }
+
+        const newDraft: ParkedSale = {
+            id: `DRAFT-${Date.now()}`,
+            customerId,
+            items,
+            date: Date.now()
+        };
+
+        const updatedDrafts = [newDraft, ...parkedSales];
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+        
+        showToast("Sale parked successfully.", 'success');
+        resetForm();
+    };
+
+    const handleResumeDraft = (draft: ParkedSale) => {
+        setCustomerId(draft.customerId);
+        setItems(draft.items);
+        
+        // Remove from drafts
+        const updatedDrafts = parkedSales.filter(d => d.id !== draft.id);
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+        
+        setIsDraftsOpen(false);
+        showToast("Draft resumed.", 'success');
+    };
+
+    const handleDeleteDraft = (draftId: string) => {
+        const updatedDrafts = parkedSales.filter(d => d.id !== draftId);
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+    };
+
     const handleSelectProduct = (product: Product) => {
         const newItem = {
             productId: product.id,
@@ -190,6 +256,23 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const selectedCustomer = useMemo(() => customerId ? state.customers.find(c => c.id === customerId) : null, [customerId, state.customers]);
 
+    // --- Last Purchase Information for Selected Customer ---
+    const lastPurchaseInfo = useMemo(() => {
+        if (!customerId) return null;
+        const customerSales = state.sales.filter(s => s.customerId === customerId);
+        if (customerSales.length === 0) return null;
+        
+        // Sort by date desc
+        const lastSale = customerSales.reduce((latest, current) => {
+            return new Date(current.date) > new Date(latest.date) ? current : latest;
+        });
+        
+        return {
+            date: new Date(lastSale.date).toLocaleDateString(),
+            amount: lastSale.totalAmount
+        };
+    }, [customerId, state.sales]);
+
     const filteredCustomers = useMemo(() => 
         state.customers.filter(c => 
             c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || 
@@ -225,8 +308,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        // FIX: Use locally scoped variables for whatsAppText instead of calculations from component state to ensure data consistency.
-        const subTotal = calculations.subTotal; // Approximation using current calc, ideally recalc from sale object
+        const subTotal = calculations.subTotal;
         const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
 
         const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmountOnSale.toLocaleString('en-IN')}\nDue: Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
@@ -252,6 +334,58 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         console.error("PDF generation or sharing failed:", error);
         showToast(`Sale created, but PDF failed: ${(error as Error).message}`, 'error');
       }
+    };
+
+    const handleAddToCalendar = async (sale: Sale, customerName: string) => {
+        if (!state.googleUser?.accessToken) {
+            showToast("Please sign in to Google to use Calendar integration.", 'info');
+            return;
+        }
+
+        try {
+            const amountPaid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const dueAmount = Number(sale.totalAmount) - amountPaid;
+            
+            // Set reminder for tomorrow at 10 AM
+            const startTime = new Date();
+            startTime.setDate(startTime.getDate() + 1);
+            startTime.setHours(10, 0, 0, 0);
+
+            await createCalendarEvent(state.googleUser.accessToken, {
+                summary: `Payment Follow-up: ${customerName}`,
+                description: `Invoice ID: ${sale.id}\nDue Amount: ₹${dueAmount.toLocaleString('en-IN')}\nReminder created from Business Manager.`,
+                startTime: startTime.toISOString()
+            });
+            showToast("Reminder added to your Google Calendar!", 'success');
+        } catch (error: any) {
+            if (error.message === "AUTH_ERROR") {
+                showToast("Calendar permission denied. Please Sign Out and Sign In again.", 'error');
+            } else {
+                showToast("Failed to create event.", 'error');
+            }
+        }
+    };
+
+    const handleExportCSV = () => {
+        const headers = ['Sale ID', 'Date', 'Customer Name', 'Items', 'Total Amount', 'Paid', 'Due'];
+        const rows = state.sales.map(sale => {
+            const customer = state.customers.find(c => c.id === sale.customerId);
+            const amountPaid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+            const due = Number(sale.totalAmount) - amountPaid;
+            const itemsList = sale.items.map(i => `${i.productName} (x${i.quantity})`).join('; ');
+            
+            return `"${sale.id}","${new Date(sale.date).toLocaleDateString()}","${customer?.name || 'Unknown'}","${itemsList}",${sale.totalAmount},${amountPaid},${due}`;
+        });
+        
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `sales_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleSubmitSale = async () => {
@@ -372,7 +506,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const pageTitle = mode === 'edit' ? `Edit Sale: ${saleToEdit?.id}` : 'New Sale / Payment';
 
     return (
-        <div className="space-y-4 animate-fade-in-fast">
+        <div className="space-y-4 animate-fade-in-fast relative">
             {isAddingCustomer && 
                 <AddCustomerModal 
                     isOpen={isAddingCustomer}
@@ -394,14 +528,70 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
-            <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                    <ShoppingCart className="w-6 h-6" />
+            
+            {/* Drafts Modal */}
+            {isDraftsOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[150] p-4 animate-fade-in-fast backdrop-blur-sm">
+                    <Card title="Parked Sales (Drafts)" className="w-full max-w-md animate-scale-in max-h-[80vh] flex flex-col">
+                        <div className="flex-grow overflow-y-auto pr-1 space-y-3">
+                            {parkedSales.length === 0 ? (
+                                <p className="text-gray-500 text-center py-4">No parked sales.</p>
+                            ) : (
+                                parkedSales.map(draft => {
+                                    const customer = state.customers.find(c => c.id === draft.customerId);
+                                    const total = draft.items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
+                                    return (
+                                        <div key={draft.id} className="bg-gray-50 dark:bg-slate-700/50 p-3 rounded-lg flex justify-between items-center border dark:border-slate-600">
+                                            <div>
+                                                <p className="font-bold text-sm dark:text-white">{customer?.name || 'Unknown'}</p>
+                                                <p className="text-xs text-gray-500 flex items-center gap-1">
+                                                    <Clock size={10} /> {new Date(draft.date).toLocaleString()}
+                                                </p>
+                                                <p className="text-xs font-semibold mt-1">{draft.items.length} items • ₹{total.toLocaleString()}</p>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button onClick={() => handleResumeDraft(draft)} className="h-8 text-xs px-2 bg-emerald-600 hover:bg-emerald-700">
+                                                    <PlayCircle size={14} className="mr-1"/> Resume
+                                                </Button>
+                                                <DeleteButton variant="delete" onClick={() => handleDeleteDraft(draft.id)} />
+                                            </div>
+                                        </div>
+                                    )
+                                })
+                            )}
+                        </div>
+                        <div className="pt-4 mt-2 border-t dark:border-slate-700">
+                            <Button onClick={() => setIsDraftsOpen(false)} variant="secondary" className="w-full">Close</Button>
+                        </div>
+                    </Card>
                 </div>
+            )}
+
+            <div className="flex justify-between items-center">
                 <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
+                
+                <div className="flex gap-2">
+                    <Button onClick={handleExportCSV} variant="secondary" className="px-3" title="Export CSV">
+                        <FileSpreadsheet size={18} />
+                    </Button>
+                    {mode === 'add' && (items.length > 0 || customerId) && (
+                        <Button onClick={handleParkSale} variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800">
+                            <PauseCircle size={16} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Park</span>
+                        </Button>
+                    )}
+                    <Button onClick={() => setIsDraftsOpen(true)} variant="secondary" className="relative">
+                        <Clock size={16} className="mr-1 sm:mr-2" /> 
+                        <span className="hidden sm:inline">Drafts</span>
+                        {parkedSales.length > 0 && (
+                            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] w-4 h-4 flex items-center justify-center rounded-full">
+                                {parkedSales.length}
+                            </span>
+                        )}
+                    </Button>
+                </div>
             </div>
             
-            <Card className="relative z-30">
+            <Card>
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
@@ -419,7 +609,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                 </button>
 
                                 {isCustomerDropdownOpen && (
-                                    <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-[100] animate-fade-in-fast">
+                                    <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-40 animate-fade-in-fast">
                                         <div className="p-2 border-b dark:border-slate-700">
                                             <input
                                                 type="text"
@@ -479,6 +669,14 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         disabled={mode === 'edit'}
                     />
 
+                    {/* Customer Last Purchase Context */}
+                    {lastPurchaseInfo && mode === 'add' && (
+                        <div className="text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800 flex items-center justify-between">
+                            <span>Last Order: <strong>{lastPurchaseInfo.date}</strong></span>
+                            <span>Amount: <strong>₹{lastPurchaseInfo.amount.toLocaleString('en-IN')}</strong></span>
+                        </div>
+                    )}
+
                     {customerId && customerTotalDue !== null && mode === 'add' && (
                         <div className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg text-center border dark:border-slate-700">
                             <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
@@ -501,11 +699,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <Button onClick={() => setIsScanning(true)} variant="secondary" className="w-full sm:w-auto flex-grow" disabled={!customerId}>
                         <QrCode size={16} className="mr-2"/> Scan Product
                     </Button>
-                    {items.length > 0 && (
-                        <Button onClick={() => setItems([])} variant="secondary" className="w-full sm:w-auto flex-grow bg-red-50 text-red-600 hover:bg-red-100 border-red-200">
-                            <Trash2 size={16} className="mr-2"/> Clear
-                        </Button>
-                    )}
                 </div>
                 <div className="mt-4 space-y-2">
                     {items.map(item => (
@@ -556,16 +749,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
-                                <div className="flex gap-2 items-center">
-                                    <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
-                                    <button 
-                                        onClick={() => setPaymentDetails({...paymentDetails, amount: calculations.totalAmount.toString()})}
-                                        className="px-3 py-2 mt-1 bg-green-100 text-green-700 rounded-lg font-bold hover:bg-green-200 text-xs border border-green-300"
-                                        title="Pay Full Amount"
-                                    >
-                                        Full
-                                    </button>
-                                </div>
+                                <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
@@ -605,6 +789,17 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                     </div>
                 </Card>
+            )}
+
+            {saleToEdit && selectedCustomer && (
+                <div className="mt-2 text-right">
+                    <button 
+                        onClick={() => handleAddToCalendar(saleToEdit, selectedCustomer.name)}
+                        className="text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 flex items-center justify-end gap-1 ml-auto"
+                    >
+                        <Calendar size={14} /> Add to Calendar
+                    </button>
+                </div>
             )}
 
             <div className="space-y-2">

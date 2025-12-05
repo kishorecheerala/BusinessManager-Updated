@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal, FileSpreadsheet, TrendingUp } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -32,6 +32,7 @@ const dataURLtoFile = (dataurl: string, filename: string) => {
     return new File([u8arr], filename, { type: mime });
 };
 
+// --- QR Scanner Modal Component ---
 const QRScannerModal: React.FC<{
     onClose: () => void;
     onScanned: (decodedText: string) => void;
@@ -196,6 +197,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         );
     }, [state.products, searchTerm]);
 
+    // Inventory Value Calculation
+    const inventoryStats = useMemo(() => {
+        const totalValue = state.products.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0);
+        const totalCount = state.products.length;
+        const lowStock = state.products.filter(p => p.quantity < 5).length;
+        return { totalValue, totalCount, lowStock };
+    }, [state.products]);
+
     const toggleSelection = (id: string) => {
         const newSet = new Set(selectedIds);
         if (newSet.has(id)) newSet.delete(id);
@@ -226,6 +235,22 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         if (selectedIds.size > 0) {
             setIsBatchBarcodeModalOpen(true);
         }
+    };
+
+    const handleExportCSV = () => {
+        const headers = ['ID', 'Name', 'Category', 'Quantity', 'Purchase Price', 'Sale Price', 'GST %', 'Description'];
+        const rows = state.products.map(p => 
+            `"${p.id}","${p.name}","${p.category || ''}",${p.quantity},${p.purchasePrice},${p.salePrice},${p.gstPercent},"${p.description || ''}"`
+        );
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleBulkShare = async () => {
@@ -492,6 +517,15 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         }
     };
 
+    // Calculate Margin for display
+    const calculateMargin = (buy: number, sell: number) => {
+        if (!buy || !sell) return 0;
+        return ((sell - buy) / sell) * 100;
+    };
+
+    const marginPercent = editedProduct ? calculateMargin(editedProduct.purchasePrice, editedProduct.salePrice) : 0;
+    const marginColor = marginPercent < 20 ? 'text-red-500' : marginPercent > 40 ? 'text-green-600' : 'text-amber-600';
+
     // Render Logic for Detail View
     if (selectedProduct && editedProduct) {
         return (
@@ -685,6 +719,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                             onChange={e => setEditedProduct({...editedProduct, salePrice: parseFloat(e.target.value) || 0})}
                                             className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                         />
+                                        {/* Margin Display */}
+                                        <div className={`text-xs mt-1 font-bold ${marginColor}`}>
+                                            Margin: {marginPercent.toFixed(1)}%
+                                        </div>
                                     </div>
                                     <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Stock Qty</label>
@@ -828,6 +866,23 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 />
             )}
 
+            {/* Inventory Summary Header */}
+            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-800 flex justify-between items-center text-sm mb-2 shrink-0">
+                <div className="flex gap-4">
+                    <span className="text-indigo-800 dark:text-indigo-200">
+                        <span className="font-bold">Total Items:</span> {inventoryStats.totalCount}
+                    </span>
+                    <span className="text-indigo-800 dark:text-indigo-200">
+                        <span className="font-bold">Inventory Value:</span> ₹{inventoryStats.totalValue.toLocaleString('en-IN')}
+                    </span>
+                </div>
+                {inventoryStats.lowStock > 0 && (
+                    <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1 text-xs bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
+                        <AlertTriangle size={12} /> {inventoryStats.lowStock} Low Stock
+                    </span>
+                )}
+            </div>
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-primary">Products</h1>
@@ -850,6 +905,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             <Grid size={18} />
                         </button>
                     </div>
+
+                    <Button onClick={handleExportCSV} variant="secondary" className="px-3" title="Export CSV">
+                        <FileSpreadsheet size={18} />
+                    </Button>
 
                     <Button onClick={() => {
                         const newProd: Product = {

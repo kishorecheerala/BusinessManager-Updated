@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone, FileSpreadsheet } from 'lucide-react';
+import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone, FileSpreadsheet, Type, PaintBucket, Plus, Trash2 } from 'lucide-react';
 import { Page } from '../types';
 import { useAppContext } from '../context/AppContext';
 import AuditLogPanel from './AuditLogPanel';
@@ -65,21 +65,6 @@ const THEME_GROUPS: ThemeGroup[] = [
         ]
     },
     {
-        name: 'Gradients',
-        colors: [
-            { hex: '#0d9488', name: 'Oceanic', gradient: 'linear-gradient(135deg, #0d9488 0%, #2563eb 100%)' },
-            { hex: '#e11d48', name: 'Sunset', gradient: 'linear-gradient(135deg, #f59e0b 0%, #e11d48 100%)' },
-            { hex: '#db2777', name: 'Berry', gradient: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)' },
-            { hex: '#6366f1', name: 'Royal', gradient: 'linear-gradient(135deg, #6366f1 0%, #a855f7 100%)' },
-            { hex: '#334155', name: 'Midnight', gradient: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' },
-            { hex: '#10b981', name: 'Aurora', gradient: 'linear-gradient(135deg, #10b981 0%, #3b82f6 100%)' },
-            { hex: '#8b5cf6', name: 'Nebula', gradient: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)' },
-            { hex: '#f97316', name: 'Solar', gradient: 'linear-gradient(135deg, #f97316 0%, #dc2626 100%)' },
-            { hex: '#15803d', name: 'Forest', gradient: 'linear-gradient(135deg, #15803d 0%, #0f766e 100%)' },
-            { hex: '#475569', name: 'Slate', gradient: 'linear-gradient(135deg, #64748b 0%, #0f172a 100%)' },
-        ]
-    },
-    {
         name: 'Dark',
         colors: [
             { hex: '#475569', name: 'Slate' },
@@ -88,6 +73,14 @@ const THEME_GROUPS: ThemeGroup[] = [
             { hex: '#000000', name: 'Black' },
         ]
     }
+];
+
+const APP_FONTS = [
+    { name: 'Inter', label: 'Inter (Default)', class: 'font-sans' },
+    { name: 'Poppins', label: 'Poppins', style: { fontFamily: 'Poppins, sans-serif' } },
+    { name: 'Roboto', label: 'Roboto', style: { fontFamily: 'Roboto, sans-serif' } },
+    { name: 'Playfair Display', label: 'Playfair (Serif)', style: { fontFamily: '"Playfair Display", serif' } },
+    { name: 'Space Mono', label: 'Space Mono', style: { fontFamily: '"Space Mono", monospace' } },
 ];
 
 // Helper to determine best text color (black or white) for a given background color
@@ -100,12 +93,13 @@ const getContrastColor = (hexColor: string) => {
 };
 
 const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, onNavigate, onOpenDevTools, onLockApp, onOpenChangeLog, onOpenSignIn }) => {
-    const { state, dispatch, googleSignOut, syncData } = useAppContext();
+    const { state, dispatch, googleSignOut, syncData, showToast } = useAppContext();
     const { isInstallable, install } = usePWAInstall();
     
     const [isAuditOpen, setIsAuditOpen] = useState(false);
     const [isCloudDebugOpen, setIsCloudDebugOpen] = useState(false);
     const [isColorPickerOpen, setIsColorPickerOpen] = useState(false);
+    const [isHeaderColorPickerOpen, setIsHeaderColorPickerOpen] = useState(false); // Separate picker for header
     const [isGradientPickerOpen, setIsGradientPickerOpen] = useState(false);
     const [isInvoiceSettingsOpen, setIsInvoiceSettingsOpen] = useState(false);
     const [isAPIConfigOpen, setIsAPIConfigOpen] = useState(false);
@@ -114,6 +108,8 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
     
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [pinMode, setPinMode] = useState<'setup' | 'enter'>('enter');
+    const fontInputRef = useRef<HTMLInputElement>(null);
+    const [googleFontName, setGoogleFontName] = useState('');
 
     const setTheme = (mode: 'light' | 'dark') => {
         dispatch({ type: 'SET_THEME', payload: mode });
@@ -123,13 +119,91 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
         dispatch({ type: 'SET_THEME_COLOR', payload: '#8b5cf6' });
         // Reset to default gradient (Nebula)
         dispatch({ type: 'SET_THEME_GRADIENT', payload: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)' });
+        dispatch({ type: 'SET_HEADER_COLOR', payload: '' }); // Clear manual header color
         dispatch({ type: 'SET_THEME', payload: 'light' });
+        dispatch({ type: 'SET_FONT', payload: 'Inter' });
     };
 
     const handleColorSelect = (color: ThemeColor) => {
         dispatch({ type: 'SET_THEME_COLOR', payload: color.hex });
-        // If the selected theme has a gradient, apply it. Otherwise, clear it (solid mode).
-        dispatch({ type: 'SET_THEME_GRADIENT', payload: color.gradient || '' });
+        // Also set the header gradient if provided by the preset
+        if (color.gradient) {
+            dispatch({ type: 'SET_THEME_GRADIENT', payload: color.gradient });
+            dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
+        } else {
+            // Solid preset: Clear gradient, let accent color take over header unless overridden
+            dispatch({ type: 'SET_THEME_GRADIENT', payload: '' });
+            dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
+        }
+    };
+
+    const handleFontSelect = (fontName: string) => {
+        dispatch({ type: 'SET_FONT', payload: fontName });
+    };
+
+    const handleLoadGoogleFont = () => {
+        if (!googleFontName.trim()) return;
+        const fontName = googleFontName.trim();
+        
+        // Dynamically load font
+        const link = document.createElement('link');
+        link.href = `https://fonts.googleapis.com/css2?family=${fontName.replace(/ /g, '+')}&display=swap`;
+        link.rel = 'stylesheet';
+        document.head.appendChild(link);
+        
+        // Add to state list so it's selectable (persisted as custom font without base64 for now to keep it simple)
+        // We will misuse custom_fonts slightly to store just the name for now, 
+        // or just set it directly if we assume internet access.
+        // A better way is to treat it as a "system font" but load it.
+        
+        // Let's add it to customFonts so it appears in the list
+        const newFont = {
+            id: `gfont-${Date.now()}`,
+            name: fontName,
+            data: 'GOOGLE_FONT_REF' // Marker
+        };
+        dispatch({ type: 'ADD_CUSTOM_FONT', payload: newFont });
+        dispatch({ type: 'SET_FONT', payload: fontName });
+        setGoogleFontName('');
+        showToast(`Loaded ${fontName} from Google Fonts!`);
+    };
+
+    const handleFontUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            if (!file.name.match(/\.(ttf|otf|woff|woff2)$/i)) {
+                showToast("Only .ttf or .otf files allowed.", 'error');
+                return;
+            }
+            
+            const reader = new FileReader();
+            reader.onload = async (event) => {
+                const result = event.target?.result as string;
+                if (result) {
+                    const fontName = file.name.replace(/\.[^/.]+$/, "").replace(/[^a-zA-Z0-9]/g, ""); 
+                    const newFont = {
+                        id: `font-${Date.now()}`,
+                        name: fontName,
+                        data: result
+                    };
+                    dispatch({ type: 'ADD_CUSTOM_FONT', payload: newFont });
+                    dispatch({ type: 'SET_FONT', payload: fontName }); // Auto-select
+                    showToast(`Font "${fontName}" added & selected!`);
+                }
+            };
+            reader.readAsDataURL(file);
+            e.target.value = '';
+        }
+    };
+
+    const handleRemoveFont = (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        if (window.confirm("Delete this custom font?")) {
+            dispatch({ type: 'REMOVE_CUSTOM_FONT', payload: id });
+            if (state.font === state.customFonts.find(f => f.id === id)?.name) {
+                dispatch({ type: 'SET_FONT', payload: 'Inter' }); // Reset if active
+            }
+        }
     };
 
     const handleDevToolsClick = () => {
@@ -151,7 +225,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
         onOpenDevTools();
     };
 
-    if (!isOpen && !isAuditOpen && !isCloudDebugOpen && !isColorPickerOpen && !isGradientPickerOpen && !isPinModalOpen && !isInvoiceSettingsOpen && !isAPIConfigOpen && !isUISettingsOpen && !isImportOpen) return null;
+    if (!isOpen && !isAuditOpen && !isCloudDebugOpen && !isColorPickerOpen && !isHeaderColorPickerOpen && !isGradientPickerOpen && !isPinModalOpen && !isInvoiceSettingsOpen && !isAPIConfigOpen && !isUISettingsOpen && !isImportOpen) return null;
 
     return (
         <>
@@ -161,22 +235,39 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
         <APIConfigModal isOpen={isAPIConfigOpen} onClose={() => setIsAPIConfigOpen(false)} />
         <UISettingsModal isOpen={isUISettingsOpen} onClose={() => setIsUISettingsOpen(false)} />
         <DataImportModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} />
+        
+        {/* Accent Color Picker */}
         <ColorPickerModal 
             isOpen={isColorPickerOpen} 
             onClose={() => setIsColorPickerOpen(false)}
             initialColor={state.themeColor}
             onChange={(color) => {
                 dispatch({ type: 'SET_THEME_COLOR', payload: color });
-                dispatch({ type: 'SET_THEME_GRADIENT', payload: '' }); // Custom color is always solid
+                // If user picks accent, reset specific header styles to default behavior (unless they want split)
+                // dispatch({ type: 'SET_THEME_GRADIENT', payload: '' }); 
+                // dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
             }}
         />
+
+        {/* Header Solid Color Picker */}
+        <ColorPickerModal 
+            isOpen={isHeaderColorPickerOpen} 
+            onClose={() => setIsHeaderColorPickerOpen(false)}
+            initialColor={state.headerColor || state.themeColor}
+            onChange={(color) => {
+                dispatch({ type: 'SET_HEADER_COLOR', payload: color });
+                dispatch({ type: 'SET_THEME_GRADIENT', payload: '' }); // Clear gradient to show solid color
+            }}
+        />
+
         <GradientPickerModal
             isOpen={isGradientPickerOpen}
             onClose={() => setIsGradientPickerOpen(false)}
             initialStartColor={state.themeColor}
             onChange={(gradient, startColor) => {
-                dispatch({ type: 'SET_THEME_COLOR', payload: startColor });
+                dispatch({ type: 'SET_THEME_COLOR', payload: startColor }); // Sync accent to start
                 dispatch({ type: 'SET_THEME_GRADIENT', payload: gradient });
+                dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
             }}
         />
         {isPinModalOpen && (
@@ -204,7 +295,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                 
                 {/* 1. Profile / Sign In Card - Styled as Gradient Card */}
                 <div className="p-3">
-                    <div className="rounded-xl overflow-hidden shadow-lg relative text-white bg-theme" style={{ background: state.themeGradient || state.themeColor }}>
+                    <div className="rounded-xl overflow-hidden shadow-lg relative text-white bg-theme" style={{ background: state.themeGradient || state.headerColor || state.themeColor }}>
                         {/* Decorative background shapes */}
                         <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/3 blur-xl"></div>
                         <div className="absolute bottom-0 left-0 w-20 h-20 bg-black/10 rounded-full translate-y-1/3 -translate-x-1/4 blur-xl"></div>
@@ -223,11 +314,11 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                                         {state.lastSyncTime && (
                                             <div className="flex items-center gap-2">
                                                 <span className="relative flex h-2 w-2">
-                                                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                                  <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+                                                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${state.syncStatus === 'syncing' ? 'bg-white' : 'bg-green-400'} opacity-75`}></span>
+                                                  <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'syncing' ? 'bg-white' : 'bg-green-500'}`}></span>
                                                 </span>
                                                 <p className="text-[10px] text-white/90 font-medium">
-                                                    {new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true})}
+                                                    {state.syncStatus === 'syncing' ? 'Syncing...' : new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true})}
                                                 </p>
                                             </div>
                                         )}
@@ -316,7 +407,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
 
                     <button onClick={() => { onClose(); setIsUISettingsOpen(true); }} className="menu-item">
                         <Layout className="w-5 h-5 text-teal-500" />
-                        <span className="flex-grow text-sm font-medium">UI & Theme</span>
+                        <span className="flex-grow text-sm font-medium">UI Preferences</span>
                         <ChevronRight className="w-4 h-4 text-gray-400" />
                     </button>
 
@@ -357,11 +448,20 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
 
                 <div className="my-2 border-t border-gray-100 dark:border-slate-700 mx-4"></div>
 
-                {/* 4. Appearance Section - Moved to Bottom */}
+                {/* 4. Appearance Section */}
                 <div className="px-3 py-2 border-b border-gray-100 dark:border-slate-700">
-                    <div className="flex items-center gap-2 mb-3 px-1">
-                        <Palette className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                        <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Appearance</span>
+                    <div className="flex items-center justify-between mb-3 px-1">
+                        <div className="flex items-center gap-2">
+                            <Palette className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                            <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Theme & Style</span>
+                        </div>
+                        <button 
+                            onClick={resetTheme}
+                            className="p-1.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                            title="Reset to Default"
+                        >
+                            <RotateCcw size={14} />
+                        </button>
                     </div>
 
                     {/* Mode Switcher */}
@@ -380,16 +480,17 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                         </button>
                     </div>
 
-                    {/* Color Picker Grid */}
+                    {/* Color Presets Grid */}
                     <div className="space-y-4 px-1">
                         {THEME_GROUPS.map(group => (
                             <div key={group.name}>
-                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-2">{group.name}</p>
+                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-2">{group.name} Colors</p>
                                 <div className="flex flex-wrap gap-3">
                                     {group.colors.map((t) => {
                                         const isHexMatch = state.themeColor.toLowerCase() === t.hex.toLowerCase();
+                                        // For solid colors, check if header matches
                                         const isGradientMatch = (state.themeGradient || '') === (t.gradient || '');
-                                        const isSelected = isHexMatch && isGradientMatch;
+                                        const isSelected = isHexMatch && (t.gradient ? isGradientMatch : !state.themeGradient && !state.headerColor);
 
                                         return (
                                             <button
@@ -418,31 +519,111 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                             </div>
                         ))}
                         
-                        {/* Custom & Reset */}
-                        <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100 dark:border-slate-700">
-                             <div 
-                                className="relative group cursor-pointer flex-1"
-                                onClick={() => { onClose(); setIsColorPickerOpen(true); }}
-                             >
-                                <div className="w-full h-9 rounded-lg bg-gradient-to-r from-pink-500 via-purple-500 to-indigo-500 flex items-center justify-center text-white text-xs font-bold shadow-sm group-hover:shadow-md transition-all border border-white/20 hover:scale-[1.02]">
-                                    Custom Color
+                        {/* Custom Colors & Header */}
+                        <div>
+                            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-2">Advanced Customization</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <button 
+                                    className="p-2 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"
+                                    onClick={() => { onClose(); setIsColorPickerOpen(true); }}
+                                >
+                                    <div className="w-4 h-4 rounded-full border border-black/10" style={{ background: state.themeColor }}></div>
+                                    <span className="text-xs font-medium text-gray-700 dark:text-gray-300">Accent Color</span>
+                                </button>
+                                
+                                <div className="flex gap-1">
+                                    <button 
+                                        className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 flex items-center justify-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors text-xs font-medium text-gray-700 dark:text-gray-300"
+                                        onClick={() => { onClose(); setIsHeaderColorPickerOpen(true); }}
+                                        title="Solid Header Background"
+                                    >
+                                        <PaintBucket size={14} /> Header
+                                    </button>
+                                    <button 
+                                        className="flex-1 p-2 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 flex items-center justify-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors text-xs font-medium text-gray-700 dark:text-gray-300"
+                                        onClick={() => { onClose(); setIsGradientPickerOpen(true); }}
+                                        title="Gradient Header"
+                                    >
+                                        <Layout size={14} /> Grad.
+                                    </button>
                                 </div>
                             </div>
-                            <div 
-                                className="relative group cursor-pointer flex-1"
-                                onClick={() => { onClose(); setIsGradientPickerOpen(true); }}
-                             >
-                                <div className="w-full h-9 rounded-lg bg-gradient-to-r from-teal-400 via-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold shadow-sm group-hover:shadow-md transition-all border border-white/20 hover:scale-[1.02]">
-                                    Custom Gradient
-                                </div>
+                        </div>
+
+                        {/* Font Selection */}
+                        <div className="border-t border-gray-100 dark:border-slate-700 pt-3">
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                                    <Type size={12} /> App Font
+                                </p>
+                                <button 
+                                    onClick={() => fontInputRef.current?.click()} 
+                                    className="text-[10px] text-blue-600 dark:text-blue-400 flex items-center gap-1 hover:underline"
+                                >
+                                    <Plus size={10} /> Add Custom
+                                </button>
+                                <input 
+                                    type="file" 
+                                    accept=".ttf,.otf,.woff,.woff2" 
+                                    ref={fontInputRef} 
+                                    className="hidden" 
+                                    onChange={handleFontUpload}
+                                />
                             </div>
-                            <button 
-                                onClick={resetTheme}
-                                className="p-2 rounded-lg bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
-                                title="Reset to Default"
-                            >
-                                <RotateCcw size={16} />
-                            </button>
+                            
+                            {/* Google Font Loader Input */}
+                            <div className="flex gap-1 mb-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="Enter Google Font Name (e.g. Lato)" 
+                                    className="flex-grow text-xs p-1.5 border rounded bg-gray-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                    value={googleFontName}
+                                    onChange={(e) => setGoogleFontName(e.target.value)}
+                                />
+                                <button onClick={handleLoadGoogleFont} className="text-xs bg-blue-600 text-white px-2 rounded hover:bg-blue-700">Load</button>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2">
+                                {/* Standard Fonts */}
+                                {APP_FONTS.map(font => (
+                                    <button
+                                        key={font.name}
+                                        onClick={() => handleFontSelect(font.name)}
+                                        className={`px-3 py-1.5 text-xs border rounded-lg transition-all ${
+                                            (state.font || 'Inter') === font.name 
+                                                ? 'bg-primary text-white border-primary shadow-sm' 
+                                                : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50'
+                                        }`}
+                                        style={font.style}
+                                    >
+                                        {font.label}
+                                    </button>
+                                ))}
+                                
+                                {/* Custom Fonts */}
+                                {state.customFonts.map(font => (
+                                    <div key={font.id} className="relative group">
+                                        <button
+                                            onClick={() => handleFontSelect(font.name)}
+                                            className={`px-3 py-1.5 text-xs border rounded-lg transition-all pr-6 ${
+                                                (state.font) === font.name 
+                                                    ? 'bg-primary text-white border-primary shadow-sm' 
+                                                    : 'bg-white dark:bg-slate-700 border-gray-200 dark:border-slate-600 text-gray-600 dark:text-gray-300 hover:bg-gray-50'
+                                            }`}
+                                            style={{ fontFamily: font.name }}
+                                        >
+                                            {font.name}
+                                        </button>
+                                        <button 
+                                            onClick={(e) => handleRemoveFont(e, font.id)}
+                                            className="absolute right-1 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-red-100 text-red-500 opacity-60 hover:opacity-100"
+                                            title="Delete font"
+                                        >
+                                            <Trash2 size={10} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 </div>

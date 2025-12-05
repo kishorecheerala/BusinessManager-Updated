@@ -326,7 +326,9 @@ export interface AppMetadataTheme {
   id: 'themeSettings';
   theme: Theme;
   color: string;
+  headerColor?: string;
   gradient: string;
+  font?: string;
 }
 
 export interface AppMetadataInvoiceSettings {
