@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, History, PlusCircle } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -31,19 +30,19 @@ const MetricCard: React.FC<{
 }> = ({ icon: Icon, title, value, color, iconBgColor, textColor, unit = '₹', subValue, onClick, delay }) => (
     <div
         onClick={onClick}
-        className={`rounded-lg shadow-sm p-3 flex items-center transition-all duration-300 hover:shadow-md hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group border border-transparent hover:border-current/10`}
+        className={`rounded-lg shadow-md p-5 flex items-center transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group`}
         style={{ animationDelay: `${delay || 0}ms` }}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
     >
-        <div className={`p-2 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
-            <Icon className={`w-5 h-5 ${textColor}`} />
+        <div className={`p-4 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
+            <Icon className={`w-8 h-8 ${textColor}`} />
         </div>
-        <div className="ml-3 flex-grow min-w-0">
-            <p className={`font-bold text-xs ${textColor} uppercase tracking-wide opacity-80 truncate`}>{title}</p>
-            <p className={`text-xl font-extrabold ${textColor} break-all mt-0.5 leading-tight`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
-            {subValue && <p className={`text-[10px] font-medium mt-0.5 opacity-75 ${textColor} truncate`}>{subValue}</p>}
+        <div className="ml-5 flex-grow">
+            <p className={`font-bold text-xl ${textColor}`}>{title}</p>
+            <p className={`text-3xl font-extrabold ${textColor} break-all mt-1`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
+            {subValue && <p className={`text-sm font-medium mt-1 opacity-90 ${textColor}`}>{subValue}</p>}
         </div>
     </div>
 );
@@ -278,47 +277,47 @@ const SmartAnalystCard: React.FC<{
         : staticInsights;
 
     return (
-        <div className="relative overflow-hidden rounded-lg bg-white dark:bg-slate-800 shadow-sm border border-primary/10 dark:border-slate-700 transition-all hover:shadow-md animate-slide-up-fade group">
+        <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-primary/10 dark:border-slate-700 transition-all hover:shadow-xl animate-slide-up-fade group">
             <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
-            <div className="p-3">
-                <div className="flex justify-between items-start mb-2">
+            <div className="p-5">
+                <div className="flex justify-between items-start mb-4">
                     <div className="flex items-center gap-2">
-                        <div className="p-1 bg-primary/10 rounded-full animate-pulse">
-                            <BrainCircuit className="w-4 h-4 text-primary transition-transform duration-700 group-hover:rotate-12" />
+                        <div className="p-2 bg-primary/10 rounded-full animate-pulse">
+                            <BrainCircuit className="w-6 h-6 text-primary transition-transform duration-700 group-hover:rotate-12" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-sm text-gray-800 dark:text-white">Smart Analyst</h3>
-                            <span className="text-[9px] font-bold bg-primary/10 text-primary px-1.5 py-0.5 rounded-full border border-primary/20">AI</span>
+                            <h3 className="font-bold text-xl text-gray-800 dark:text-white">Smart Analyst</h3>
+                            <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">AI Powered</span>
                         </div>
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-2">
                         <button 
                             onClick={handlePlayBriefing}
-                            className={`p-1.5 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500'}`}
+                            className={`p-2 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500'}`}
                             title={isPlaying ? "Stop Briefing" : "Listen to Briefing"}
                         >
-                            {isPlaying ? <StopCircle size={14} /> : <Volume2 size={14} />}
+                            {isPlaying ? <StopCircle size={18} /> : <Volume2 size={18} />}
                         </button>
                         <button 
                             onClick={handleGenerateBriefing} 
                             disabled={isGenerating}
-                            className="p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors"
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors"
                             title="Refresh AI Insights"
                         >
-                            {isGenerating ? <Loader2 size={14} className="animate-spin" /> : <RotateCw size={14} />}
+                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <RotateCw size={18} />}
                         </button>
                     </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {displayInsights.map((insight, idx) => (
-                        <div key={idx} className="flex gap-2 p-2 rounded bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade group/item" style={{ animationDelay: `${idx * 100}ms` }}>
-                            <div className="mt-0.5 flex-shrink-0 transition-transform group-hover/item:scale-110 duration-300">
-                                <insight.icon className={`w-3.5 h-3.5 ${insight.color}`} />
+                        <div key={idx} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade group/item" style={{ animationDelay: `${idx * 100}ms` }}>
+                            <div className="mt-1 flex-shrink-0 transition-transform group-hover/item:scale-110 duration-300">
+                                <insight.icon className={`w-5 h-5 ${insight.color}`} />
                             </div>
                             <div>
-                                <p className={`text-[9px] font-bold uppercase mb-0.5 ${insight.color}`}>{insight.type}</p>
-                                <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
+                                <p className={`text-xs font-bold uppercase mb-0.5 ${insight.color}`}>{insight.type}</p>
+                                <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
                                     {insight.text}
                                 </p>
                             </div>
@@ -374,22 +373,22 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime:
             icon: ShieldX,
             classes: 'bg-red-50 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-200 dark:border-red-800',
             iconColor: 'text-red-600 dark:text-red-400',
-            title: 'No Backup',
-            message: 'Backup required.'
+            title: 'No Backup Found',
+            message: 'Please create a backup immediately to protect your data.'
         },
         'overdue': {
             icon: ShieldX,
             classes: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200 dark:border-amber-800',
             iconColor: 'text-amber-600 dark:text-amber-400',
             title: 'Backup Overdue',
-            message: diffDays > 0 ? `${diffDays} days overdue` : "Not today"
+            message: diffDays > 0 ? `Last backup was ${diffDays} day${diffDays > 1 ? 's' : ''} ago.` : "Last backup was not today."
         },
         'safe': {
             icon: ShieldCheck,
             classes: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-200 dark:border-emerald-800',
             iconColor: 'text-emerald-600 dark:text-emerald-400',
-            title: `Safe (${isCloud ? 'Cloud' : 'Local'})`,
-            message: `${backupDate?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`
+            title: `Data is Safe ${isCloud ? '(Cloud Sync)' : '(Manual Backup)'}`,
+            message: `Backed up today at ${backupDate?.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}.`
         }
     };
 
@@ -397,11 +396,11 @@ const BackupStatusAlert: React.FC<{ lastBackupDate: string | null, lastSyncTime:
     const Icon = current.icon;
 
     return (
-        <div className={`flex items-center p-2 rounded-lg border ${current.classes} mb-3 group`}>
-            <Icon className={`w-4 h-4 mr-2 flex-shrink-0 ${current.iconColor} transition-transform group-hover:scale-110`} />
-            <div className="flex-grow flex justify-between items-center">
-                <h4 className="font-bold text-xs uppercase tracking-wide">{current.title}</h4>
-                <p className="text-[10px] opacity-90">{current.message}</p>
+        <div className={`flex items-start p-4 rounded-lg border ${current.classes} mb-6 group`}>
+            <Icon className={`w-6 h-6 mr-3 flex-shrink-0 ${current.iconColor} transition-transform group-hover:scale-110`} />
+            <div>
+                <h4 className="font-bold text-sm uppercase tracking-wide mb-1">{current.title}</h4>
+                <p className="text-sm opacity-90">{current.message}</p>
             </div>
         </div>
     );
@@ -456,12 +455,12 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
 
     if (overdueCustomersArray.length === 0) {
         return (
-            <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 p-3">
+            <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
                 <div className="flex items-center">
-                    <ShieldCheck className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                    <ShieldCheck className="w-8 h-8 text-green-600 dark:text-green-400 mr-4" />
                     <div>
-                        <p className="font-bold text-sm text-green-800 dark:text-green-200">No Overdue Dues</p>
-                        <p className="text-[10px] text-green-700 dark:text-green-300">All &gt;30 day payments settled.</p>
+                        <p className="font-bold text-green-800 dark:text-green-200">No Overdue Dues</p>
+                        <p className="text-sm text-green-700 dark:text-green-300">All customer payments older than 30 days are settled.</p>
                     </div>
                 </div>
             </Card>
@@ -469,32 +468,33 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
     }
 
     return (
-        <Card className="border-l-4 border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-600 p-3">
-            <div className="flex items-center mb-2">
-                <AlertTriangle className="w-4 h-4 text-rose-600 dark:text-rose-400 mr-2" />
-                <h2 className="text-sm font-bold text-rose-800 dark:text-rose-200">Overdue Dues Alert</h2>
+        <Card className="border-l-4 border-rose-500 bg-rose-50 dark:bg-rose-900/20 dark:border-rose-600">
+            <div className="flex items-center mb-4">
+                <AlertTriangle className="w-6 h-6 text-rose-600 dark:text-rose-400 mr-3" />
+                <h2 className="text-lg font-bold text-rose-800 dark:text-rose-200">Overdue Dues Alert</h2>
             </div>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+            <p className="text-sm text-rose-700 dark:text-rose-300 mb-4">The following customers have dues from sales older than 30 days.</p>
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {overdueCustomersArray.sort((a, b) => b.totalOverdue - a.totalOverdue).map(({ customer, totalOverdue, oldestOverdueDate }) => (
                     <div
                         key={customer.id}
-                        className="p-1.5 bg-white dark:bg-slate-800 rounded shadow-sm cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors flex justify-between items-center border dark:border-slate-700"
+                        className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm cursor-pointer hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors flex justify-between items-center border dark:border-slate-700"
                         onClick={() => onNavigate(customer.id)}
                         role="button"
                         tabIndex={0}
                     >
-                        <div className="flex items-center gap-2 overflow-hidden">
-                            <User className="w-3 h-3 text-rose-700 dark:text-rose-400 flex-shrink-0" />
-                            <div className="min-w-0">
-                                <p className="font-bold text-xs text-rose-900 dark:text-rose-100 truncate">{customer.name}</p>
-                                <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate">{customer.area}</p>
+                        <div className="flex items-center gap-3">
+                            <User className="w-6 h-6 text-rose-700 dark:text-rose-400 flex-shrink-0" />
+                            <div>
+                                <p className="font-bold text-rose-900 dark:text-rose-100">{customer.name}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{customer.area}</p>
                             </div>
                         </div>
                         <div className="text-right flex-shrink-0 ml-2">
-                            <p className="font-bold text-xs text-red-600 dark:text-red-400">₹{totalOverdue.toLocaleString('en-IN')}</p>
-                            <div className="flex items-center justify-end gap-1">
-                                <p className="text-[9px] text-gray-500 dark:text-gray-400">{Math.floor((new Date().getTime() - new Date(oldestOverdueDate).getTime()) / (1000 * 60 * 60 * 24))}d</p>
-                                <button onClick={(e) => sendWhatsAppReminder(e, customer, totalOverdue)} className="bg-green-500 text-white p-0.5 rounded-full hover:scale-110 transition-transform" title="Send Reminder"><MessageCircle size={10} /></button>
+                            <p className="font-bold text-lg text-red-600 dark:text-red-400">₹{totalOverdue.toLocaleString('en-IN')}</p>
+                            <div className="flex items-center justify-end gap-2">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">{Math.floor((new Date().getTime() - new Date(oldestOverdueDate).getTime()) / (1000 * 60 * 60 * 24))} days old</p>
+                                <button onClick={(e) => sendWhatsAppReminder(e, customer, totalOverdue)} className="bg-green-500 text-white p-1 rounded-full hover:scale-110 transition-transform" title="Send Reminder"><MessageCircle size={12} /></button>
                             </div>
                         </div>
                     </div>
@@ -539,38 +539,39 @@ const UpcomingPurchaseDuesCard: React.FC<{
     }, [purchases, suppliers]);
 
     if (upcomingDues.length === 0) return (
-        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 p-3">
+        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
             <div className="flex items-center">
-                <PackageCheck className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                <PackageCheck className="w-8 h-8 text-green-600 dark:text-green-400 mr-4" />
                 <div>
-                    <p className="font-bold text-sm text-green-800 dark:text-green-200">No Purchase Dues</p>
-                    <p className="text-[10px] text-green-700 dark:text-green-300">No supplier payments in 30 days.</p>
+                    <p className="font-bold text-green-800 dark:text-green-200">No Upcoming Purchase Dues</p>
+                    <p className="text-sm text-green-700 dark:text-green-300">There are no payment dues to suppliers in the next 30 days.</p>
                 </div>
             </div>
         </Card>
     );
 
     return (
-        <Card className="border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600 p-3">
-            <div className="flex items-center mb-2">
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 mr-2" />
-                <h2 className="text-sm font-bold text-amber-800 dark:text-amber-200">Purchase Dues</h2>
+        <Card className="border-l-4 border-amber-500 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-600">
+            <div className="flex items-center mb-4">
+                <AlertTriangle className="w-6 h-6 text-amber-600 dark:text-amber-400 mr-3" />
+                <h2 className="text-lg font-bold text-amber-800 dark:text-amber-200">Upcoming Purchase Dues</h2>
             </div>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+            <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">The following payments to suppliers are due within the next 30 days.</p>
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
                 {upcomingDues.map((due) => {
-                    const countdownText = due.daysRemaining === 0 ? "Due today" : `${due.daysRemaining} days`;
+                    const countdownText = due.daysRemaining === 0 ? "Due today" : `Due in ${due.daysRemaining} day${due.daysRemaining !== 1 ? 's' : ''}`;
                     return (
-                        <div key={`${due.purchaseId}-${due.dueDate.toISOString()}`} className="p-1.5 bg-white dark:bg-slate-800 rounded shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex justify-between items-center border dark:border-slate-700" onClick={() => onNavigate(due.supplier.id)}>
-                            <div className="flex items-center gap-2 overflow-hidden">
-                                <Package className="w-3 h-3 text-amber-700 dark:text-amber-400 flex-shrink-0" />
-                                <div className="min-w-0">
-                                    <p className="font-bold text-xs text-amber-900 dark:text-amber-100 truncate">{due.supplier.name}</p>
-                                    <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate">Inv: {due.purchaseId}</p>
+                        <div key={`${due.purchaseId}-${due.dueDate.toISOString()}`} className="p-3 bg-white dark:bg-slate-800 rounded-lg shadow-sm cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors flex justify-between items-center border dark:border-slate-700" onClick={() => onNavigate(due.supplier.id)}>
+                            <div className="flex items-center gap-3">
+                                <Package className="w-6 h-6 text-amber-700 dark:text-amber-400 flex-shrink-0" />
+                                <div>
+                                    <p className="font-bold text-amber-900 dark:text-amber-100">{due.supplier.name}</p>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Inv: {due.purchaseId}</p>
                                 </div>
                             </div>
                             <div className="text-right flex-shrink-0 ml-2">
-                                <p className="font-bold text-xs text-amber-600 dark:text-amber-400">{countdownText}</p>
-                                <p className="text-[9px] text-gray-500 dark:text-gray-400">{due.dueDate.toLocaleDateString()}</p>
+                                <p className="font-bold text-lg text-amber-600 dark:text-amber-400">{countdownText}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400">Date: {due.dueDate.toLocaleDateString()}</p>
                             </div>
                         </div>
                     );
@@ -586,31 +587,31 @@ const LowStockCard: React.FC<{ products: Product[]; onNavigate: (id: string) => 
     }, [products]);
 
     if (lowStockProducts.length === 0) return (
-        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600 p-3">
+        <Card className="border-l-4 border-green-500 bg-green-50 dark:bg-green-900/20 dark:border-green-600">
             <div className="flex items-center">
-                <PackageCheck className="w-5 h-5 text-green-600 dark:text-green-400 mr-2" />
+                <PackageCheck className="w-8 h-8 text-green-600 dark:text-green-400 mr-4" />
                 <div>
-                    <p className="font-bold text-sm text-green-800 dark:text-green-200">Stock Healthy</p>
-                    <p className="text-[10px] text-green-700 dark:text-green-300">All products have sufficient stock (5+).</p>
+                    <p className="font-bold text-green-800 dark:text-green-200">Stock Healthy</p>
+                    <p className="text-sm text-green-700 dark:text-green-300">All products have sufficient stock levels (5+).</p>
                 </div>
             </div>
         </Card>
     );
 
     return (
-        <Card className="border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-600 p-3">
-            <div className="flex items-center mb-2">
-                <AlertTriangle className="w-4 h-4 text-orange-600 dark:text-orange-400 mr-2" />
-                <h2 className="text-sm font-bold text-orange-800 dark:text-orange-200">Low Stock Alert</h2>
+        <Card className="border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-600">
+            <div className="flex items-center mb-4">
+                <AlertTriangle className="w-6 h-6 text-orange-600 dark:text-orange-400 mr-3" />
+                <h2 className="text-lg font-bold text-orange-800 dark:text-orange-200">Low Stock Alert</h2>
             </div>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto pr-1">
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                 {lowStockProducts.map(product => (
-                    <div key={product.id} className="p-1.5 bg-white dark:bg-slate-800 rounded shadow-sm flex justify-between items-center cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border dark:border-slate-700" onClick={() => onNavigate(product.id)}>
-                        <div className="min-w-0">
-                            <p className="font-semibold text-xs dark:text-slate-200 truncate">{product.name}</p>
-                            <p className="text-[9px] text-gray-500 dark:text-gray-400 truncate">{product.id}</p>
+                    <div key={product.id} className="p-2 bg-white dark:bg-slate-800 rounded shadow-sm flex justify-between items-center cursor-pointer hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors border dark:border-slate-700" onClick={() => onNavigate(product.id)}>
+                        <div>
+                            <p className="font-semibold text-sm dark:text-slate-200">{product.name}</p>
+                            <p className="text-xs text-gray-500 dark:text-gray-400">ID: {product.id}</p>
                         </div>
-                        <span className="font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-1.5 py-0.5 rounded text-[10px] flex-shrink-0 ml-2">
+                        <span className="font-bold text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/30 px-2 py-1 rounded text-xs">
                             {product.quantity} left
                         </span>
                     </div>
@@ -818,7 +819,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     };
 
     return (
-        <div className="space-y-4 animate-fade-in-fast">
+        <div className="space-y-6 animate-fade-in-fast">
             <CheckpointsModal isOpen={isCheckpointsModalOpen} onClose={() => setIsCheckpointsModalOpen(false)} />
             
             {isPinModalOpen && (
@@ -833,44 +834,41 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 />
             )}
             
-            {/* Header Section */}
-            <div className="mb-2 mt-1 text-center">
-                <h1 className="text-xl sm:text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600 tracking-tight drop-shadow-sm mb-0.5">
+            {/* Header Section - Cleaned up */}
+            <div className="mb-6 text-center">
+                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
                     Dashboard
                 </h1>
-                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 font-medium">
-                    Overview & Analytics
-                </p>
             </div>
 
             {/* Install Prompt Banner - Shows if installable AND NOT dismissed this session */}
             {(isInstallable || (isIOS && !isInstalled)) && !bannerDismissed && (
-                <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-lg p-2 shadow-md flex flex-col sm:flex-row items-center justify-between gap-2 animate-slide-down-fade mb-2 relative">
+                <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-down-fade mb-4 relative">
                     {/* Close Button */}
                     <button 
                         onClick={handleDismissBanner}
-                        className="absolute top-1 right-1 p-1 hover:bg-white/20 rounded-full transition-colors"
+                        className="absolute top-2 right-2 p-1 hover:bg-white/20 rounded-full transition-colors"
                         aria-label="Dismiss install banner"
                     >
-                        <X size={14} />
+                        <X size={16} />
                     </button>
 
-                    <div className="flex items-center gap-2 pr-6">
-                        <div className="bg-white/20 p-1.5 rounded-lg backdrop-blur-sm">
-                            <Download size={16} />
+                    <div className="flex items-center gap-3 pr-8">
+                        <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
+                            <Download size={24} />
                         </div>
                         <div>
-                            <h3 className="font-bold text-xs">Install App</h3>
-                            <p className="text-[9px] opacity-90">Better offline experience.</p>
+                            <h3 className="font-bold text-base">Install App for Offline Use</h3>
+                            <p className="text-xs opacity-90">Get the best experience with full screen & faster loading.</p>
                         </div>
                     </div>
                     {isIOS ? (
-                        <div className="flex items-center gap-2 bg-white/20 px-2 py-1 rounded-lg backdrop-blur-sm">
-                            <p className="text-[10px] font-bold text-white">Tap <Share size={10} className="inline mx-0.5"/> then "Add to Home Screen"</p>
+                        <div className="flex items-center gap-2 bg-white/20 px-3 py-1.5 rounded-lg backdrop-blur-sm">
+                            <p className="text-xs font-bold text-white">Tap <Share size={12} className="inline mx-1"/> then "Add to Home Screen"</p>
                         </div>
                     ) : (
-                        <button onClick={install} className="bg-white text-indigo-600 px-3 py-1 rounded font-bold text-xs shadow hover:bg-gray-100 transition-colors whitespace-nowrap w-full sm:w-auto">
-                            Install
+                        <button onClick={install} className="bg-white text-indigo-600 px-4 py-2 rounded-lg font-bold text-sm shadow hover:bg-gray-100 transition-colors whitespace-nowrap w-full sm:w-auto">
+                            Install Now
                         </button>
                     )}
                 </div>
@@ -888,49 +886,52 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             
             {/* Toolbar for Period Selectors */}
             <div className="flex justify-end items-center mb-1">
-                 <div className="flex items-center gap-1 bg-white dark:bg-slate-800 p-0.5 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
+                 <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
                      <select 
                         value={selectedMonth} 
                         onChange={(e) => setSelectedMonth(e.target.value)} 
-                        className="p-1 border-none bg-transparent text-xs font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
+                        className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
                     >
                         {monthOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
                     </select>
-                    <div className="h-3 w-px bg-gray-300 dark:bg-slate-600"></div>
+                    <div className="h-4 w-px bg-gray-300 dark:bg-slate-600"></div>
                     <select 
                         value={selectedYear} 
                         onChange={(e) => setSelectedYear(e.target.value)} 
-                        className="p-1 border-none bg-transparent text-xs font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
+                        className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
                     >
                         {getYears.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <MetricCard icon={IndianRupee} title="Sales" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-primary/5 dark:bg-primary/10" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
                 <MetricCard icon={Package} title="Purchases" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-blue-50 dark:bg-blue-900/20" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
-                <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
-                <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
+                <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Total Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
+                <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Total Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
             </div>
             
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <OverdueDuesCard sales={sales} customers={customers} onNavigate={(id) => handleNavigate('CUSTOMERS', id)} />
                 <UpcomingPurchaseDuesCard purchases={purchases} suppliers={suppliers} onNavigate={(id) => handleNavigate('PURCHASES', id)} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                  <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
-                 <div className="space-y-3">
-                    <Card title="Data Management" className="p-3">
+                 <div className="space-y-6">
+                    <Card title="Data Management">
                         <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />
-                        <div className="space-y-2 mt-2">
-                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                <Button onClick={handleBackup} className="w-full text-xs h-9" disabled={isGeneratingReport}>
-                                    <Download className="w-3 h-3 mr-1.5" /> {isGeneratingReport ? 'Preparing...' : 'Backup'}
+                        <div className="space-y-4 mt-4">
+                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                Your data is stored locally. Please create regular backups.
+                            </p>
+                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <Button onClick={handleBackup} className="w-full" disabled={isGeneratingReport}>
+                                    <Download className="w-4 h-4 mr-2" /> {isGeneratingReport ? 'Preparing...' : 'Backup Data Now'}
                                 </Button>
-                                <label htmlFor="restore-backup" className="px-3 py-2 rounded-md font-semibold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-sm flex items-center justify-center gap-1.5 bg-secondary hover:bg-teal-500 focus:ring-secondary cursor-pointer w-full text-center text-xs dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600 h-9">
-                                    <Upload className="w-3 h-3" /> Restore
+                                <label htmlFor="restore-backup" className="px-4 py-2 rounded-md font-semibold text-white transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 shadow-sm flex items-center justify-center gap-2 bg-secondary hover:bg-teal-500 focus:ring-secondary cursor-pointer w-full text-center dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600">
+                                    <Upload className="w-4 h-4 mr-2" /> Restore from Backup
                                 </label>
                                 <input 
                                     id="restore-backup" 
@@ -939,18 +940,18 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                                     className="hidden" 
                                     onChange={handleFileRestore} 
                                 />
-                                <Button onClick={() => runSecureAction(handleLoadTestData)} variant="secondary" className="w-full text-xs h-9 bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800">
-                                    <TestTube2 className="w-3 h-3 mr-1.5" /> Test Data
+                                <Button onClick={() => runSecureAction(handleLoadTestData)} variant="secondary" className="w-full bg-purple-50 text-purple-700 hover:bg-purple-100 border-purple-200 dark:bg-purple-900/20 dark:text-purple-300 dark:border-purple-800">
+                                    <TestTube2 className="w-4 h-4 mr-2" /> Load Test Data
                                 </Button>
                             </div>
-                            
-                            <div className="mt-2 pt-2 border-t dark:border-slate-700 grid grid-cols-2 gap-2">
-                                <Button onClick={() => setIsCheckpointsModalOpen(true)} variant="secondary" className="w-full text-xs h-9">
-                                    <History className="w-3 h-3 mr-1.5" /> History
-                                </Button>
-                                <Button onClick={() => runSecureAction(handleCreateCheckpoint)} className="w-full text-xs h-9 bg-indigo-600 hover:bg-indigo-700">
-                                    <PlusCircle className="w-3 h-3 mr-1.5" /> Checkpoint
-                                </Button>
+
+                             <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-md border border-yellow-200 dark:border-yellow-700 mt-4">
+                                <div className="flex gap-2">
+                                    <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
+                                    <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                                        <strong>Tip:</strong> Send the backup file to your email or save it to Google Drive for safe keeping.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     </Card>

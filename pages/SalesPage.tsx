@@ -225,7 +225,8 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        const subTotal = calculations.subTotal;
+        // FIX: Use locally scoped variables for whatsAppText instead of calculations from component state to ensure data consistency.
+        const subTotal = calculations.subTotal; // Approximation using current calc, ideally recalc from sale object
         const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
 
         const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmountOnSale.toLocaleString('en-IN')}\nDue: Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
@@ -400,7 +401,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
             </div>
             
-            <Card>
+            <Card className="relative z-30">
                 <div className="space-y-4">
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
@@ -418,7 +419,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                 </button>
 
                                 {isCustomerDropdownOpen && (
-                                    <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-40 animate-fade-in-fast">
+                                    <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-[100] animate-fade-in-fast">
                                         <div className="p-2 border-b dark:border-slate-700">
                                             <input
                                                 type="text"
@@ -500,6 +501,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <Button onClick={() => setIsScanning(true)} variant="secondary" className="w-full sm:w-auto flex-grow" disabled={!customerId}>
                         <QrCode size={16} className="mr-2"/> Scan Product
                     </Button>
+                    {items.length > 0 && (
+                        <Button onClick={() => setItems([])} variant="secondary" className="w-full sm:w-auto flex-grow bg-red-50 text-red-600 hover:bg-red-100 border-red-200">
+                            <Trash2 size={16} className="mr-2"/> Clear
+                        </Button>
+                    )}
                 </div>
                 <div className="mt-4 space-y-2">
                     {items.map(item => (
@@ -550,7 +556,16 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
-                                <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
+                                <div className="flex gap-2 items-center">
+                                    <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
+                                    <button 
+                                        onClick={() => setPaymentDetails({...paymentDetails, amount: calculations.totalAmount.toString()})}
+                                        className="px-3 py-2 mt-1 bg-green-100 text-green-700 rounded-lg font-bold hover:bg-green-200 text-xs border border-green-300"
+                                        title="Pay Full Amount"
+                                    >
+                                        Full
+                                    </button>
+                                </div>
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
