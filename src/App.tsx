@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -60,7 +59,7 @@ const ICON_MAP: Record<string, React.ElementType> = {
 };
 
 const LABEL_MAP: Record<string, string> = {
-    'DASHBOARD': 'Home',
+    'DASHBOARD': 'Dashboard',
     'CUSTOMERS': 'Customers',
     'SALES': 'Sales',
     'PURCHASES': 'Purchases',
@@ -391,8 +390,7 @@ const AppContent: React.FC = () => {
 
     // Calculate Navigation Layout based on user preference order
     const { mainNavItems, pinnedItems, mobileMoreItems } = useMemo(() => {
-        // Filter out SYSTEM_OPTIMIZER explicitly from nav bar
-        const order = (state.navOrder || []).filter(id => id !== 'SYSTEM_OPTIMIZER');
+        const order = state.navOrder || [];
         
         const allDesktopItems = order.map(id => ({
             page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
@@ -446,14 +444,15 @@ const AppContent: React.FC = () => {
                         </div>
 
                         {/* Center: Title - Absolutely Centered */}
-                        <div className="absolute left-0 right-0 top-0 bottom-0 flex flex-col justify-center items-center pointer-events-none z-10 px-16">
+                        <div className="absolute left-0 right-0 top-0 h-16 flex items-center justify-center pointer-events-none z-10 px-16">
                             <button 
                                 onClick={() => handleNavigation('DASHBOARD')}
-                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity"
+                                className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity h-full py-1"
                             >
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
                                     {state.profile?.name || 'Business Manager'}
                                 </h1>
+                                
                                 {state.googleUser && (
                                     <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
                                         <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">

@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -9,16 +8,21 @@ import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataB
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
 import PinModal from '../components/PinModal';
+import DatePill from '../components/DatePill';
 import CheckpointsModal from '../components/CheckpointsModal';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { usePWAInstall } from '../hooks/usePWAInstall';
-import { AnalyticsDashboard } from '../components/AnalyticsDashboard';
-import { SmartRecommendations } from '../components/SmartRecommendations';
-import { InvoiceReminders } from '../components/InvoiceReminders';
 
 interface DashboardProps {
     setCurrentPage: (page: Page) => void;
 }
+
+const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+};
 
 const MetricCard: React.FC<{
     icon: React.ElementType;
@@ -758,6 +762,19 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         }
     };
 
+    const handleCreateCheckpoint = async () => {
+        const name = prompt("Enter a name for this checkpoint:", `Backup ${new Date().toLocaleTimeString()}`);
+        if (name) {
+            try {
+                await db.createSnapshot(name);
+                showToast("Checkpoint created successfully.", 'success');
+            } catch (e) {
+                console.error(e);
+                showToast("Failed to create checkpoint.", 'error');
+            }
+        }
+    };
+
     const handleNavigate = (page: Page, id: string) => {
         dispatch({ type: 'SET_SELECTION', payload: { page, id } });
         setCurrentPage(page);
@@ -826,11 +843,22 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             )}
             
             {/* Header Section */}
-            <div className="flex flex-row items-center justify-center gap-2 relative mb-6">
-                <div className="text-center">
+            <div className="flex flex-row items-center justify-between gap-2 relative mb-6">
+                <div className="flex-shrink-0">
+                     <span className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm cursor-default flex flex-col items-start gap-0.5 max-w-full">
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{getTimeBasedGreeting()},</span>
+                        <strong className="truncate max-w-[120px] sm:max-w-[150px] text-sm">{profile?.ownerName || 'Owner'}</strong>
+                    </span>
+                </div>
+
+                <div className="flex-grow text-center">
                     <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
                         Dashboard
                     </h1>
+                </div>
+                
+                <div className="flex-shrink-0">
+                    <DatePill />
                 </div>
             </div>
 
@@ -867,9 +895,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 </div>
             )}
             
-            {/* New Analytics Dashboard */}
-            <AnalyticsDashboard />
-            
             <SmartAnalystCard 
                 sales={sales} 
                 products={products} 
@@ -879,12 +904,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 expenses={expenses}
                 ownerName={profile?.ownerName || 'Owner'}
             />
-            
-            {/* Phase 3 & 4 Widgets */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-                <SmartRecommendations />
-                <InvoiceReminders onNavigate={handleNavigate} />
-            </div>
             
             {/* Toolbar for Period Selectors */}
             <div className="flex justify-end items-center mb-1">
@@ -954,12 +973,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                                         <strong>Tip:</strong> Send the backup file to your email or save it to Google Drive for safe keeping.
                                     </p>
                                 </div>
-                            </div>
-                            
-                            <div className="mt-4 pt-4 border-t dark:border-slate-700">
-                                <Button onClick={() => setIsCheckpointsModalOpen(true)} variant="secondary" className="w-full text-xs h-8">
-                                    Manage Checkpoints
-                                </Button>
                             </div>
                         </div>
                     </Card>

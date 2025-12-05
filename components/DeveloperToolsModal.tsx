@@ -1,5 +1,8 @@
+
+
+
 import React, { useState, useEffect } from 'react';
-import { X, Database, Terminal, CloudLightning, Zap, Trash2, RefreshCw, HardDrive, Save, AlertTriangle, Bell, Bug, History, RotateCcw, PlusCircle, Globe, Cpu } from 'lucide-react';
+import { X, Database, Terminal, CloudLightning, Zap, Trash2, RefreshCw, HardDrive, Save, AlertTriangle, Bell, Bug, History, RotateCcw, PlusCircle } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
@@ -21,7 +24,6 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number, quota: number } | null>(null);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false);
-  const [swStatus, setSwStatus] = useState<string>('Checking...');
 
   useEffect(() => {
     if (isOpen) {
@@ -33,22 +35,8 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
             });
         }
         loadSnapshots();
-        checkSwStatus();
     }
   }, [isOpen]);
-
-  const checkSwStatus = async () => {
-      if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          if (regs.length > 0) {
-              setSwStatus(`Active (${regs[0].scope})`);
-          } else {
-              setSwStatus('Inactive (Dev Mode)');
-          }
-      } else {
-          setSwStatus('Not Supported');
-      }
-  };
 
   const loadSnapshots = async () => {
       setIsSnapshotLoading(true);
@@ -182,8 +170,6 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
-  const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[120] p-4 animate-fade-in-fast">
       <Card className="w-full max-w-4xl h-[85vh] flex flex-col p-0 overflow-hidden animate-scale-in bg-slate-50 dark:bg-slate-900 border-2 border-indigo-500 shadow-2xl">
@@ -194,7 +180,7 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
             <Terminal size={20} className="text-green-400" />
             <div>
                 <h2 className="font-bold text-lg leading-none">Developer Tools</h2>
-                <span className="text-[10px] font-mono text-slate-400">Mode: {isLocal ? 'Local Dev' : 'Production'}</span>
+                <span className="text-[10px] font-mono text-slate-400">Mode: Enabled</span>
             </div>
           </div>
           <button onClick={onClose} className="p-1 hover:bg-white/20 rounded-full transition-colors"><X size={20}/></button>
@@ -224,16 +210,16 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
                     <div className="space-y-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border dark:border-slate-700">
-                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><Globe size={12}/> Environment</h3>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">Environment</h3>
                                 <div className="space-y-1 text-xs font-mono text-slate-700 dark:text-slate-300">
-                                    <p><span className="text-slate-400">Host:</span> {window.location.hostname}</p>
-                                    <p><span className="text-slate-400">Type:</span> {isLocal ? <span className="text-amber-600 font-bold">Development</span> : <span className="text-green-600 font-bold">Production</span>}</p>
-                                    <p><span className="text-slate-400">PWA Service Worker:</span> {swStatus}</p>
+                                    <p><span className="text-slate-400">User Agent:</span> {navigator.userAgent}</p>
+                                    <p><span className="text-slate-400">Platform:</span> {navigator.platform}</p>
+                                    <p><span className="text-slate-400">Screen:</span> {window.innerWidth}x{window.innerHeight}</p>
                                     <p><span className="text-slate-400">Online:</span> {navigator.onLine ? 'Yes' : 'No'}</p>
                                 </div>
                             </div>
                             <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg border dark:border-slate-700">
-                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-2 flex items-center gap-1"><Cpu size={12}/> App Status</h3>
+                                <h3 className="text-xs font-bold text-slate-500 uppercase mb-2">App Status</h3>
                                 <div className="space-y-1 text-xs font-mono text-slate-700 dark:text-slate-300">
                                     <p><span className="text-slate-400">Dev Mode:</span> Enabled</p>
                                     <p><span className="text-slate-400">Theme:</span> {state.theme}</p>

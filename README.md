@@ -1,4 +1,3 @@
-
 # Business Manager
 
 A comprehensive, offline-first Progressive Web App (PWA) designed to streamline sales, purchase, and customer management for a small business. This application empowers users to track dues, manage stock, and generate reports directly from their device, without needing a constant internet connection.
@@ -35,7 +34,7 @@ A comprehensive, offline-first Progressive Web App (PWA) designed to streamline 
 - **Styling:** Tailwind CSS
 - **State Management:** React Context API with `useReducer` for centralized logic.
 - **Local Storage:** Browser `localStorage` & `IndexedDB` for robust data persistence.
-- **PWA Capabilities:** Service Workers for caching and offline access.
+- **PWA Capabilities:** Service Workers (`sw.js`) for caching and offline access.
 - **Icons:** [Lucide React](https://lucide.dev/) for consistent UI.
 - **PDF Generation:** [jsPDF](https://github.com/parallax/jsPDF) & [jspdf-autotable](https://github.com/simonbengtsson/jsPDF-AutoTable).
 - **AI Integration:** Google Gemini API for insights and text parsing.
@@ -48,11 +47,8 @@ The project is organized into a modular and scalable structure:
 /
 ├── public/
 │   ├── manifest.json       # PWA manifest
-│   ├── service-worker.js   # Service Worker for offline caching
+│   ├── sw.js               # Service Worker for offline caching
 │   └── vite.svg            # App icon
-│
-├── scripts/
-│   └── verify-pwa.js       # Integrity check for PWA files
 │
 ├── src/
 │   ├── components/         # Reusable UI components (Card, Button, Charts)

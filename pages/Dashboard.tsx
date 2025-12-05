@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, History, PlusCircle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -8,7 +8,6 @@ import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataB
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
 import PinModal from '../components/PinModal';
-import DatePill from '../components/DatePill';
 import CheckpointsModal from '../components/CheckpointsModal';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -16,13 +15,6 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 interface DashboardProps {
     setCurrentPage: (page: Page) => void;
 }
-
-const getTimeBasedGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-};
 
 const MetricCard: React.FC<{
     icon: React.ElementType;
@@ -843,23 +835,13 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             )}
             
             {/* Header Section */}
-            <div className="flex flex-row items-center justify-between gap-2 relative mb-6">
-                <div className="flex-shrink-0">
-                     <span className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm cursor-default flex flex-col items-start gap-0.5 max-w-full">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{getTimeBasedGreeting()},</span>
-                        <strong className="truncate max-w-[120px] sm:max-w-[150px] text-sm">{profile?.ownerName || 'Owner'}</strong>
-                    </span>
-                </div>
-
-                <div className="flex-grow text-center">
-                    <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
-                        Dashboard
-                    </h1>
-                </div>
-                
-                <div className="flex-shrink-0">
-                    <DatePill />
-                </div>
+            <div className="mb-8 mt-4 text-center">
+                <h1 className="text-4xl sm:text-5xl md:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-primary to-blue-600 tracking-tight drop-shadow-sm mb-2">
+                    Dashboard
+                </h1>
+                <p className="text-gray-500 dark:text-gray-400 font-medium">
+                    Overview & Analytics
+                </p>
             </div>
 
             {/* Install Prompt Banner - Shows if installable AND NOT dismissed this session */}
@@ -975,9 +957,12 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                                 </div>
                             </div>
                             
-                            <div className="mt-4 pt-4 border-t dark:border-slate-700">
-                                <Button onClick={() => setIsCheckpointsModalOpen(true)} variant="secondary" className="w-full text-xs h-8">
-                                    Manage Checkpoints
+                            <div className="mt-4 pt-4 border-t dark:border-slate-700 grid grid-cols-2 gap-3">
+                                <Button onClick={() => setIsCheckpointsModalOpen(true)} variant="secondary" className="w-full text-xs h-9">
+                                    <History className="w-4 h-4 mr-2" /> View History
+                                </Button>
+                                <Button onClick={() => runSecureAction(handleCreateCheckpoint)} className="w-full text-xs h-9 bg-indigo-600 hover:bg-indigo-700">
+                                    <PlusCircle className="w-4 h-4 mr-2" /> New Checkpoint
                                 </Button>
                             </div>
                         </div>

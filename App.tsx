@@ -37,6 +37,7 @@ import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
 import SignInModal from './components/SignInModal';
+import PinModal from './components/PinModal';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
@@ -185,6 +186,7 @@ const AppContent: React.FC = () => {
     const [isDirty, setIsDirty] = useState(false);
     const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
+    const [isLocked, setIsLocked] = useState(false);
 
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const mobileQuickAddRef = useRef<HTMLDivElement>(null);
@@ -408,21 +410,33 @@ const AppContent: React.FC = () => {
 
     const isMoreBtnActive = mobileMoreItems.some(item => item.page === currentPage);
 
-    // Swipe Navigation Removed to prevent accidental closure
-    // The user requested to disable single swipe closure, relying on double-back button logic instead.
+    // Lock App Handler
+    const handleLockApp = () => {
+        setIsLocked(true);
+        setIsMenuOpen(false);
+    };
 
     if (!isDbLoaded) return <AppSkeletonLoader />;
 
     // Main Content Class Logic
-    // If INVOICE_DESIGNER: Fixed full height, internal scrolling.
-    // Standard Pages: Native body scrolling (min-h-screen).
-    // Increased top padding to accommodate the taller header + banner
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
         : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
+            {/* Lock Screen Overlay */}
+            {isLocked && (
+                <div className="fixed inset-0 z-[1000] bg-background dark:bg-slate-950 flex items-center justify-center">
+                    <PinModal 
+                        mode="enter" 
+                        correctPin={state.pin} 
+                        onCorrectPin={() => setIsLocked(false)}
+                        // No onCancel prop = no back button = forced lock
+                    />
+                </div>
+            )}
+
             <Toast />
             <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
             <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
@@ -573,6 +587,7 @@ const AppContent: React.FC = () => {
                 onOpenDevTools={() => setIsDevToolsOpen(true)}
                 onOpenChangeLog={() => setIsChangeLogOpen(true)}
                 onOpenSignIn={() => setIsSignInModalOpen(true)}
+                onLockApp={handleLockApp}
             />
             <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
             <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
