@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, Eye } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -504,6 +503,17 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                     <MessageCircle size={14} className="mr-1.5" /> Send Order
                                                 </button>
                                                 
+                                                {/* View Image Button */}
+                                                {hasImages && (
+                                                    <button 
+                                                        onClick={() => setViewImageModal((purchase.invoiceImages && purchase.invoiceImages[0]) || purchase.invoiceUrl || '')}
+                                                        className="flex-grow sm:flex-grow-0 h-8 px-3 text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-md shadow-sm transition-colors flex items-center justify-center border border-gray-300 dark:border-slate-600"
+                                                        title="View Invoice Image"
+                                                    >
+                                                        <Eye size={14} className="mr-1.5" /> View
+                                                    </button>
+                                                )}
+
                                                 {/* New Share Docs Button */}
                                                 {hasImages && (
                                                     <button 
@@ -511,7 +521,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                         className="flex-grow sm:flex-grow-0 h-8 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm transition-colors flex items-center justify-center"
                                                         title="Share PDF for GST"
                                                     >
-                                                        <Share2 size={14} className="mr-1.5" /> Share Docs
+                                                        <Share2 size={14} className="mr-1.5" /> Share
                                                     </button>
                                                 )}
 
