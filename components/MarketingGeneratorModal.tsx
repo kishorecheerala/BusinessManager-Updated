@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Image as ImageIcon, Video, Loader2, Download, Wand2, RefreshCw } from 'lucide-react';
+import { X, Image as ImageIcon, Video, Loader2, Download, Wand2, RefreshCw, WifiOff } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import Card from './Card';
 import Button from './Button';
@@ -14,7 +14,7 @@ interface MarketingGeneratorModalProps {
 }
 
 const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpen, onClose, product }) => {
-    const { showToast } = useAppContext();
+    const { state, showToast } = useAppContext();
     const [mode, setMode] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
     const [prompt, setPrompt] = useState(`Professional studio shot of ${product.name}, ${product.category || 'product'}, cinematic lighting, 4k resolution.`);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -35,6 +35,11 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
     };
 
     const handleGenerate = async () => {
+        if (!state.isOnline) {
+            showToast("Offline. Cannot generate.", 'error');
+            return;
+        }
+
         setIsGenerating(true);
         setResultUrl(null);
         
@@ -133,78 +138,88 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
                 </div>
 
                 <div className="p-5 space-y-5">
-                    {/* Mode Selector */}
-                    <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
-                        <button 
-                            onClick={() => { setMode('IMAGE'); setResultUrl(null); }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${mode === 'IMAGE' ? 'bg-white dark:bg-slate-700 shadow text-pink-600 dark:text-pink-400' : 'text-gray-500'}`}
-                        >
-                            <ImageIcon size={16} /> Product Image
-                        </button>
-                        <button 
-                            onClick={() => { setMode('VIDEO'); setResultUrl(null); }}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${mode === 'VIDEO' ? 'bg-white dark:bg-slate-700 shadow text-purple-600 dark:text-purple-400' : 'text-gray-500'}`}
-                        >
-                            <Video size={16} /> Promo Video
-                        </button>
-                    </div>
-
-                    {/* Result Area */}
-                    <div className="aspect-video bg-gray-50 dark:bg-slate-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden relative">
-                        {isGenerating ? (
-                            <div className="text-center p-6">
-                                <Loader2 className="w-10 h-10 animate-spin text-purple-500 mx-auto mb-3" />
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                    {mode === 'VIDEO' ? 'Generating Video (this takes a moment)...' : 'Creating Image...'}
-                                </p>
-                                {mode === 'VIDEO' && <p className="text-xs text-gray-400 mt-1">AI is dreaming up your scene</p>}
-                            </div>
-                        ) : resultUrl ? (
-                            mode === 'IMAGE' ? (
-                                <img src={resultUrl} alt="Generated" className="w-full h-full object-cover" />
-                            ) : (
-                                <video src={resultUrl} controls className="w-full h-full object-contain bg-black" />
-                            )
-                        ) : (
-                            <div className="text-center text-gray-400">
-                                <Wand2 size={40} className="mx-auto mb-2 opacity-50" />
-                                <p className="text-sm">Ready to generate</p>
-                            </div>
-                        )}
-                    </div>
-
-                    {/* Controls */}
-                    <div className="space-y-3">
-                        <div>
-                            <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Creative Prompt</label>
-                            <textarea 
-                                value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
-                                className="w-full p-3 text-sm border rounded-lg bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none"
-                                rows={3}
-                            />
-                        </div>
-                        
-                        <div className="flex gap-3">
-                            <Button 
-                                onClick={handleGenerate} 
-                                disabled={isGenerating}
-                                className={`flex-1 py-3 text-white shadow-lg ${mode === 'IMAGE' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-purple-600 hover:bg-purple-700'}`}
-                            >
-                                {isGenerating ? 'Working Magic...' : `Generate ${mode === 'IMAGE' ? 'Image' : 'Video'}`}
-                            </Button>
-                            
-                            {resultUrl && (
-                                <a 
-                                    href={resultUrl} 
-                                    download={`marketing-${mode.toLowerCase()}-${Date.now()}.${mode === 'IMAGE' ? 'jpg' : 'mp4'}`}
-                                    className="px-4 flex items-center justify-center bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg text-gray-700 dark:text-gray-200 transition-colors"
+                    {state.isOnline ? (
+                        <>
+                            {/* Mode Selector */}
+                            <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
+                                <button 
+                                    onClick={() => { setMode('IMAGE'); setResultUrl(null); }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${mode === 'IMAGE' ? 'bg-white dark:bg-slate-700 shadow text-pink-600 dark:text-pink-400' : 'text-gray-500'}`}
                                 >
-                                    <Download size={20} />
-                                </a>
-                            )}
+                                    <ImageIcon size={16} /> Product Image
+                                </button>
+                                <button 
+                                    onClick={() => { setMode('VIDEO'); setResultUrl(null); }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${mode === 'VIDEO' ? 'bg-white dark:bg-slate-700 shadow text-purple-600 dark:text-purple-400' : 'text-gray-500'}`}
+                                >
+                                    <Video size={16} /> Promo Video
+                                </button>
+                            </div>
+
+                            {/* Result Area */}
+                            <div className="aspect-video bg-gray-50 dark:bg-slate-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden relative">
+                                {isGenerating ? (
+                                    <div className="text-center p-6">
+                                        <Loader2 className="w-10 h-10 animate-spin text-purple-500 mx-auto mb-3" />
+                                        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                                            {mode === 'VIDEO' ? 'Generating Video (this takes a moment)...' : 'Creating Image...'}
+                                        </p>
+                                        {mode === 'VIDEO' && <p className="text-xs text-gray-400 mt-1">AI is dreaming up your scene</p>}
+                                    </div>
+                                ) : resultUrl ? (
+                                    mode === 'IMAGE' ? (
+                                        <img src={resultUrl} alt="Generated" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <video src={resultUrl} controls className="w-full h-full object-contain bg-black" />
+                                    )
+                                ) : (
+                                    <div className="text-center text-gray-400">
+                                        <Wand2 size={40} className="mx-auto mb-2 opacity-50" />
+                                        <p className="text-sm">Ready to generate</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Controls */}
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Creative Prompt</label>
+                                    <textarea 
+                                        value={prompt}
+                                        onChange={(e) => setPrompt(e.target.value)}
+                                        className="w-full p-3 text-sm border rounded-lg bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none"
+                                        rows={3}
+                                    />
+                                </div>
+                                
+                                <div className="flex gap-3">
+                                    <Button 
+                                        onClick={handleGenerate} 
+                                        disabled={isGenerating}
+                                        className={`flex-1 py-3 text-white shadow-lg ${mode === 'IMAGE' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                                    >
+                                        {isGenerating ? 'Working Magic...' : `Generate ${mode === 'IMAGE' ? 'Image' : 'Video'}`}
+                                    </Button>
+                                    
+                                    {resultUrl && (
+                                        <a 
+                                            href={resultUrl} 
+                                            download={`marketing-${mode.toLowerCase()}-${Date.now()}.${mode === 'IMAGE' ? 'jpg' : 'mp4'}`}
+                                            className="px-4 flex items-center justify-center bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg text-gray-700 dark:text-gray-200 transition-colors"
+                                        >
+                                            <Download size={20} />
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-10 gap-4 text-gray-500">
+                            <WifiOff size={48} />
+                            <p className="font-medium">You are currently offline.</p>
+                            <Button onClick={onClose} variant="secondary">Close</Button>
                         </div>
-                    </div>
+                    )}
                 </div>
             </Card>
         </div>

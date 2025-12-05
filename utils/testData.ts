@@ -121,6 +121,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   lastSyncTime: null,
   devMode: false,
   performanceMode: false,
+  isOnline: true,
   navOrder: [
     'DASHBOARD', 'CUSTOMERS', 'SALES', 'PURCHASES', 
     'INSIGHTS', 'REPORTS', 'PRODUCTS', 'EXPENSES', 

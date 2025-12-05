@@ -51,6 +51,7 @@ export interface AppState {
   performanceMode: boolean;
   navOrder: string[]; // List of page IDs in order
   quickActions: string[]; // List of Quick Action IDs
+  isOnline: boolean; // New: Network Status
   restoreFromFileId?: (fileId: string) => Promise<void>;
 }
 
@@ -103,6 +104,7 @@ type Action =
   | { type: 'UPDATE_NAV_ORDER'; payload: string[] }
   | { type: 'UPDATE_QUICK_ACTIONS'; payload: string[] }
   | { type: 'TOGGLE_PERFORMANCE_MODE' }
+  | { type: 'SET_ONLINE_STATUS'; payload: boolean }
   | { type: 'CLEANUP_OLD_DATA' }
   | { type: 'REPLACE_COLLECTION'; payload: { storeName: StoreName; data: any[] } };
 
@@ -169,7 +171,8 @@ const initialState: AppState = {
     devMode: false,
     performanceMode: false,
     navOrder: DEFAULT_NAV_ORDER,
-    quickActions: DEFAULT_QUICK_ACTIONS
+    quickActions: DEFAULT_QUICK_ACTIONS,
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true
 };
 
 // Logging helper
@@ -270,10 +273,28 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
     case 'ADD_SALE':
         const newSale = action.payload;
+        
+        // Update Customer Loyalty Points
+        let customersAfterSale = [...state.customers];
+        const saleCustomerIdx = state.customers.findIndex(c => c.id === newSale.customerId);
+        
+        if (saleCustomerIdx >= 0) {
+            const cust = customersAfterSale[saleCustomerIdx];
+            const currentPoints = cust.loyaltyPoints || 0;
+            const pointsUsed = newSale.loyaltyPointsUsed || 0;
+            const pointsEarned = newSale.loyaltyPointsEarned || 0;
+            
+            customersAfterSale[saleCustomerIdx] = {
+                ...cust,
+                loyaltyPoints: Math.max(0, currentPoints - pointsUsed + pointsEarned)
+            };
+        }
+
         db.saveCollection('sales', [...state.sales, newSale]);
+        db.saveCollection('customers', customersAfterSale);
         newLog = logAction(state, 'New Sale', `ID: ${newSale.id}, Amt: ${newSale.totalAmount}`);
         db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
-        return { ...state, sales: [...state.sales, newSale], audit_logs: [newLog, ...state.audit_logs], ...touch };
+        return { ...state, sales: [...state.sales, newSale], customers: customersAfterSale, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
     case 'UPDATE_SALE':
         const { oldSale, updatedSale } = action.payload;
@@ -314,15 +335,32 @@ const appReducer = (state: AppState, action: Action): AppState => {
             const item = saleToDelete.items.find(i => i.productId === p.id);
             return item ? { ...p, quantity: p.quantity + item.quantity } : p;
         });
+        
+        // Revert Customer Points
+        let customersAfterDelete = [...state.customers];
+        const delCustomerIdx = state.customers.findIndex(c => c.id === saleToDelete.customerId);
+        if (delCustomerIdx >= 0) {
+            const cust = customersAfterDelete[delCustomerIdx];
+            const currentPoints = cust.loyaltyPoints || 0;
+            const pointsUsed = saleToDelete.loyaltyPointsUsed || 0;
+            const pointsEarned = saleToDelete.loyaltyPointsEarned || 0;
+            
+            // Reverse operation: Add back used points, subtract earned points
+            customersAfterDelete[delCustomerIdx] = {
+                ...cust,
+                loyaltyPoints: Math.max(0, currentPoints + pointsUsed - pointsEarned)
+            };
+        }
 
         const filteredSales = state.sales.filter(s => s.id !== action.payload);
         db.saveCollection('sales', filteredSales);
         db.saveCollection('products', restoredProducts);
+        db.saveCollection('customers', customersAfterDelete);
         
         newLog = logAction(state, 'Deleted Sale', `ID: ${action.payload}`);
         db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
-        return { ...state, sales: filteredSales, products: restoredProducts, audit_logs: [newLog, ...state.audit_logs], ...touch };
+        return { ...state, sales: filteredSales, products: restoredProducts, customers: customersAfterDelete, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
     case 'ADD_PAYMENT_TO_SALE':
         const salesWithPayment = state.sales.map(s => 
@@ -638,6 +676,9 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'TOGGLE_PERFORMANCE_MODE':
         return { ...state, performanceMode: !state.performanceMode };
 
+    case 'SET_ONLINE_STATUS':
+        return { ...state, isOnline: action.payload };
+
     case 'CLEANUP_OLD_DATA':
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -690,6 +731,23 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'info') => {
         dispatch({ type: 'SHOW_TOAST', payload: { message, type } });
         // The Toast component handles its own timeout logic
+    }, []);
+
+    // --- Online/Offline Listener ---
+    useEffect(() => {
+        const handleOnline = () => dispatch({ type: 'SET_ONLINE_STATUS', payload: true });
+        const handleOffline = () => {
+            dispatch({ type: 'SET_ONLINE_STATUS', payload: false });
+            showToast("You are offline. Sync and AI features are unavailable.", "info");
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+        };
     }, []);
 
     // --- Load Data from IDB on Mount ---
@@ -828,6 +886,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     }, []); // Run once on mount
 
     const googleSignIn = (options?: { forceConsent?: boolean }) => {
+        if (!state.isOnline) {
+            showToast("Cannot sign in while offline.", 'error');
+            return;
+        }
         // Enforce prompt: 'select_account' to ensure the account chooser is always displayed
         // If forceConsent is true, we also request consent (for scopes)
         const prompt = options?.forceConsent ? 'consent select_account' : 'select_account';
@@ -851,7 +913,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     const googleSignOut = () => {
         const token = state.googleUser?.accessToken;
-        if (token && (window as any).google) {
+        if (token && (window as any).google && state.isOnline) {
             (window as any).google.accounts.oauth2.revoke(token, () => {
                 console.log('Access token revoked');
             });
@@ -874,6 +936,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         if (!isExpired) {
             return currentUser.accessToken;
         }
+
+        if (!stateRef.current.isOnline) return null;
 
         console.log("Token expired/expiring, attempting refresh...");
         
@@ -920,6 +984,11 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const syncData = useCallback(async () => {
+        if (!stateRef.current.isOnline) {
+            // Can't sync offline
+            return;
+        }
+
         // 1. Check Auth & Refresh if needed
         let accessToken = stateRef.current.googleUser?.accessToken;
         
@@ -1062,18 +1131,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // --- AUTO SYNC LOGIC ---
     
-    // 1. Initial Sync on Load (if logged in)
+    // 1. Initial Sync on Load (if logged in and online)
     useEffect(() => {
-        if (isDbLoaded && state.googleUser && state.syncStatus === 'idle' && !state.lastSyncTime) {
+        if (isDbLoaded && state.googleUser && state.isOnline && state.syncStatus === 'idle' && !state.lastSyncTime) {
             console.log("Initial App Sync Triggered");
             syncData();
         }
-    }, [isDbLoaded, state.googleUser]);
+    }, [isDbLoaded, state.googleUser, state.isOnline]);
 
     // 2. Debounced Sync on Changes
     useEffect(() => {
-        // Auto-sync if user is logged in and data has changed locally
-        if (state.googleUser && state.lastLocalUpdate > 0 && state.syncStatus !== 'syncing') {
+        // Auto-sync if user is logged in, online, and data has changed locally
+        if (state.googleUser && state.isOnline && state.lastLocalUpdate > 0 && state.syncStatus !== 'syncing') {
             const timer = setTimeout(() => {
                 console.log("Auto-sync triggered due to local changes");
                 syncData();
@@ -1081,13 +1150,13 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
             return () => clearTimeout(timer);
         }
-    }, [state.lastLocalUpdate, state.googleUser, syncData, state.syncStatus]);
+    }, [state.lastLocalUpdate, state.googleUser, state.isOnline, syncData, state.syncStatus]);
 
     // --- PROACTIVE TOKEN REFRESH ---
     useEffect(() => {
         const checkInterval = setInterval(() => {
             const user = stateRef.current.googleUser;
-            if (user && user.expiresAt) {
+            if (user && user.expiresAt && stateRef.current.isOnline) {
                 const timeLeft = user.expiresAt - Date.now();
                 // If less than 2 minutes left, try to refresh silently
                 if (timeLeft < 2 * 60 * 1000 && timeLeft > 0) {

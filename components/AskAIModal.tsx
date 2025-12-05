@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { X, Send, Sparkles, Bot, User, Loader2, Key, AlertTriangle, Mic, Volume2, StopCircle } from 'lucide-react';
+import { X, Send, Sparkles, Bot, User, Loader2, Key, AlertTriangle, Mic, Volume2, StopCircle, WifiOff } from 'lucide-react';
 import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
 import { useAppContext } from '../context/AppContext';
 import Card from './Card';
@@ -109,6 +109,16 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
   // Check for API key on open
   useEffect(() => {
     if (isOpen) {
+        if (!state.isOnline) {
+            setMessages(prev => [...prev, { 
+                id: 'sys-offline', 
+                role: 'model', 
+                text: "⚠️ You are currently offline. AI features require an internet connection.",
+                isError: true 
+            }]);
+            return;
+        }
+
         const checkConfig = async () => {
             const aistudio = (window as any).aistudio;
             const key = getApiKey();
@@ -139,7 +149,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
     return () => {
         stopLiveSession();
     };
-  }, [isOpen]);
+  }, [isOpen, state.isOnline]);
 
   const generateSystemContext = () => {
     // Generate condensed context for the model
@@ -159,6 +169,11 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
   // --- LIVE API HANDLERS ---
 
   const startLiveSession = async () => {
+      if (!state.isOnline) {
+          showToast("Cannot start live session while offline.", 'error');
+          return;
+      }
+
       try {
           const apiKey = getApiKey();
           if (!apiKey) throw new Error("API Key missing");
@@ -274,6 +289,10 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
 
   const handleSend = async () => {
     if (!input.trim()) return;
+    if (!state.isOnline) {
+        showToast("You are offline.", 'error');
+        return;
+    }
     
     const userMsg: Message = { id: Date.now().toString(), role: 'user', text: input };
     setMessages(prev => [...prev, userMsg]);
@@ -386,52 +405,61 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
             ) : (
                 // Live Voice Mode
                 <div className="h-full flex flex-col items-center justify-center text-center space-y-8 animate-fade-in-fast">
-                    <div className="relative">
-                        {/* Visualizer Circle */}
-                        <div 
-                            className={`w-32 h-32 rounded-full flex items-center justify-center transition-all duration-100 ${isLiveActive ? 'bg-primary/10' : 'bg-gray-100 dark:bg-slate-800'}`}
-                            style={{ 
-                                transform: isLiveActive ? `scale(${1 + liveVolume * 0.5})` : 'scale(1)',
-                                boxShadow: isLiveActive ? `0 0 ${liveVolume * 40}px var(--primary-color)` : 'none'
-                            }}
-                        >
-                            {isLiveActive ? (
-                                <Volume2 size={48} className="text-primary animate-pulse" />
-                            ) : (
-                                <Mic size={48} className="text-gray-400" />
-                            )}
+                    {state.isOnline ? (
+                        <>
+                            <div className="relative">
+                                {/* Visualizer Circle */}
+                                <div 
+                                    className={`w-32 h-32 rounded-full flex items-center justify-center transition-all duration-100 ${isLiveActive ? 'bg-primary/10' : 'bg-gray-100 dark:bg-slate-800'}`}
+                                    style={{ 
+                                        transform: isLiveActive ? `scale(${1 + liveVolume * 0.5})` : 'scale(1)',
+                                        boxShadow: isLiveActive ? `0 0 ${liveVolume * 40}px var(--primary-color)` : 'none'
+                                    }}
+                                >
+                                    {isLiveActive ? (
+                                        <Volume2 size={48} className="text-primary animate-pulse" />
+                                    ) : (
+                                        <Mic size={48} className="text-gray-400" />
+                                    )}
+                                </div>
+                                
+                                {/* Ripple Effects when active */}
+                                {isLiveActive && (
+                                    <>
+                                        <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping" style={{ animationDuration: '2s' }}></div>
+                                        <div className="absolute inset-0 rounded-full border border-primary/20 animate-ping" style={{ animationDuration: '3s', animationDelay: '0.5s' }}></div>
+                                    </>
+                                )}
+                            </div>
+
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-800 dark:text-white">
+                                    {isLiveActive ? "Listening..." : "Live Conversation"}
+                                </h3>
+                                <p className="text-sm text-gray-500 max-w-xs mx-auto mt-2">
+                                    {isLiveActive 
+                                        ? "Talk to your assistant naturally. Tap Stop to end." 
+                                        : "Tap Start to have a real-time voice conversation with your AI business analyst."}
+                                </p>
+                            </div>
+
+                            <Button 
+                                onClick={isLiveActive ? stopLiveSession : startLiveSession}
+                                className={`py-4 px-8 rounded-full text-lg shadow-xl ${isLiveActive ? 'bg-red-500 hover:bg-red-600' : 'bg-primary hover:brightness-110'}`}
+                            >
+                                {isLiveActive ? (
+                                    <><StopCircle size={24} className="mr-2" /> End Session</>
+                                ) : (
+                                    <><Mic size={24} className="mr-2" /> Start Conversation</>
+                                )}
+                            </Button>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center gap-4 text-gray-500">
+                            <WifiOff size={48} />
+                            <p>Live Voice requires an internet connection.</p>
                         </div>
-                        
-                        {/* Ripple Effects when active */}
-                        {isLiveActive && (
-                            <>
-                                <div className="absolute inset-0 rounded-full border-2 border-primary/30 animate-ping" style={{ animationDuration: '2s' }}></div>
-                                <div className="absolute inset-0 rounded-full border border-primary/20 animate-ping" style={{ animationDuration: '3s', animationDelay: '0.5s' }}></div>
-                            </>
-                        )}
-                    </div>
-
-                    <div>
-                        <h3 className="text-xl font-bold text-gray-800 dark:text-white">
-                            {isLiveActive ? "Listening..." : "Live Conversation"}
-                        </h3>
-                        <p className="text-sm text-gray-500 max-w-xs mx-auto mt-2">
-                            {isLiveActive 
-                                ? "Talk to your assistant naturally. Tap Stop to end." 
-                                : "Tap Start to have a real-time voice conversation with your AI business analyst."}
-                        </p>
-                    </div>
-
-                    <Button 
-                        onClick={isLiveActive ? stopLiveSession : startLiveSession}
-                        className={`py-4 px-8 rounded-full text-lg shadow-xl ${isLiveActive ? 'bg-red-500 hover:bg-red-600' : 'bg-primary hover:brightness-110'}`}
-                    >
-                        {isLiveActive ? (
-                            <><StopCircle size={24} className="mr-2" /> End Session</>
-                        ) : (
-                            <><Mic size={24} className="mr-2" /> Start Conversation</>
-                        )}
-                    </Button>
+                    )}
                 </div>
             )}
         </div>
@@ -439,19 +467,19 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
         {/* Input Area (Only for Text Mode) */}
         {!isLiveMode && (
             <div className="p-3 bg-white dark:bg-slate-800 border-t dark:border-slate-700 shrink-0">
-                <div className={`flex gap-2 items-end bg-gray-100 dark:bg-slate-900 p-2 rounded-xl border border-gray-200 dark:border-slate-700 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all`}>
+                <div className={`flex gap-2 items-end bg-gray-100 dark:bg-slate-900 p-2 rounded-xl border border-gray-200 dark:border-slate-700 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all ${!state.isOnline ? 'opacity-50' : ''}`}>
                     <textarea 
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyPress}
-                        placeholder="Ask about sales, stock, or profit..."
+                        placeholder={state.isOnline ? "Ask about sales, stock, or profit..." : "Offline mode enabled"}
                         className="flex-grow bg-transparent border-none focus:ring-0 resize-none text-sm max-h-24 py-2 px-2 dark:text-white disabled:cursor-not-allowed placeholder-gray-400"
                         rows={1}
-                        disabled={isLoading}
+                        disabled={isLoading || !state.isOnline}
                     />
                     <button 
                         onClick={handleSend}
-                        disabled={isLoading || !input.trim()}
+                        disabled={isLoading || !input.trim() || !state.isOnline}
                         className="p-2 bg-primary text-white rounded-lg hover:brightness-90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mb-0.5 shadow-sm"
                     >
                         <Send size={18} />

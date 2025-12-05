@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, Crown, ShieldAlert, BadgeCheck, Users, MessageCircle } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, Crown, ShieldAlert, BadgeCheck, Users, MessageCircle, FileText, Star, Tag } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Customer, Payment, Sale, Page } from '../types';
 import Card from '../components/Card';
@@ -12,6 +13,7 @@ import { useDialog } from '../context/DialogContext';
 import PaymentModal from '../components/PaymentModal';
 import AddCustomerModal from '../components/AddCustomerModal';
 import { getLocalDateString } from '../utils/dateUtils';
+import LedgerModal from '../components/LedgerModal';
 
 // --- Customer Segmentation Helper ---
 type CustomerSegment = 'VIP' | 'Regular' | 'New' | 'At-Risk';
@@ -76,6 +78,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
     });
     
     const [confirmModalState, setConfirmModalState] = useState<{ isOpen: boolean, saleIdToDelete: string | null }>({ isOpen: false, saleIdToDelete: null });
+    const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+    
     const isDirtyRef = useRef(false);
     const actionMenuRef = useRef<HTMLDivElement>(null);
 
@@ -331,7 +335,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         const customerSales = state.sales.filter(s => s.customerId === selectedCustomer.id);
         const customerReturns = state.returns.filter(r => r.type === 'CUSTOMER' && r.partyId === selectedCustomer.id);
         
-        const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
             setEditedCustomer({ ...editedCustomer, [e.target.name]: e.target.value });
         };
         
@@ -341,6 +345,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
         return (
             <div className="space-y-4 animate-fade-in-fast">
+                {isLedgerOpen && <LedgerModal isOpen={isLedgerOpen} onClose={() => setIsLedgerOpen(false)} partyId={selectedCustomer.id} partyType="CUSTOMER" />}
+                
                 <ConfirmationModal
                     isOpen={confirmModalState.isOpen}
                     onClose={() => setConfirmModalState({ isOpen: false, saleIdToDelete: null })}
@@ -387,6 +393,18 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                             <div><label className="text-sm font-medium">Address</label><input type="text" name="address" value={editedCustomer.address} onChange={handleInputChange} className="w-full p-2 border rounded" /></div>
                             <div><label className="text-sm font-medium">Area</label><input type="text" name="area" value={editedCustomer.area} onChange={handleInputChange} className="w-full p-2 border rounded" /></div>
                             <div><label className="text-sm font-medium">Reference</label><input type="text" name="reference" value={editedCustomer.reference ?? ''} onChange={handleInputChange} className="w-full p-2 border rounded" /></div>
+                            <div>
+                                <label className="text-sm font-medium">Pricing Tier</label>
+                                <select 
+                                    name="priceTier" 
+                                    value={editedCustomer.priceTier || 'RETAIL'} 
+                                    onChange={handleInputChange} 
+                                    className="w-full p-2 border rounded bg-white dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                >
+                                    <option value="RETAIL">Retail</option>
+                                    <option value="WHOLESALE">Wholesale</option>
+                                </select>
+                            </div>
                         </div>
                     ) : (
                         <div className="space-y-3 text-gray-700">
@@ -416,7 +434,18 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                 </div>
                              </div>
                             
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-4 text-sm mt-2">
+                                <div className="flex items-center gap-1 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 px-2 py-1 rounded border border-yellow-200 dark:border-yellow-800">
+                                    <Star size={14} fill="currentColor" />
+                                    <span className="font-bold">{selectedCustomer.loyaltyPoints || 0}</span> Points
+                                </div>
+                                <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-2 py-1 rounded border border-gray-200 dark:border-gray-700">
+                                    <Tag size={14} />
+                                    <span className="font-bold">{selectedCustomer.priceTier || 'RETAIL'}</span>
+                                </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 mt-2">
                                 <p><strong>Address:</strong> {selectedCustomer.address}</p>
                                 <button 
                                     onClick={(e) => handleOpenMap(e, selectedCustomer.address + ', ' + selectedCustomer.area)}
@@ -430,8 +459,12 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                             {selectedCustomer.reference && <p><strong>Reference:</strong> {selectedCustomer.reference}</p>}
                         </div>
                     )}
-                     <div className="mt-4 pt-4 border-t">
-                        <Button onClick={handleShareDuesSummary} className="w-full">
+                     <div className="mt-4 pt-4 border-t flex gap-2">
+                        <Button onClick={() => setIsLedgerOpen(true)} variant="secondary" className="flex-1">
+                            <FileText size={16} className="mr-2" />
+                            Statement / Ledger
+                        </Button>
+                        <Button onClick={handleShareDuesSummary} className="flex-1">
                             <Share2 size={16} className="mr-2" />
                             Share Dues Summary
                         </Button>
@@ -635,6 +668,16 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                                 <MapPin size={14} />
                                             </button>
                                         </div>
+                                    </div>
+                                    <div className="flex gap-2 mt-2">
+                                        {customer.priceTier === 'WHOLESALE' && (
+                                            <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded border border-purple-200 font-bold">WHOLESALE</span>
+                                        )}
+                                        {customer.loyaltyPoints && customer.loyaltyPoints > 0 ? (
+                                            <span className="text-[10px] bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded border border-yellow-200 flex items-center gap-1">
+                                                <Star size={10} fill="currentColor" /> {customer.loyaltyPoints} Pts
+                                            </span>
+                                        ) : null}
                                     </div>
                                 </div>
                                 <div className="text-right flex-shrink-0 ml-4">

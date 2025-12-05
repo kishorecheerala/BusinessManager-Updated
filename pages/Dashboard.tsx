@@ -1,5 +1,6 @@
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award, WifiOff } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -8,6 +9,7 @@ import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataB
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
 import PinModal from '../components/PinModal';
+import DatePill from '../components/DatePill';
 import CheckpointsModal from '../components/CheckpointsModal';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -15,6 +17,13 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 interface DashboardProps {
     setCurrentPage: (page: Page) => void;
 }
+
+const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
+};
 
 const MetricCard: React.FC<{
     icon: React.ElementType;
@@ -30,19 +39,19 @@ const MetricCard: React.FC<{
 }> = ({ icon: Icon, title, value, color, iconBgColor, textColor, unit = '₹', subValue, onClick, delay }) => (
     <div
         onClick={onClick}
-        className={`rounded-xl shadow-sm p-4 flex items-center transition-all duration-300 hover:shadow-md hover:scale-[1.02] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group border border-transparent hover:border-primary/10`}
+        className={`rounded-lg shadow-md p-5 flex items-center transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group`}
         style={{ animationDelay: `${delay || 0}ms` }}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
     >
-        <div className={`p-3 sm:p-4 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
-            <Icon className={`w-6 h-6 sm:w-8 sm:h-8 ${textColor}`} />
+        <div className={`p-4 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
+            <Icon className={`w-8 h-8 ${textColor}`} />
         </div>
-        <div className="ml-3 sm:ml-5 flex-grow min-w-0">
-            <p className={`font-bold text-xs sm:text-sm uppercase tracking-wider ${textColor} opacity-80`}>{title}</p>
-            <p className={`text-xl sm:text-3xl font-extrabold ${textColor} break-all mt-0.5 sm:mt-1`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
-            {subValue && <p className={`text-[10px] sm:text-xs font-medium mt-0.5 sm:mt-1 opacity-70 ${textColor}`}>{subValue}</p>}
+        <div className="ml-5 flex-grow">
+            <p className={`font-bold text-xl ${textColor}`}>{title}</p>
+            <p className={`text-3xl font-extrabold ${textColor} break-all mt-1`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
+            {subValue && <p className={`text-sm font-medium mt-1 opacity-90 ${textColor}`}>{subValue}</p>}
         </div>
     </div>
 );
@@ -81,7 +90,7 @@ const SmartAnalystCard: React.FC<{
     expenses: Expense[], 
     ownerName: string 
 }> = ({ sales, products, customers, purchases, returns, expenses, ownerName }) => {
-    const { showToast } = useAppContext();
+    const { showToast, state } = useAppContext();
     const [aiBriefing, setAiBriefing] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -165,6 +174,10 @@ const SmartAnalystCard: React.FC<{
     }, [sales, products, customers, purchases, returns, expenses]);
 
     const handleGenerateBriefing = async () => {
+        if (!state.isOnline) {
+            showToast("You are offline.", 'error');
+            return;
+        }
         setIsGenerating(true);
         try {
             const apiKey = process.env.API_KEY || localStorage.getItem('gemini_api_key');
@@ -213,6 +226,11 @@ const SmartAnalystCard: React.FC<{
     const handlePlayBriefing = async () => {
         if (isPlaying) {
             handleStopAudio();
+            return;
+        }
+        
+        if (!state.isOnline) {
+            showToast("Offline. Cannot stream audio.", 'error');
             return;
         }
 
@@ -293,18 +311,19 @@ const SmartAnalystCard: React.FC<{
                     <div className="flex gap-2">
                         <button 
                             onClick={handlePlayBriefing}
-                            className={`p-2 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500'}`}
-                            title={isPlaying ? "Stop Briefing" : "Listen to Briefing"}
+                            disabled={!state.isOnline}
+                            className={`p-2 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 disabled:opacity-50'}`}
+                            title={state.isOnline ? (isPlaying ? "Stop Briefing" : "Listen to Briefing") : "Offline"}
                         >
                             {isPlaying ? <StopCircle size={18} /> : <Volume2 size={18} />}
                         </button>
                         <button 
                             onClick={handleGenerateBriefing} 
-                            disabled={isGenerating}
-                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors"
-                            title="Refresh AI Insights"
+                            disabled={isGenerating || !state.isOnline}
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors disabled:opacity-50"
+                            title={state.isOnline ? "Refresh AI Insights" : "Offline"}
                         >
-                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <RotateCw size={18} />}
+                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : state.isOnline ? <RotateCw size={18} /> : <WifiOff size={18} />}
                         </button>
                     </div>
                 </div>
@@ -497,6 +516,55 @@ const OverdueDuesCard: React.FC<{ sales: Sale[]; customers: Customer[]; onNaviga
                                 <button onClick={(e) => sendWhatsAppReminder(e, customer, totalOverdue)} className="bg-green-500 text-white p-1 rounded-full hover:scale-110 transition-transform" title="Send Reminder"><MessageCircle size={12} /></button>
                             </div>
                         </div>
+                    </div>
+                ))}
+            </div>
+        </Card>
+    );
+};
+
+const TopProductsCard: React.FC<{ sales: Sale[] }> = ({ sales }) => {
+    const topProducts = useMemo(() => {
+        const productMap: Record<string, { name: string, quantity: number, revenue: number }> = {};
+        
+        sales.forEach(sale => {
+            sale.items.forEach(item => {
+                if (!productMap[item.productId]) {
+                    productMap[item.productId] = { 
+                        name: item.productName, 
+                        quantity: 0,
+                        revenue: 0 
+                    };
+                }
+                productMap[item.productId].quantity += item.quantity;
+                productMap[item.productId].revenue += (item.quantity * item.price);
+            });
+        });
+
+        return Object.values(productMap)
+            .sort((a, b) => b.quantity - a.quantity)
+            .slice(0, 3);
+    }, [sales]);
+
+    if (topProducts.length === 0) return null;
+
+    return (
+        <Card className="border-l-4 border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20 dark:border-indigo-600">
+            <div className="flex items-center mb-4">
+                <Award className="w-6 h-6 text-indigo-600 dark:text-indigo-400 mr-3" />
+                <h2 className="text-lg font-bold text-indigo-800 dark:text-indigo-200">Top Selling Products</h2>
+            </div>
+            <div className="space-y-3">
+                {topProducts.map((p, idx) => (
+                    <div key={idx} className="flex justify-between items-center p-2 bg-white dark:bg-slate-800 rounded shadow-sm">
+                        <div className="flex items-center gap-3">
+                            <span className="font-bold text-lg text-indigo-300 w-4">{idx + 1}</span>
+                            <div>
+                                <p className="font-bold text-sm text-gray-800 dark:text-gray-200">{p.name}</p>
+                                <p className="text-xs text-gray-500">{p.quantity} units sold</p>
+                            </div>
+                        </div>
+                        <p className="font-bold text-indigo-600 dark:text-indigo-400">₹{p.revenue.toLocaleString('en-IN')}</p>
                     </div>
                 ))}
             </div>
@@ -835,10 +903,23 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             )}
             
             {/* Header Section */}
-            <div className="mb-4 sm:mb-6">
-                <h1 className="text-2xl sm:text-3xl font-bold text-primary tracking-tight">
-                    Dashboard
-                </h1>
+            <div className="flex flex-row items-center justify-between gap-2 relative mb-6">
+                <div className="flex-shrink-0">
+                     <span className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm cursor-default flex flex-col items-start gap-0.5 max-w-full">
+                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{getTimeBasedGreeting()},</span>
+                        <strong className="truncate max-w-[120px] sm:max-w-[150px] text-sm">{profile?.ownerName || 'Owner'}</strong>
+                    </span>
+                </div>
+
+                <div className="flex-grow text-center">
+                    <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
+                        Dashboard
+                    </h1>
+                </div>
+                
+                <div className="flex-shrink-0">
+                    <DatePill />
+                </div>
             </div>
 
             {/* Install Prompt Banner - Shows if installable AND NOT dismissed this session */}
@@ -905,11 +986,11 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <MetricCard icon={IndianRupee} title="SALES" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-primary/5 dark:bg-primary/10" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
-                <MetricCard icon={Package} title="PURCHASES" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-blue-50 dark:bg-blue-900/20" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
-                <MetricCard icon={User} title="CUST. DUES" value={stats.totalCustomerDues} subValue="Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
-                <MetricCard icon={ShoppingCart} title="MY PAYABLES" value={stats.totalSupplierDues} subValue="Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <MetricCard icon={IndianRupee} title="Sales" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-primary/5 dark:bg-primary/10" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
+                <MetricCard icon={Package} title="Purchases" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-blue-50 dark:bg-blue-900/20" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
+                <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Total Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
+                <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Total Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -918,7 +999,10 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                 <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
+                 <div className="flex flex-col gap-6">
+                    <TopProductsCard sales={sales} />
+                    <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
+                 </div>
                  <div className="space-y-6">
                     <Card title="Data Management">
                         <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />

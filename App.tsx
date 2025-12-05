@@ -1,29 +1,16 @@
-import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+
+import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, Suspense } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download, Sun, Moon, CalendarClock
+  X, Download, Sun, Moon, CalendarClock, WifiOff
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
 import { Page } from './types';
 
-// Pages
-import Dashboard from './pages/Dashboard';
-import CustomersPage from './pages/CustomersPage';
-import SalesPage from './pages/SalesPage';
-import PurchasesPage from './pages/PurchasesPage';
-import ProductsPage from './pages/ProductsPage';
-import ReportsPage from './pages/ReportsPage';
-import ReturnsPage from './pages/ReturnsPage';
-import InsightsPage from './pages/InsightsPage';
-import ExpensesPage from './pages/ExpensesPage';
-import QuotationsPage from './pages/QuotationsPage';
-import InvoiceDesigner from './pages/InvoiceDesigner';
-import SystemOptimizerPage from './pages/SystemOptimizerPage';
-
-// Components
+// Components (Eager Load)
 import MenuPanel from './components/MenuPanel';
 import NotificationsPanel from './components/NotificationsPanel';
 import AskAIModal from './components/AskAIModal';
@@ -42,6 +29,20 @@ import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
 import { APP_VERSION } from './utils/changelogData';
+
+// Pages (Lazy Load for Performance)
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const CustomersPage = React.lazy(() => import('./pages/CustomersPage'));
+const SalesPage = React.lazy(() => import('./pages/SalesPage'));
+const PurchasesPage = React.lazy(() => import('./pages/PurchasesPage'));
+const ProductsPage = React.lazy(() => import('./pages/ProductsPage'));
+const ReportsPage = React.lazy(() => import('./pages/ReportsPage'));
+const ReturnsPage = React.lazy(() => import('./pages/ReturnsPage'));
+const InsightsPage = React.lazy(() => import('./pages/InsightsPage'));
+const ExpensesPage = React.lazy(() => import('./pages/ExpensesPage'));
+const QuotationsPage = React.lazy(() => import('./pages/QuotationsPage'));
+const InvoiceDesigner = React.lazy(() => import('./pages/InvoiceDesigner'));
+const SystemOptimizerPage = React.lazy(() => import('./pages/SystemOptimizerPage'));
 
 // Icon Map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -390,6 +391,11 @@ const AppContent: React.FC = () => {
         setIsMenuOpen(false);
     };
 
+    const toggleTheme = () => {
+        const newTheme = state.theme === 'light' ? 'dark' : 'light';
+        dispatch({ type: 'SET_THEME', payload: newTheme });
+    };
+
     if (!isDbLoaded) return <AppSkeletonLoader />;
 
     // Main Content Class Logic
@@ -440,36 +446,58 @@ const AppContent: React.FC = () => {
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
                                     {state.profile?.name || 'Business Manager'}
                                 </h1>
-                                {state.googleUser && (
-                                    <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
-                                        <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">
-                                            {state.googleUser.name}
-                                        </span>
-                                        
-                                        {/* Status Dot */}
-                                        <div className="relative flex h-2 w-2 shrink-0">
-                                          {state.syncStatus === 'syncing' && (
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                          )}
-                                          <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'error' ? 'bg-red-500' : 'bg-green-400'} shadow-sm`}></span>
-                                        </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
+                                    {state.googleUser ? (
+                                        <>
+                                            <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">
+                                                {state.googleUser.name}
+                                            </span>
+                                            
+                                            {/* Status Dot */}
+                                            <div className="relative flex h-2 w-2 shrink-0">
+                                              {state.syncStatus === 'syncing' && (
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                              )}
+                                              <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'error' ? 'bg-red-500' : 'bg-green-400'} shadow-sm`}></span>
+                                            </div>
 
-                                        {/* Sync Time */}
-                                        <span className="text-[9px] sm:text-[10px] font-mono text-white/80 font-medium tracking-wide">
-                                            {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true}) : 'Connected'}
-                                        </span>
-                                    </div>
-                                )}
+                                            {/* Sync Time */}
+                                            <span className="text-[9px] sm:text-[10px] font-mono text-white/80 font-medium tracking-wide">
+                                                {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true}) : 'Connected'}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-[10px] sm:text-xs text-white/80">Local Mode</span>
+                                    )}
+                                </div>
                             </button>
                         </div>
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-1 sm:gap-2 z-20">
+                            {/* Offline Indicator - Only visible when offline */}
+                            {!state.isOnline && (
+                                <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-red-500/20 rounded-full border border-red-400/50 mr-1 animate-pulse">
+                                    <WifiOff size={14} className="text-white" />
+                                    <span className="text-[10px] font-bold text-white">Offline</span>
+                                </div>
+                            )}
+
+                            {/* Theme Toggle Button - New */}
+                            <button 
+                                onClick={toggleTheme}
+                                className="p-2 hover:bg-white/20 rounded-full transition-colors hidden sm:block"
+                                title="Toggle Theme"
+                            >
+                                {state.theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+                            </button>
+
                             {/* Cloud Sync / Sign In Button */}
                             <button 
                                 onClick={() => { 
                                     if (!state.googleUser) {
-                                        setIsSignInModalOpen(true);
+                                        if (state.isOnline) setIsSignInModalOpen(true);
+                                        else showToast("Connect to internet to sign in.", "error");
                                     } else {
                                         syncData(); 
                                     }
@@ -527,6 +555,7 @@ const AppContent: React.FC = () => {
                             <span>{getTimeBasedGreeting()}, <span className="font-bold">{state.profile?.ownerName || 'Owner'}</span></span>
                         </div>
                         <div className="flex-1 text-right opacity-90 truncate pl-2 flex items-center justify-end gap-2">
+                            {!state.isOnline && <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded sm:hidden">OFFLINE</span>}
                             <CalendarClock className="w-4 h-4 text-white/80" />
                             {currentDateTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} {currentDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -537,18 +566,20 @@ const AppContent: React.FC = () => {
             {/* Main Content Area */}
             <main className={`flex-grow w-full ${mainClass}`}>
                 <div className={`mx-auto ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'p-4 pb-32 max-w-7xl'}`}>
-                    {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
-                    {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
-                    {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'PURCHASES' && <PurchasesPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
-                    {currentPage === 'PRODUCTS' && <ProductsPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'REPORTS' && <ReportsPage setCurrentPage={handleNavigation} />}
-                    {currentPage === 'RETURNS' && <ReturnsPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'INSIGHTS' && <InsightsPage setCurrentPage={handleNavigation} />}
-                    {currentPage === 'EXPENSES' && <ExpensesPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'QUOTATIONS' && <QuotationsPage />}
-                    {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
-                    {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
+                    <Suspense fallback={<AppSkeletonLoader />}>
+                        {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
+                        {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                        {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'PURCHASES' && <PurchasesPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                        {currentPage === 'PRODUCTS' && <ProductsPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'REPORTS' && <ReportsPage setCurrentPage={handleNavigation} />}
+                        {currentPage === 'RETURNS' && <ReturnsPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'INSIGHTS' && <InsightsPage setCurrentPage={handleNavigation} />}
+                        {currentPage === 'EXPENSES' && <ExpensesPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'QUOTATIONS' && <QuotationsPage />}
+                        {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                        {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
+                    </Suspense>
                 </div>
             </main>
 

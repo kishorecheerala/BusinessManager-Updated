@@ -37,6 +37,8 @@ export interface Customer {
   address: string;
   area: string;
   reference?: string;
+  loyaltyPoints?: number; // New: Loyalty Points Balance
+  priceTier?: 'RETAIL' | 'WHOLESALE'; // New: Customer Pricing Tier
 }
 
 export interface Supplier {
@@ -66,7 +68,9 @@ export interface Product {
   quantity: number;
   purchasePrice: number;
   salePrice: number;
+  wholesalePrice?: number; // New: Wholesale Price
   gstPercent: number;
+  unit?: string; // New: Unit of Measurement (Pcs, Kg, Mtr, etc.)
   image?: string; // Base64 encoded image (Main)
   additionalImages?: string[]; // New: Multiple images
   batches?: ProductBatch[]; 
@@ -88,6 +92,8 @@ export interface Sale {
   totalAmount: number;
   date: string; // ISO string
   payments: Payment[];
+  loyaltyPointsUsed?: number; // New: Points redeemed
+  loyaltyPointsEarned?: number; // New: Points awarded
 }
 
 export interface QuoteItem {

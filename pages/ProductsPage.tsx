@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal, FileSpreadsheet, TrendingUp, Scale, Settings } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -13,6 +13,8 @@ import { Html5Qrcode } from 'html5-qrcode';
 import EmptyState from '../components/EmptyState';
 import { useDialog } from '../context/DialogContext';
 import ImageCropperModal from '../components/ImageCropperModal';
+import { GoogleGenAI } from "@google/genai";
+import StockAdjustmentModal from '../components/StockAdjustmentModal';
 
 interface ProductsPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -31,6 +33,7 @@ const dataURLtoFile = (dataurl: string, filename: string) => {
     return new File([u8arr], filename, { type: mime });
 };
 
+// --- QR Scanner Modal Component ---
 const QRScannerModal: React.FC<{
     onClose: () => void;
     onScanned: (decodedText: string) => void;
@@ -109,7 +112,13 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
     const [isBatchBarcodeModalOpen, setIsBatchBarcodeModalOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [isCropperOpen, setIsCropperOpen] = useState(false);
+    const [tempImageForCrop, setTempImageForCrop] = useState<string | null>(null);
+    const [isStockAdjustOpen, setIsStockAdjustOpen] = useState(false);
     
+    const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
+    const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
+
     const isDirtyRef = useRef(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -192,6 +201,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         );
     }, [state.products, searchTerm]);
 
+    // Inventory Value Calculation
+    const inventoryStats = useMemo(() => {
+        const totalValue = state.products.reduce((sum, p) => sum + (p.quantity * p.purchasePrice), 0);
+        const totalCount = state.products.length;
+        const lowStock = state.products.filter(p => p.quantity < 5).length;
+        return { totalValue, totalCount, lowStock };
+    }, [state.products]);
+
     const toggleSelection = (id: string) => {
         const newSet = new Set(selectedIds);
         if (newSet.has(id)) newSet.delete(id);
@@ -222,6 +239,22 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         if (selectedIds.size > 0) {
             setIsBatchBarcodeModalOpen(true);
         }
+    };
+
+    const handleExportCSV = () => {
+        const headers = ['ID', 'Name', 'Category', 'Unit', 'Quantity', 'Purchase Price', 'Sale Price', 'Wholesale Price', 'GST %', 'Description'];
+        const rows = state.products.map(p => 
+            `"${p.id}","${p.name}","${p.category || ''}","${p.unit || 'Pcs'}",${p.quantity},${p.purchasePrice},${p.salePrice},${p.wholesalePrice || p.salePrice},${p.gstPercent},"${p.description || ''}"`
+        );
+        const csvContent = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `inventory_export_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const handleBulkShare = async () => {
@@ -291,39 +324,36 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     };
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files.length > 0 && editedProduct) {
-            const newImages: string[] = [];
-            const files = e.target.files;
-            
-            for (let i = 0; i < files.length; i++) {
-                try {
-                    const file = files[i];
-                    const base64 = await compressImage(file, 800, 0.8);
-                    if (typeof base64 === 'string') {
-                        newImages.push(base64);
-                    }
-                } catch (err: any) {
-                    console.error("Image upload failed", err);
-                }
+        if (e.target.files && e.target.files[0]) {
+            try {
+                const file = e.target.files[0];
+                const base64 = await compressImage(file, 1200, 0.9); // Get high quality first
+                setTempImageForCrop(base64);
+                setIsCropperOpen(true);
+            } catch (err: any) {
+                console.error("Image upload failed", err);
+                showToast("Failed to load image.", 'error');
+            } finally {
+                if (fileInputRef.current) fileInputRef.current.value = '';
             }
-            
-            // If primary image is empty, use first new image
-            let updatedProduct = { ...editedProduct };
-            
-            if (!updatedProduct.image && newImages.length > 0) {
-                updatedProduct.image = newImages[0];
-                // Add rest to additional
-                if (newImages.length > 1) {
-                    const currentAdditional: string[] = updatedProduct.additionalImages || [];
-                    updatedProduct.additionalImages = [...currentAdditional, ...newImages.slice(1)];
-                }
-            } else {
-                const currentAdditional: string[] = updatedProduct.additionalImages || [];
-                updatedProduct.additionalImages = [...currentAdditional, ...newImages];
-            }
-            
-            setEditedProduct(updatedProduct);
         }
+    };
+
+    const handleCroppedImage = (croppedBase64: string) => {
+        if (!editedProduct) return;
+        
+        let updatedProduct = { ...editedProduct };
+        
+        if (!updatedProduct.image) {
+            updatedProduct.image = croppedBase64;
+        } else {
+            const currentAdditional: string[] = updatedProduct.additionalImages || [];
+            updatedProduct.additionalImages = [...currentAdditional, croppedBase64];
+        }
+        
+        setEditedProduct(updatedProduct);
+        setIsCropperOpen(false);
+        setTempImageForCrop(null);
     };
 
     const setMainImage = (img: string) => {
@@ -411,6 +441,92 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         window.open(url, '_blank');
     };
     
+    // AI Description Generation
+    const handleAIGenerateDescription = async () => {
+        if (!editedProduct || !editedProduct.name) {
+            showToast("Product Name is required to generate description.", 'error');
+            return;
+        }
+        
+        setIsGeneratingDesc(true);
+        try {
+            // Fix: Cast process.env to any to avoid type errors
+            const apiKey = (process.env as any).API_KEY || localStorage.getItem('gemini_api_key') || '';
+            
+            if (!apiKey) throw new Error("API Key not available");
+            
+            const ai = new GoogleGenAI({ apiKey });
+            const prompt = `Write a professional and catchy 2-sentence sales description for a product named "${editedProduct.name}" in category "${editedProduct.category || 'General'}". The description should highlight quality and value. Keep it under 50 words.`;
+            
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt
+            });
+            
+            const text = response.text;
+            if (text) {
+                setEditedProduct(prev => prev ? ({ ...prev, description: text }) : null);
+                showToast("Description generated!");
+            }
+        } catch (error: any) {
+            console.error("AI Gen Error", error);
+            showToast("Failed to generate description. Check network/API key.", 'error');
+        } finally {
+            setIsGeneratingDesc(false);
+        }
+    };
+
+    // AI Price Suggestion
+    const handleAIGeneratePrice = async () => {
+        if (!editedProduct || !editedProduct.purchasePrice) {
+            showToast("Need a valid Purchase Price to suggest selling price.", 'error');
+            return;
+        }
+
+        setIsSuggestingPrice(true);
+        try {
+            // Fix: Cast process.env to any to avoid type errors
+            const apiKey = (process.env as any).API_KEY || localStorage.getItem('gemini_api_key') || '';
+            
+            if (!apiKey) throw new Error("API Key not available");
+
+            const ai = new GoogleGenAI({ apiKey });
+            const prompt = `I bought a product named "${editedProduct.name}" (${editedProduct.category || 'General'}) for ${editedProduct.purchasePrice}. 
+            Suggest a competitive selling price with a 25-45% profit margin range. 
+            Return ONLY the suggested price number (e.g. 500).`;
+
+            const response = await ai.models.generateContent({
+                model: 'gemini-2.5-flash',
+                contents: prompt
+            });
+
+            const text = response.text;
+            const priceText = text ? text.trim() : '';
+            const suggestedPrice = parseFloat(priceText.replace(/[^0-9.]/g, ''));
+
+            if (!isNaN(suggestedPrice)) {
+                setEditedProduct(prev => prev ? ({ ...prev, salePrice: suggestedPrice }) : null);
+                showToast(`Suggested Price: ${suggestedPrice} (Based on standard margins)`, 'success');
+            } else {
+                throw new Error("AI returned invalid number");
+            }
+        } catch (error: any) {
+            console.error("AI Price Error", error);
+            showToast("Failed to suggest price.", 'error');
+        } finally {
+            setIsSuggestingPrice(false);
+        }
+    };
+
+    // Calculate Margin for display
+    const calculateMargin = (buy: number, sell: number) => {
+        if (!buy || !sell) return 0;
+        return ((sell - buy) / sell) * 100;
+    };
+
+    const marginPercent = editedProduct ? calculateMargin(editedProduct.purchasePrice, editedProduct.salePrice) : 0;
+    const marginColor = marginPercent < 20 ? 'text-red-500' : marginPercent > 40 ? 'text-green-600' : 'text-amber-600';
+
     // Render Logic for Detail View
     if (selectedProduct && editedProduct) {
         return (
@@ -418,6 +534,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 ref={detailContainerRef}
                 className="fixed inset-0 w-full h-full z-[5000] bg-white dark:bg-slate-900 flex flex-col md:flex-row overflow-hidden animate-fade-in-fast"
             >
+                {isCropperOpen && (
+                    <ImageCropperModal
+                        isOpen={isCropperOpen}
+                        imageSrc={tempImageForCrop}
+                        onClose={() => { setIsCropperOpen(false); setTempImageForCrop(null); }}
+                        onCrop={handleCroppedImage}
+                    />
+                )}
                 {isBarcodeModalOpen && (
                     <BarcodeModal 
                         isOpen={isBarcodeModalOpen} 
@@ -587,7 +711,16 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
                                         <div className="flex justify-between items-center mb-1">
-                                            <label className="text-xs font-bold text-gray-500 uppercase">Sale Price</label>
+                                            <label className="text-xs font-bold text-gray-500 uppercase">Sale Price (Retail)</label>
+                                            <button 
+                                                onClick={handleAIGeneratePrice}
+                                                disabled={isSuggestingPrice || !editedProduct.purchasePrice}
+                                                className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 hover:underline disabled:opacity-50"
+                                                title="Suggest price based on purchase cost"
+                                            >
+                                                {isSuggestingPrice ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                                                Magic Price
+                                            </button>
                                         </div>
                                         <input 
                                             type="number" 
@@ -595,20 +728,42 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                             onChange={e => setEditedProduct({...editedProduct, salePrice: parseFloat(e.target.value) || 0})}
                                             className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                         />
+                                        {/* Margin Display */}
+                                        <div className={`text-xs mt-1 font-bold ${marginColor}`}>
+                                            Margin: {marginPercent.toFixed(1)}%
+                                        </div>
                                     </div>
                                     <div>
-                                        <label className="text-xs font-bold text-gray-500 uppercase">Stock Qty</label>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Wholesale Price</label>
                                         <input 
                                             type="number" 
-                                            value={editedProduct.quantity} 
-                                            onChange={e => setEditedProduct({...editedProduct, quantity: parseFloat(e.target.value) || 0})}
-                                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold"
+                                            value={editedProduct.wholesalePrice || ''} 
+                                            onChange={e => setEditedProduct({...editedProduct, wholesalePrice: parseFloat(e.target.value) || 0})}
+                                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white font-medium"
+                                            placeholder="Optional"
                                         />
                                     </div>
                                 </div>
                                 <div>
+                                    <label className="text-xs font-bold text-gray-500 uppercase">Stock Qty</label>
+                                    <input 
+                                        type="number" 
+                                        value={editedProduct.quantity} 
+                                        onChange={e => setEditedProduct({...editedProduct, quantity: parseFloat(e.target.value) || 0})}
+                                        className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white font-bold"
+                                    />
+                                </div>
+                                <div>
                                     <div className="flex justify-between items-center mb-1">
                                         <label className="text-xs font-bold text-gray-500 uppercase">Description</label>
+                                        <button 
+                                            onClick={handleAIGenerateDescription}
+                                            disabled={isGeneratingDesc}
+                                            className="text-xs text-indigo-600 dark:text-indigo-400 flex items-center gap-1 hover:underline disabled:opacity-50"
+                                        >
+                                            {isGeneratingDesc ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                                            {isGeneratingDesc ? 'Writing...' : 'Magic Write'}
+                                        </button>
                                     </div>
                                     <textarea 
                                         rows={4}
@@ -629,6 +784,24 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                         />
                                     </div>
                                     <div>
+                                        <label className="text-xs font-bold text-gray-500 uppercase">Unit (UOM)</label>
+                                        <select 
+                                            value={editedProduct.unit || 'Pcs'} 
+                                            onChange={e => setEditedProduct({...editedProduct, unit: e.target.value})}
+                                            className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                                        >
+                                            <option value="Pcs">Pieces (Pcs)</option>
+                                            <option value="Kg">Kilogram (Kg)</option>
+                                            <option value="Gm">Gram (Gm)</option>
+                                            <option value="Ltr">Liter (Ltr)</option>
+                                            <option value="Ml">Milliliter (Ml)</option>
+                                            <option value="Mtr">Meter (Mtr)</option>
+                                            <option value="Box">Box</option>
+                                            <option value="Set">Set</option>
+                                            <option value="Dzn">Dozen</option>
+                                        </select>
+                                    </div>
+                                    <div>
                                         <label className="text-xs font-bold text-gray-500 uppercase">Purchase Price</label>
                                         <input 
                                             type="number" 
@@ -646,6 +819,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                     <div className="flex items-center gap-2">
                                         <span className="bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 px-2 py-0.5 rounded text-xs font-mono">{editedProduct.id}</span>
                                         {editedProduct.category && <span className="bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-300 px-2 py-0.5 rounded text-xs font-bold uppercase">{editedProduct.category}</span>}
+                                        {editedProduct.unit && <span className="bg-orange-50 dark:bg-orange-900/30 text-orange-600 dark:text-orange-300 px-2 py-0.5 rounded text-xs font-bold">{editedProduct.unit}</span>}
                                     </div>
                                 </div>
 
@@ -653,12 +827,17 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                     <div>
                                         <p className="text-xs text-gray-500 uppercase mb-1">Price</p>
                                         <p className="text-2xl font-bold text-primary">₹{editedProduct.salePrice.toLocaleString('en-IN')}</p>
+                                        {editedProduct.wholesalePrice && (
+                                            <p className="text-xs text-gray-500 mt-1">
+                                                Wholesale: <strong>₹{editedProduct.wholesalePrice.toLocaleString('en-IN')}</strong>
+                                            </p>
+                                        )}
                                     </div>
                                     <div className="w-px bg-gray-300 dark:bg-slate-600"></div>
                                     <div>
                                         <p className="text-xs text-gray-500 uppercase mb-1">Stock</p>
                                         <p className={`text-2xl font-bold ${editedProduct.quantity < 5 ? 'text-red-500' : 'text-gray-700 dark:text-white'}`}>
-                                            {editedProduct.quantity}
+                                            {editedProduct.quantity} <span className="text-sm font-normal text-gray-500">{editedProduct.unit || 'Pcs'}</span>
                                         </p>
                                     </div>
                                 </div>
@@ -688,6 +867,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
 
     return (
         <div className="space-y-4 animate-fade-in-fast h-full flex flex-col">
+            {isStockAdjustOpen && <StockAdjustmentModal isOpen={isStockAdjustOpen} onClose={() => setIsStockAdjustOpen(false)} />}
             {isBarcodeModalOpen && selectedProduct && (
                 <BarcodeModal 
                     isOpen={isBarcodeModalOpen} 
@@ -730,6 +910,23 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 />
             )}
 
+            {/* Inventory Summary Header */}
+            <div className="bg-indigo-50 dark:bg-indigo-900/20 p-3 rounded-xl border border-indigo-100 dark:border-indigo-800 flex justify-between items-center text-sm mb-2 shrink-0">
+                <div className="flex gap-4">
+                    <span className="text-indigo-800 dark:text-indigo-200">
+                        <span className="font-bold">Total Items:</span> {inventoryStats.totalCount}
+                    </span>
+                    <span className="text-indigo-800 dark:text-indigo-200">
+                        <span className="font-bold">Inventory Value:</span> ₹{inventoryStats.totalValue.toLocaleString('en-IN')}
+                    </span>
+                </div>
+                {inventoryStats.lowStock > 0 && (
+                    <span className="text-red-600 dark:text-red-400 font-bold flex items-center gap-1 text-xs bg-red-100 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
+                        <AlertTriangle size={12} /> {inventoryStats.lowStock} Low Stock
+                    </span>
+                )}
+            </div>
+
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-primary">Products</h1>
@@ -753,6 +950,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                         </button>
                     </div>
 
+                    <Button onClick={handleExportCSV} variant="secondary" className="px-3" title="Export CSV">
+                        <FileSpreadsheet size={18} />
+                    </Button>
+
+                    <Button onClick={() => setIsStockAdjustOpen(true)} variant="secondary" className="px-3 bg-amber-100 text-amber-800 hover:bg-amber-200 border-amber-200 dark:bg-amber-900/30 dark:text-amber-200" title="Stock Adjustment">
+                        <Scale size={18} />
+                    </Button>
+
                     <Button onClick={() => {
                         const newProd: Product = {
                             id: `PROD-${Date.now()}`,
@@ -760,7 +965,8 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             quantity: 0,
                             purchasePrice: 0,
                             salePrice: 0,
-                            gstPercent: 0
+                            gstPercent: 0,
+                            unit: 'Pcs'
                         };
                         setSelectedProduct(newProd);
                         setEditedProduct(newProd);
@@ -862,7 +1068,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             <div className="text-right flex-shrink-0">
                                 <p className="font-bold text-primary">₹{product.salePrice.toLocaleString('en-IN')}</p>
                                 <p className={`text-xs font-medium ${product.quantity < 5 ? 'text-red-500' : 'text-gray-500'}`}>
-                                    {product.quantity} in stock
+                                    {product.quantity} {product.unit || ''}
                                 </p>
                             </div>
                         </div>
@@ -919,7 +1125,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 <h3 className="font-bold text-sm text-gray-800 dark:text-white truncate mb-1">{product.name}</h3>
                                 <div className="flex justify-between items-center">
                                     <span className="text-primary font-bold text-sm">₹{product.salePrice}</span>
-                                    <span className="text-xs text-gray-500">{product.quantity} left</span>
+                                    <span className="text-xs text-gray-500">{product.quantity} {product.unit || ''}</span>
                                 </div>
                             </div>
                         </div>

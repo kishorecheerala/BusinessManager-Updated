@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Plus, UserPlus, ShoppingCart, PackagePlus, Undo2, FileText, Receipt } from 'lucide-react';
 import { Page } from '../types';

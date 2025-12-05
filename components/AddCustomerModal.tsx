@@ -4,7 +4,7 @@ import Card from './Card';
 import Button from './Button';
 import { Customer } from '../types';
 import { useAppContext } from '../context/AppContext';
-import { X, User, Phone, MapPin, FileText, Hash } from 'lucide-react';
+import { X, User, Phone, MapPin, FileText, Hash, Tag } from 'lucide-react';
 
 interface AddCustomerModalProps {
     isOpen: boolean;
@@ -15,7 +15,7 @@ interface AddCustomerModalProps {
 
 const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, onAdd, existingCustomers }) => {
     const { showToast } = useAppContext();
-    const [newCustomer, setNewCustomer] = useState({ id: '', name: '', phone: '', address: '', area: '', reference: '' });
+    const [newCustomer, setNewCustomer] = useState({ id: '', name: '', phone: '', address: '', area: '', reference: '', priceTier: 'RETAIL' as 'RETAIL' | 'WHOLESALE' });
 
     const handleSave = () => {
         const trimmedId = newCustomer.id.trim();
@@ -42,15 +42,16 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
             address: newCustomer.address,
             area: newCustomer.area,
             id: finalId,
-            reference: newCustomer.reference || ''
+            reference: newCustomer.reference || '',
+            priceTier: newCustomer.priceTier
         };
         
         onAdd(customerWithId);
-        setNewCustomer({ id: '', name: '', phone: '', address: '', area: '', reference: '' });
+        setNewCustomer({ id: '', name: '', phone: '', address: '', area: '', reference: '', priceTier: 'RETAIL' });
         onClose();
     };
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setNewCustomer({ ...newCustomer, [e.target.name]: e.target.value });
     };
 
@@ -155,15 +156,19 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Reference</label>
-                                <input 
-                                    type="text" 
-                                    name="reference"
-                                    placeholder="Optional" 
-                                    value={newCustomer.reference} 
-                                    onChange={handleInputChange} 
-                                    className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
-                                />
+                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Pricing Tier</label>
+                                <div className="relative">
+                                    <select 
+                                        name="priceTier" 
+                                        value={newCustomer.priceTier} 
+                                        onChange={handleInputChange} 
+                                        className="w-full p-3 pl-10 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all appearance-none"
+                                    >
+                                        <option value="RETAIL">Retail</option>
+                                        <option value="WHOLESALE">Wholesale</option>
+                                    </select>
+                                    <Tag size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
+                                </div>
                             </div>
                         </div>
                     </div>

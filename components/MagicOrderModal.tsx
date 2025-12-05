@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { X, Wand2, Loader2, ArrowRight } from 'lucide-react';
+import { X, Wand2, Loader2, ArrowRight, WifiOff } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import Card from './Card';
 import Button from './Button';
@@ -15,12 +15,16 @@ interface MagicOrderModalProps {
 }
 
 const MagicOrderModal: React.FC<MagicOrderModalProps> = ({ isOpen, onClose, products, onItemsParsed }) => {
-    const { showToast } = useAppContext();
+    const { state, showToast } = useAppContext();
     const [inputText, setInputText] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
 
     const handleProcess = async () => {
         if (!inputText.trim()) return;
+        if (!state.isOnline) {
+            showToast("You are offline.", 'error');
+            return;
+        }
 
         setIsProcessing(true);
         try {
@@ -103,30 +107,40 @@ const MagicOrderModal: React.FC<MagicOrderModalProps> = ({ isOpen, onClose, prod
                 </div>
 
                 <div className="p-6 space-y-4">
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Paste an order from WhatsApp, SMS, or Email. AI will match products and quantities automatically.
-                    </p>
-                    
-                    <textarea 
-                        value={inputText}
-                        onChange={(e) => setInputText(e.target.value)}
-                        placeholder="e.g., I need 2 Blue Silk Sarees and 1 Cotton Kurti (L)"
-                        className="w-full h-32 p-3 border rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-violet-500 outline-none resize-none"
-                    />
+                    {state.isOnline ? (
+                        <>
+                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                                Paste an order from WhatsApp, SMS, or Email. AI will match products and quantities automatically.
+                            </p>
+                            
+                            <textarea 
+                                value={inputText}
+                                onChange={(e) => setInputText(e.target.value)}
+                                placeholder="e.g., I need 2 Blue Silk Sarees and 1 Cotton Kurti (L)"
+                                className="w-full h-32 p-3 border rounded-xl dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-violet-500 outline-none resize-none"
+                            />
 
-                    <div className="flex justify-end pt-2">
-                        <Button 
-                            onClick={handleProcess} 
-                            disabled={isProcessing || !inputText.trim()}
-                            className="bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-200 dark:shadow-none"
-                        >
-                            {isProcessing ? (
-                                <><Loader2 size={18} className="mr-2 animate-spin" /> Processing...</>
-                            ) : (
-                                <><Wand2 size={18} className="mr-2" /> Convert to Items <ArrowRight size={16} className="ml-1" /></>
-                            )}
-                        </Button>
-                    </div>
+                            <div className="flex justify-end pt-2">
+                                <Button 
+                                    onClick={handleProcess} 
+                                    disabled={isProcessing || !inputText.trim()}
+                                    className="bg-violet-600 hover:bg-violet-700 text-white shadow-lg shadow-violet-200 dark:shadow-none"
+                                >
+                                    {isProcessing ? (
+                                        <><Loader2 size={18} className="mr-2 animate-spin" /> Processing...</>
+                                    ) : (
+                                        <><Wand2 size={18} className="mr-2" /> Convert to Items <ArrowRight size={16} className="ml-1" /></>
+                                    )}
+                                </Button>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center py-8 text-gray-500 gap-3">
+                            <WifiOff size={40} />
+                            <p className="text-center text-sm font-medium">Magic Paste requires an internet connection.</p>
+                            <Button onClick={onClose} variant="secondary">Close</Button>
+                        </div>
+                    )}
                 </div>
             </Card>
         </div>
