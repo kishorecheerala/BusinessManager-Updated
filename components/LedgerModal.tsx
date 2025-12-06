@@ -208,8 +208,8 @@ const LedgerModal: React.FC<LedgerModalProps> = ({ isOpen, onClose, partyId, par
     if (!isOpen || !party) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[200] p-4 animate-fade-in-fast backdrop-blur-sm">
-            <Card className="w-full max-w-4xl h-[90vh] sm:h-[85vh] flex flex-col p-0 overflow-hidden animate-scale-in border-none shadow-2xl">
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[300] p-0 sm:p-4 animate-fade-in-fast backdrop-blur-sm">
+            <Card className="w-full max-w-4xl h-full sm:h-[85vh] flex flex-col p-0 overflow-hidden animate-scale-in border-none shadow-2xl rounded-none sm:rounded-lg hover:scale-100 transition-none">
                 {/* Header */}
                 <div className="bg-slate-800 text-white p-4 flex justify-between items-center shrink-0">
                     <div>
