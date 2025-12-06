@@ -47,14 +47,17 @@
       }
       .pre-loader-om {
           font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-          font-size: 350px !important;
+          font-size: 300px !important;
           line-height: 1;
           font-weight: 700;
           color: rgb(var(--primary-color));
           animation: pulse-om 3s ease-in-out infinite;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.05);
+          /* Subtle Glow */
+          text-shadow: 0 0 20px rgba(var(--primary-color), 0.2); 
           margin-bottom: 32px;
           user-select: none;
+          display: block;
+          will-change: transform, opacity;
       }
       .pre-loader-info {
           display: flex;
@@ -94,15 +97,31 @@
       }
       .pre-loader-bar-fill {
           height: 100%;
-          background: linear-gradient(to right, rgb(var(--primary-color) / 0.4), rgb(var(--primary-color)));
+          /* Use fallback color for gradients to ensure visibility */
+          background: rgb(var(--primary-color)); 
+          background: linear-gradient(to right, rgba(var(--primary-color), 0.4), rgb(var(--primary-color)));
           width: 100%;
           transform-origin: left;
           animation: progress-indeterminate 1.5s infinite ease-in-out;
       }
+
+      /* Animation Keyframes */
       @keyframes pulse-om {
-          0% { transform: scale(0.95); opacity: 0.85; filter: drop-shadow(0 0 2px rgb(var(--primary-color) / 0.1)); }
-          50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 10px rgb(var(--primary-color) / 0.25)); }
-          100% { transform: scale(0.95); opacity: 0.85; filter: drop-shadow(0 0 2px rgb(var(--primary-color) / 0.1)); }
+          0% { 
+            transform: scale(0.95); 
+            opacity: 0.85; 
+            text-shadow: 0 0 15px rgba(var(--primary-color), 0.1);
+          }
+          50% { 
+            transform: scale(1.05); 
+            opacity: 1; 
+            text-shadow: 0 0 30px rgba(var(--primary-color), 0.3);
+          }
+          100% { 
+            transform: scale(0.95); 
+            opacity: 0.85; 
+            text-shadow: 0 0 15px rgba(var(--primary-color), 0.1);
+          }
       }
       @keyframes progress-indeterminate {
           0% { transform: translateX(-100%); }
