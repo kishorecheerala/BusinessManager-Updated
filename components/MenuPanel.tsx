@@ -189,7 +189,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
             data: 'GOOGLE_FONT_REF' // Marker
         };
         dispatch({ type: 'ADD_CUSTOM_FONT', payload: newFont });
-        dispatch({ type: 'SET_FONT', payload: fontName });
+        dispatch({ type: 'SET_FONT', payload: fontName }); // Auto-select
         setGoogleFontName('');
         showToast(`Loaded ${fontName} from Google Fonts!`);
     };
@@ -455,6 +455,12 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                     <button onClick={() => { onClose(); onNavigate('SYSTEM_OPTIMIZER'); }} className="menu-item">
                         <Gauge className="w-5 h-5 text-emerald-500" />
                         <span className="flex-grow text-sm font-medium">System Optimizer</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+
+                     <button onClick={() => { onClose(); onNavigate('TRASH'); }} className="menu-item text-red-600 dark:text-red-400">
+                        <Trash2 className="w-5 h-5" />
+                        <span className="flex-grow text-sm font-medium">Recycle Bin</span>
                         <ChevronRight className="w-4 h-4 text-gray-400" />
                     </button>
 

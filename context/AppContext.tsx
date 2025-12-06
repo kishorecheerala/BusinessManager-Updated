@@ -1,7 +1,6 @@
 
-
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences, SaleDraft, ParkedSale } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences, SaleDraft, ParkedSale, TrashItem } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
@@ -58,6 +57,9 @@ export interface AppState {
   // Sales Management State
   currentSale: SaleDraft;
   parkedSales: ParkedSale[];
+
+  // Trash
+  trash: TrashItem[];
   
   restoreFromFileId?: (fileId: string) => Promise<void>;
 }
@@ -119,7 +121,10 @@ type Action =
   | { type: 'PARK_CURRENT_SALE' }
   | { type: 'CLEAR_CURRENT_SALE' }
   | { type: 'RESUME_PARKED_SALE'; payload: ParkedSale }
-  | { type: 'DELETE_PARKED_SALE'; payload: string };
+  | { type: 'DELETE_PARKED_SALE'; payload: string }
+  // Trash Actions
+  | { type: 'RESTORE_FROM_TRASH'; payload: TrashItem }
+  | { type: 'PERMANENTLY_DELETE_FROM_TRASH'; payload: string };
 
 // Default Template to prevent crashes
 const DEFAULT_TEMPLATE: InvoiceTemplateConfig = {
@@ -243,6 +248,7 @@ const initialState: AppState = {
     
     currentSale: DEFAULT_SALE_DRAFT,
     parkedSales: localDefaults.parkedSales || [],
+    trash: []
 };
 
 // Logging helper
@@ -384,15 +390,17 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
         return { ...state, sales: updatedSalesList, products: adjustedProducts, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
-    case 'DELETE_SALE':
+    case 'DELETE_SALE': {
         const saleToDelete = state.sales.find(s => s.id === action.payload);
         if (!saleToDelete) return state;
 
+        // Restore Stock
         const restoredProducts = state.products.map(p => {
             const item = saleToDelete.items.find(i => i.productId === p.id);
             return item ? { ...p, quantity: p.quantity + item.quantity } : p;
         });
         
+        // Revert Loyalty Points
         let customersAfterDelete = [...state.customers];
         const delCustomerIdx = state.customers.findIndex(c => c.id === saleToDelete.customerId);
         if (delCustomerIdx >= 0) {
@@ -407,15 +415,32 @@ const appReducer = (state: AppState, action: Action): AppState => {
             };
         }
 
-        const filteredSales = state.sales.filter(s => s.id !== action.payload);
-        db.saveCollection('sales', filteredSales);
+        // Create Trash Item
+        const trashSale: TrashItem = {
+            id: saleToDelete.id,
+            originalStore: 'sales',
+            data: saleToDelete,
+            deletedAt: new Date().toISOString()
+        };
+
+        db.addToTrash(trashSale);
+        db.deleteFromStore('sales', saleToDelete.id);
         db.saveCollection('products', restoredProducts);
         db.saveCollection('customers', customersAfterDelete);
         
         newLog = logAction(state, 'Deleted Sale', `ID: ${action.payload}`);
         db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
-        return { ...state, sales: filteredSales, products: restoredProducts, customers: customersAfterDelete, audit_logs: [newLog, ...state.audit_logs], ...touch };
+        return { 
+            ...state, 
+            sales: state.sales.filter(s => s.id !== action.payload), 
+            products: restoredProducts, 
+            customers: customersAfterDelete, 
+            trash: [trashSale, ...state.trash],
+            audit_logs: [newLog, ...state.audit_logs], 
+            ...touch 
+        };
+    }
 
     case 'ADD_PAYMENT_TO_SALE':
         const salesWithPayment = state.sales.map(s => 
@@ -473,22 +498,40 @@ const appReducer = (state: AppState, action: Action): AppState => {
         db.saveCollection('purchases', updatedPurchasesList);
         return { ...state, purchases: updatedPurchasesList, ...touch };
 
-    case 'DELETE_PURCHASE':
+    case 'DELETE_PURCHASE': {
         const purchaseToDelete = state.purchases.find(p => p.id === action.payload);
         if (!purchaseToDelete) return state;
         
+        // Reduce Stock
         const reducedProducts = state.products.map(p => {
             const item = purchaseToDelete.items.find(i => i.productId === p.id);
             return item ? { ...p, quantity: Math.max(0, p.quantity - item.quantity) } : p;
         });
 
-        const filteredPurchases = state.purchases.filter(p => p.id !== action.payload);
-        db.saveCollection('purchases', filteredPurchases);
+        // Trash Logic
+        const trashPurchase: TrashItem = {
+            id: purchaseToDelete.id,
+            originalStore: 'purchases',
+            data: purchaseToDelete,
+            deletedAt: new Date().toISOString()
+        };
+
+        db.addToTrash(trashPurchase);
+        db.deleteFromStore('purchases', purchaseToDelete.id);
         db.saveCollection('products', reducedProducts);
+        
         newLog = logAction(state, 'Deleted Purchase', `ID: ${action.payload}`);
         db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
-        return { ...state, purchases: filteredPurchases, products: reducedProducts, audit_logs: [newLog, ...state.audit_logs], ...touch };
+        return { 
+            ...state, 
+            purchases: state.purchases.filter(p => p.id !== action.payload), 
+            products: reducedProducts, 
+            trash: [trashPurchase, ...state.trash],
+            audit_logs: [newLog, ...state.audit_logs], 
+            ...touch 
+        };
+    }
 
     case 'ADD_PAYMENT_TO_PURCHASE':
         const purchasesWithPayment = state.purchases.map(p => 
@@ -531,10 +574,27 @@ const appReducer = (state: AppState, action: Action): AppState => {
         db.saveCollection('expenses', [...state.expenses, newExpense]);
         return { ...state, expenses: [...state.expenses, newExpense], ...touch };
 
-    case 'DELETE_EXPENSE':
-        const filteredExpenses = state.expenses.filter(e => e.id !== action.payload);
-        db.saveCollection('expenses', filteredExpenses);
-        return { ...state, expenses: filteredExpenses, ...touch };
+    case 'DELETE_EXPENSE': {
+        const expenseToDelete = state.expenses.find(e => e.id === action.payload);
+        if (!expenseToDelete) return state;
+        
+        const trashExpense: TrashItem = {
+            id: expenseToDelete.id,
+            originalStore: 'expenses',
+            data: expenseToDelete,
+            deletedAt: new Date().toISOString()
+        };
+        
+        db.addToTrash(trashExpense);
+        db.deleteFromStore('expenses', expenseToDelete.id);
+        
+        return { 
+            ...state, 
+            expenses: state.expenses.filter(e => e.id !== action.payload), 
+            trash: [trashExpense, ...state.trash],
+            ...touch 
+        };
+    }
 
     case 'ADD_QUOTE':
         const newQuote = action.payload;
@@ -546,10 +606,54 @@ const appReducer = (state: AppState, action: Action): AppState => {
         db.saveCollection('quotes', updatedQuotes);
         return { ...state, quotes: updatedQuotes, ...touch };
 
-    case 'DELETE_QUOTE':
-        const filteredQuotes = state.quotes.filter(q => q.id !== action.payload);
-        db.saveCollection('quotes', filteredQuotes);
-        return { ...state, quotes: filteredQuotes, ...touch };
+    case 'DELETE_QUOTE': {
+        const quoteToDelete = state.quotes.find(q => q.id === action.payload);
+        if (!quoteToDelete) return state;
+
+        const trashQuote: TrashItem = {
+            id: quoteToDelete.id,
+            originalStore: 'quotes',
+            data: quoteToDelete,
+            deletedAt: new Date().toISOString()
+        };
+        
+        db.addToTrash(trashQuote);
+        db.deleteFromStore('quotes', quoteToDelete.id);
+
+        return { 
+            ...state, 
+            quotes: state.quotes.filter(q => q.id !== action.payload),
+            trash: [trashQuote, ...state.trash],
+            ...touch 
+        };
+    }
+
+    case 'RESTORE_FROM_TRASH': {
+        const trashItem = action.payload;
+        const storeName = trashItem.originalStore as StoreName;
+        const itemData = trashItem.data;
+        
+        // Add back to original store
+        db.saveCollection(storeName, [...(state as any)[storeName], itemData]);
+        
+        // Remove from trash
+        db.deleteFromStore('trash', trashItem.id);
+        
+        return {
+            ...state,
+            [storeName]: [...(state as any)[storeName], itemData],
+            trash: state.trash.filter(t => t.id !== trashItem.id),
+            ...touch
+        };
+    }
+
+    case 'PERMANENTLY_DELETE_FROM_TRASH':
+        db.deleteFromStore('trash', action.payload);
+        return {
+            ...state,
+            trash: state.trash.filter(t => t.id !== action.payload),
+            ...touch
+        };
 
     case 'ADD_NOTIFICATION':
         const newNotif = action.payload;
@@ -730,13 +834,14 @@ const appReducer = (state: AppState, action: Action): AppState => {
         
         return { ...state, notifications: cleanNotifs, audit_logs: cleanLogs };
 
-    case 'REPLACE_COLLECTION':
+    case 'REPLACE_COLLECTION': {
         const { storeName, data } = action.payload;
         if (storeName && data) {
             db.saveCollection(storeName, data);
             return { ...state, [storeName]: data, ...touch };
         }
         return state;
+    }
         
     case 'UPDATE_CURRENT_SALE':
         return { ...state, currentSale: { ...state.currentSale, ...action.payload } };
@@ -860,6 +965,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const notifications = await db.getAll('notifications');
             const profileData = await db.getAll('profile');
             const audit_logs = await db.getAll('audit_logs');
+            const trash = await db.getAll('trash');
 
             const pinMeta = app_metadata.find(m => m.id === 'securityPin') as any;
             const pin = pinMeta ? pinMeta.pin : null;
@@ -890,7 +996,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 type: 'SET_STATE',
                 payload: {
                     customers, suppliers, products, sales, purchases, returns, expenses, quotes, customFonts,
-                    app_metadata, notifications, audit_logs,
+                    app_metadata, notifications, audit_logs, trash,
                     profile: profileData[0] || null,
                     pin,
                     invoiceSettings: invSettings,
@@ -924,225 +1030,95 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             };
             dispatch({ type: 'SET_GOOGLE_USER', payload: user });
             showToast("Signed in successfully!", 'success');
+
+            // Optionally auto-sync after login
+            setTimeout(() => syncData(), 1000);
         }
     };
-
-    const handleGoogleLoginError = (err: any) => {
-        console.warn("Google Auth Failed", err);
-        dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-        if (err.type === 'popup_closed') {
-            showToast("Sign-in cancelled.", 'info');
-        } else {
-            showToast("Authentication failed.", 'error');
-        }
-    };
-
-    useEffect(() => {
-        const init = async () => {
-            try {
-                await loadGoogleScript();
-                if (!tokenClientRef.current) {
-                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
-                }
-            } catch (e) {
-                console.error("Google script preload failed", e);
-            }
-        };
-        init();
-    }, []);
 
     const googleSignIn = (options?: { forceConsent?: boolean }) => {
-        if (!state.isOnline) {
-            showToast("Cannot sign in while offline.", 'error');
-            return;
-        }
-        const prompt = options?.forceConsent ? 'consent select_account' : 'select_account';
-        
-        if (tokenClientRef.current) {
-            tokenClientRef.current.requestAccessToken({ prompt });
+        if (!tokenClientRef.current) {
+            loadGoogleScript()
+                .then(() => {
+                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse);
+                    const prompt = options?.forceConsent ? 'consent' : ''; 
+                    tokenClientRef.current.requestAccessToken({ prompt });
+                })
+                .catch(err => {
+                    console.error("Failed to load Google Script", err);
+                    showToast("Failed to load Google Sign-In.", 'error');
+                });
         } else {
-            loadGoogleScript().then(() => {
-                if (!tokenClientRef.current) {
-                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
-                }
-                tokenClientRef.current.requestAccessToken({ prompt });
-            }).catch(err => {
-                console.error("Google Script Load Error:", err);
-                showToast("Failed to load Google Sign-In", 'error');
-            });
+             const prompt = options?.forceConsent ? 'consent' : ''; 
+             tokenClientRef.current.requestAccessToken({ prompt });
         }
     };
 
     const googleSignOut = () => {
-        const token = state.googleUser?.accessToken;
-        if (token && (window as any).google && state.isOnline) {
-            (window as any).google.accounts.oauth2.revoke(token, () => {
-                console.log('Access token revoked');
+        if ((window as any).google) {
+            (window as any).google.accounts.oauth2.revoke(state.googleUser?.accessToken, () => {
+                console.log('Consent revoked');
             });
         }
         dispatch({ type: 'SET_GOOGLE_USER', payload: null });
-        dispatch({ type: 'SET_SYNC_STATUS', payload: 'idle' });
-        showToast("Signed out.");
+        showToast("Signed out.", 'info');
     };
 
-    const ensureValidToken = async (): Promise<string | null> => {
-        const currentUser = stateRef.current.googleUser;
-        if (!currentUser) return null;
-
-        const isExpired = !currentUser.expiresAt || Date.now() > (currentUser.expiresAt - 5 * 60 * 1000);
-
-        if (!isExpired) {
-            return currentUser.accessToken;
-        }
-
-        if (!stateRef.current.isOnline) return null;
-
-        console.log("Token expired/expiring, attempting refresh...");
-        
-        return new Promise((resolve) => {
-            if (!tokenClientRef.current) {
-                 loadGoogleScript().then(() => {
-                     tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
-                     resolve(null); 
-                 });
-                 return;
-            }
-
-            const timer = setTimeout(() => {
-                console.warn("Token refresh timed out (popup closed or blocked).");
-                if (tokenClientRef.current && originalCallback) {
-                    tokenClientRef.current.callback = originalCallback;
-                }
-                resolve(null);
-            }, 60000);
-
-            const originalCallback = tokenClientRef.current.callback;
-            
-            tokenClientRef.current.callback = async (resp: any) => {
-                clearTimeout(timer);
-                tokenClientRef.current.callback = originalCallback;
-                
-                if (resp.access_token) {
-                    await handleGoogleLoginResponse(resp);
-                    resolve(resp.access_token);
-                } else {
-                    resolve(null);
-                }
-            };
-            
-            tokenClientRef.current.requestAccessToken({ prompt: '' }); 
-        });
-    };
-
-    const syncData = useCallback(async () => {
-        if (!stateRef.current.isOnline) {
+    const syncData = async () => {
+        if (!state.googleUser || !state.googleUser.accessToken) {
+            showToast("Please sign in to sync.", 'error');
             return;
         }
 
-        let accessToken = stateRef.current.googleUser?.accessToken;
-        
-        if (!accessToken) {
-            if (stateRef.current.googleUser) {
-                 accessToken = (await ensureValidToken()) || undefined;
-            }
-            
-            if (!accessToken) {
-                return;
-            }
-        } else {
-            if (stateRef.current.googleUser?.expiresAt && Date.now() > (stateRef.current.googleUser.expiresAt - 300000)) {
-                 dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' }); 
-                 const newToken = await ensureValidToken();
-                 if (!newToken) {
-                     dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-                     showToast("Session expired. Please sign in again.", 'error');
-                     return;
-                 }
-                 accessToken = newToken;
-            }
-        }
-
         dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
-        
         try {
-            const cloudData = await DriveService.read(accessToken);
+            // 1. Read Cloud Data
+            const cloudData = await DriveService.read(state.googleUser.accessToken);
             
+            // 2. Merge Strategies
             if (cloudData) {
-                console.log("Merging cloud data...");
                 await db.mergeData(cloudData);
-                
+            }
+
+            // 3. Re-read Local Data to reflect merges
+            // Re-fetch everything from DB after merge to get current state for upload
+            const freshData = await db.exportData();
+            
+            // 4. Write to Cloud
+            await DriveService.write(state.googleUser.accessToken, freshData);
+            
+            // 5. Update State UI
+            const time = Date.now();
+            dispatch({ type: 'SET_LAST_SYNC_TIME', payload: time });
+            dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
+            
+            // If we merged data, we should reload the app state from DB to show new items
+            if (cloudData) {
                 const customers = await db.getAll('customers');
-                const sales = await db.getAll('sales');
                 const products = await db.getAll('products');
+                const sales = await db.getAll('sales');
                 const purchases = await db.getAll('purchases');
-                const profileData = await db.getAll('profile');
-                const app_metadata = await db.getAll('app_metadata');
+                const returns = await db.getAll('returns');
+                const expenses = await db.getAll('expenses');
+                const quotes = await db.getAll('quotes');
+                const trash = await db.getAll('trash');
                 
-                const themeMeta = app_metadata.find(m => m.id === 'themeSettings') as any;
-                const invSettings = app_metadata.find(m => m.id === 'invoiceSettings') as any;
-                const uiPrefsMeta = app_metadata.find(m => m.id === 'uiPreferences') as any;
-                const navOrderMeta = app_metadata.find(m => m.id === 'navOrder') as any;
-                const quickActionsMeta = app_metadata.find(m => m.id === 'quickActions') as any;
-                
-                const invoiceTemplate = (app_metadata.find(m => m.id === 'invoiceTemplateConfig') as any);
-                const estimateTemplate = (app_metadata.find(m => m.id === 'estimateTemplateConfig') as any);
-                const debitNoteTemplate = (app_metadata.find(m => m.id === 'debitNoteTemplateConfig') as any);
-                const receiptTemplate = (app_metadata.find(m => m.id === 'receiptTemplateConfig') as any);
-                const reportTemplate = (app_metadata.find(m => m.id === 'reportTemplateConfig') as any);
-
-                const payload: Partial<AppState> = { 
-                    customers, 
-                    sales, 
-                    products, 
-                    purchases,
-                    profile: profileData[0] || stateRef.current.profile,
-                    app_metadata
-                };
-
-                if (themeMeta) {
-                    payload.theme = themeMeta.theme;
-                    payload.themeColor = themeMeta.color;
-                    payload.headerColor = themeMeta.headerColor;
-                    payload.themeGradient = themeMeta.gradient;
-                    payload.font = themeMeta.font;
-                }
-                if (invSettings) payload.invoiceSettings = invSettings;
-                if (uiPrefsMeta) payload.uiPreferences = uiPrefsMeta;
-                if (navOrderMeta) payload.navOrder = navOrderMeta.order;
-                if (quickActionsMeta) payload.quickActions = quickActionsMeta.actions;
-                
-                if (invoiceTemplate) payload.invoiceTemplate = invoiceTemplate;
-                if (estimateTemplate) payload.estimateTemplate = estimateTemplate;
-                if (debitNoteTemplate) payload.debitNoteTemplate = debitNoteTemplate;
-                if (receiptTemplate) payload.receiptTemplate = receiptTemplate;
-                if (reportTemplate) payload.reportTemplate = reportTemplate;
-
                 dispatch({ 
                     type: 'SET_STATE', 
-                    payload
+                    payload: { customers, products, sales, purchases, returns, expenses, quotes, trash } 
                 });
             }
+            
+            showToast("Sync complete!", 'success');
 
-            const currentData = await db.exportData();
-            
-            await DriveService.write(accessToken, currentData);
-            
-            dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
-            dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
-            
-            if (!stateRef.current.lastSyncTime) {
-                 showToast("Sync Complete!", 'success'); 
-            }
-        } catch (error: any) {
-            console.error("Sync failed:", error);
-            
-            if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
-                dispatch({ type: 'SET_GOOGLE_USER', payload: null }); 
-            }
+        } catch (error) {
+            console.error("Sync failed", error);
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
+            showToast("Sync failed. Check connection.", 'error');
         }
-    }, []);
-    
+    };
+
+    // ... restore function implementation ...
     const restoreFromFileId = async (fileId: string) => {
         if (!state.googleUser?.accessToken) return;
         try {
@@ -1151,49 +1127,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 await db.importData(data);
                 window.location.reload();
             }
-        } catch(e) {
-            console.error("Restore error", e);
-            throw e;
+        } catch (e) {
+            console.error(e);
+            showToast("Restore failed", 'error');
         }
     };
 
-    useEffect(() => {
-        dispatch({ type: 'SET_STATE', payload: { restoreFromFileId } });
-    }, [state.googleUser]);
-
-    useEffect(() => {
-        if (isDbLoaded && state.googleUser && state.isOnline && state.syncStatus === 'idle' && !state.lastSyncTime) {
-            console.log("Initial App Sync Triggered");
-            syncData();
-        }
-    }, [isDbLoaded, state.googleUser, state.isOnline]);
-
-    useEffect(() => {
-        if (state.googleUser && state.isOnline && state.lastLocalUpdate > 0 && state.syncStatus !== 'syncing') {
-            const timer = setTimeout(() => {
-                console.log("Auto-sync triggered due to local changes");
-                syncData();
-            }, 2000);
-
-            return () => clearTimeout(timer);
-        }
-    }, [state.lastLocalUpdate, state.googleUser, state.isOnline, syncData, state.syncStatus]);
-
-    useEffect(() => {
-        const checkInterval = setInterval(() => {
-            const user = stateRef.current.googleUser;
-            if (user && user.expiresAt && stateRef.current.isOnline) {
-                const timeLeft = user.expiresAt - Date.now();
-                if (timeLeft < 2 * 60 * 1000 && timeLeft > 0) {
-                    ensureValidToken();
-                }
-            }
-        }, 60000); 
-        return () => clearInterval(checkInterval);
-    }, []);
-
     return (
-        <AppContext.Provider value={{ state: state as any, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData }}>
+        <AppContext.Provider value={{ state: { ...state, restoreFromFileId }, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData }}>
             {children}
         </AppContext.Provider>
     );

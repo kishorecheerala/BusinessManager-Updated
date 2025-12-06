@@ -100,7 +100,7 @@ const expenses: Expense[] = [
     { id: 'EXP-004', category: 'Food', amount: 150, date: daysAgo(2), note: 'Tea & Snacks', paymentMethod: 'CASH' },
 ];
 
-export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEvent' | 'notifications' | 'profile' | 'pin' | 'googleUser' | 'syncStatus'> = {
+export const testData: Omit<AppState, 'toast' | 'selection' | 'pin' | 'googleUser' | 'syncStatus' | 'currentSale' | 'parkedSales' | 'trash' | 'restoreFromFileId'> = {
   customers,
   suppliers,
   products,
@@ -111,6 +111,8 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   quotes: [],
   app_metadata: [],
   audit_logs: [],
+  notifications: [],
+  profile: testProfile,
   customFonts: [],
   theme: 'light',
   themeColor: '#8b5cf6',
@@ -125,7 +127,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
   navOrder: [
     'DASHBOARD', 'CUSTOMERS', 'SALES', 'PURCHASES', 
     'INSIGHTS', 'REPORTS', 'PRODUCTS', 'EXPENSES', 
-    'RETURNS', 'QUOTATIONS', 'INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER'
+    'RETURNS', 'QUOTATIONS', 'INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER', 'SQL_ASSISTANT', 'TRASH'
   ],
   quickActions: [
     'add_sale', 'add_customer', 'add_expense', 'add_purchase', 'add_quote', 'add_return'

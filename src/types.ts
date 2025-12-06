@@ -1,7 +1,7 @@
 
 import { ReactNode } from "react";
 
-export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS' | 'EXPENSES' | 'QUOTATIONS' | 'INVOICE_DESIGNER' | 'SYSTEM_OPTIMIZER';
+export type Page = 'DASHBOARD' | 'CUSTOMERS' | 'SALES' | 'PURCHASES' | 'REPORTS' | 'RETURNS' | 'PRODUCTS' | 'INSIGHTS' | 'EXPENSES' | 'QUOTATIONS' | 'INVOICE_DESIGNER' | 'SYSTEM_OPTIMIZER' | 'SQL_ASSISTANT' | 'TRASH';
 export type Theme = 'light' | 'dark';
 
 export interface GoogleUser {
@@ -369,4 +369,11 @@ export interface Snapshot {
   timestamp: string; // ISO string
   name: string;
   data: any; // The exported data object
+}
+
+export interface TrashItem {
+  id: string;
+  originalStore: string; // StoreName
+  data: any;
+  deletedAt: string; // ISO String
 }

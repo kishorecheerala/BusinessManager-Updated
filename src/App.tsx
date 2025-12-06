@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, Suspense } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -46,6 +48,7 @@ const QuotationsPage = React.lazy(() => import('./pages/QuotationsPage'));
 const InvoiceDesigner = React.lazy(() => import('./pages/InvoiceDesigner'));
 const SystemOptimizerPage = React.lazy(() => import('./pages/SystemOptimizerPage'));
 const SQLAssistantPage = React.lazy(() => import('./pages/SQLAssistantPage'));
+const TrashPage = React.lazy(() => import('./pages/TrashPage'));
 
 // Icon Map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -61,7 +64,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
     'QUOTATIONS': FileText,
     'INVOICE_DESIGNER': PenTool,
     'SYSTEM_OPTIMIZER': Gauge,
-    'SQL_ASSISTANT': Database
+    'SQL_ASSISTANT': Database,
+    'TRASH': Trash2
 };
 
 const LABEL_MAP: Record<string, string> = {
@@ -77,7 +81,8 @@ const LABEL_MAP: Record<string, string> = {
     'QUOTATIONS': 'Estimates',
     'INVOICE_DESIGNER': 'Designer',
     'SYSTEM_OPTIMIZER': 'System',
-    'SQL_ASSISTANT': 'SQL AI'
+    'SQL_ASSISTANT': 'SQL AI',
+    'TRASH': 'Recycle Bin'
 };
 
 const QUICK_ACTION_REGISTRY: Record<string, { icon: React.ElementType, label: string, page: Page, action?: string }> = {
@@ -130,7 +135,7 @@ const AppContent: React.FC = () => {
         try {
             const saved = localStorage.getItem('business_manager_last_page');
             // Exclude admin/utility pages from auto-restore to prevent getting stuck
-            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER', 'SQL_ASSISTANT'];
+            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER', 'SQL_ASSISTANT', 'TRASH'];
             if (saved && Object.keys(ICON_MAP).includes(saved) && !excludedPages.includes(saved)) {
                 return saved as Page;
             }
@@ -414,9 +419,11 @@ const AppContent: React.FC = () => {
     const { mainNavItems, pinnedItems, mobileMoreItems } = useMemo(() => {
         const order = state.navOrder || [];
         
-        const allDesktopItems = order.map(id => ({
-            page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
-        }));
+        const allDesktopItems = order
+            .filter(id => id !== 'SYSTEM_OPTIMIZER')
+            .map(id => ({
+                page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
+            }));
 
         // Mobile: 4 items + More + FAB (at end)
         const pinnedIds = order.slice(0, 4);
@@ -653,6 +660,7 @@ const AppContent: React.FC = () => {
                         {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
                         {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
                         {currentPage === 'SQL_ASSISTANT' && <SQLAssistantPage setCurrentPage={handleNavigation} />}
+                        {currentPage === 'TRASH' && <TrashPage setCurrentPage={handleNavigation} />}
                     </Suspense>
                 </div>
             </main>

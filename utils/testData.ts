@@ -100,7 +100,7 @@ const expenses: Expense[] = [
     { id: 'EXP-004', category: 'Food', amount: 150, date: daysAgo(2), note: 'Tea & Snacks', paymentMethod: 'CASH' },
 ];
 
-export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEvent' | 'notifications' | 'profile' | 'pin' | 'googleUser' | 'syncStatus'> = {
+export const testData: Omit<AppState, 'toast' | 'selection' | 'pin' | 'googleUser' | 'syncStatus' | 'currentSale' | 'parkedSales' | 'trash' | 'restoreFromFileId'> = {
   customers,
   suppliers,
   products,
@@ -189,8 +189,6 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
         signatureText: 'Authorized Signatory',
         showAmountInWords: true,
         showStatusStamp: false,
-        showTaxBreakdown: false,
-        showGst: true,
         labels: {
             billedTo: "Billed To",
             invoiceNo: "Invoice No",
@@ -303,18 +301,5 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
     cardStyle: 'solid',
     toastPosition: 'top-center',
     density: 'comfortable'
-  },
-  currentSale: {
-      customerId: '',
-      items: [],
-      discount: '0',
-      date: new Date().toISOString().split('T')[0],
-      paymentDetails: {
-          amount: '',
-          method: 'CASH',
-          date: new Date().toISOString().split('T')[0],
-          reference: ''
-      }
-  },
-  parkedSales: []
+  }
 };
