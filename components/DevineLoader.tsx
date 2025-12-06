@@ -40,22 +40,22 @@ const DevineLoader: React.FC = () => {
       <style>{`
         @keyframes devine-pulse {
             0% { 
-                transform: scale(0.85); 
-                opacity: 0.4; 
-                text-shadow: 0 0 0px rgb(var(--primary-color) / 0);
+                transform: scale(0.9); 
+                opacity: 0.8; 
+                text-shadow: 0 0 20px rgb(var(--primary-color) / 0.5);
             }
             50% { 
-                transform: scale(1.15); 
+                transform: scale(1.1); 
                 opacity: 1; 
                 text-shadow: 
-                    0 0 10px rgb(var(--primary-color) / 0.8),
-                    0 0 30px rgb(var(--primary-color) / 0.6),
-                    0 0 60px rgb(var(--primary-color) / 0.4);
+                    0 0 30px rgb(var(--primary-color) / 0.8),
+                    0 0 60px rgb(var(--primary-color) / 0.6),
+                    0 0 90px rgb(var(--primary-color) / 0.4);
             }
             100% { 
-                transform: scale(0.85); 
-                opacity: 0.4; 
-                text-shadow: 0 0 0px rgb(var(--primary-color) / 0);
+                transform: scale(0.9); 
+                opacity: 0.8; 
+                text-shadow: 0 0 20px rgb(var(--primary-color) / 0.5);
             }
         }
         @keyframes progress-indeterminate {
