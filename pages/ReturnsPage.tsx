@@ -8,7 +8,6 @@ import Button from '../components/Button';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Dropdown from '../components/Dropdown';
-import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
 import { generateDebitNotePDF } from '../utils/pdfGenerator';
 import { getLocalDateString } from '../utils/dateUtils';

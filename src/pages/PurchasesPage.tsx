@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, Eye } from 'lucide-react';
+import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, Eye, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Supplier, Purchase, Payment, Return, Page, Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
@@ -11,12 +12,12 @@ import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
 import { generateDebitNotePDF, generateImagesToPDF } from '../utils/pdfGenerator';
-import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PurchaseForm } from '../components/AddPurchaseView';
 import { getLocalDateString } from '../utils/dateUtils';
 import { createCalendarEvent } from '../utils/googleCalendar';
+import LedgerModal from '../components/LedgerModal';
 
 interface PurchasesPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -35,6 +36,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
     const [confirmModalState, setConfirmModalState] = useState<{ isOpen: boolean, purchaseIdToDelete: string | null }>({ isOpen: false, purchaseIdToDelete: null });
     const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
     const [tempDueDates, setTempDueDates] = useState<string[]>([]);
+    const [isLedgerOpen, setIsLedgerOpen] = useState(false);
     
     const [isBatchBarcodeModalOpen, setIsBatchBarcodeModalOpen] = useState(false);
     const [lastPurchase, setLastPurchase] = useState<Purchase | null>(null);
@@ -354,6 +356,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
 
             return (
                 <div className="space-y-6 animate-fade-in-fast">
+                    {isLedgerOpen && <LedgerModal isOpen={isLedgerOpen} onClose={() => setIsLedgerOpen(false)} partyId={selectedSupplier.id} partyType="SUPPLIER" />}
+                    
                     <ConfirmationModal
                         isOpen={confirmModalState.isOpen}
                         onClose={() => setConfirmModalState({ isOpen: false, purchaseIdToDelete: null })}
@@ -387,6 +391,12 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                 {selectedSupplier.gstNumber && <p className="text-gray-600 dark:text-gray-300 flex items-center gap-2"><span className="font-bold">GST:</span> {selectedSupplier.gstNumber}</p>}
                             </div>
                             <Button onClick={() => setView('edit_supplier')} variant="secondary"><Edit size={16} className="mr-2"/> Edit Details</Button>
+                        </div>
+                        <div className="mt-4 pt-4 border-t">
+                            <Button onClick={() => setIsLedgerOpen(true)} className="w-full">
+                                <FileText size={16} className="mr-2" />
+                                Statement / Ledger
+                            </Button>
                         </div>
                     </Card>
 
@@ -612,7 +622,6 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-primary">Purchases</h1>
-                        <DatePill />
                     </div>
                     <Button onClick={() => setView('add_purchase')}>
                         <Plus size={16} className="mr-2"/> Create Purchase

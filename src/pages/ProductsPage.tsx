@@ -1,19 +1,19 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal, FileSpreadsheet, TrendingUp } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal, FileSpreadsheet, TrendingUp, Scale, Settings } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import BarcodeModal from '../components/BarcodeModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
-import DatePill from '../components/DatePill';
 import { compressImage } from '../utils/imageUtils'; 
 import { Html5Qrcode } from 'html5-qrcode';
 import EmptyState from '../components/EmptyState';
 import { useDialog } from '../context/DialogContext';
 import ImageCropperModal from '../components/ImageCropperModal';
 import { GoogleGenAI } from "@google/genai";
+import StockAdjustmentModal from '../components/StockAdjustmentModal';
 
 interface ProductsPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -111,6 +111,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const [isBarcodeModalOpen, setIsBarcodeModalOpen] = useState(false);
     const [isBatchBarcodeModalOpen, setIsBatchBarcodeModalOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+    const [isStockAdjustOpen, setIsStockAdjustOpen] = useState(false);
     
     const [isGeneratingDesc, setIsGeneratingDesc] = useState(false);
     const [isSuggestingPrice, setIsSuggestingPrice] = useState(false);
@@ -824,6 +825,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
 
     return (
         <div className="space-y-4 animate-fade-in-fast h-full flex flex-col">
+            {isStockAdjustOpen && (
+                <StockAdjustmentModal isOpen={isStockAdjustOpen} onClose={() => setIsStockAdjustOpen(false)} />
+            )}
+            
             {isBarcodeModalOpen && selectedProduct && (
                 <BarcodeModal 
                     isOpen={isBarcodeModalOpen} 
@@ -886,10 +891,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-primary">Products</h1>
-                    <DatePill />
                 </div>
                 
-                <div className="flex gap-2 w-full sm:w-auto">
+                <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
                     {/* View Toggle */}
                     <div className="flex bg-gray-100 dark:bg-slate-800 rounded-lg p-1">
                         <button 
@@ -905,6 +909,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             <Grid size={18} />
                         </button>
                     </div>
+
+                    <Button onClick={() => setIsStockAdjustOpen(true)} variant="secondary" className="px-3" title="Audit Stock">
+                        <Scale size={18} />
+                    </Button>
 
                     <Button onClick={handleExportCSV} variant="secondary" className="px-3" title="Export CSV">
                         <FileSpreadsheet size={18} />

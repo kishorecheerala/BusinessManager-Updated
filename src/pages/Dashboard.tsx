@@ -9,7 +9,6 @@ import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataB
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
 import PinModal from '../components/PinModal';
-import DatePill from '../components/DatePill';
 import CheckpointsModal from '../components/CheckpointsModal';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -17,13 +16,6 @@ import { usePWAInstall } from '../hooks/usePWAInstall';
 interface DashboardProps {
     setCurrentPage: (page: Page) => void;
 }
-
-const getTimeBasedGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
-};
 
 const MetricCard: React.FC<{
     icon: React.ElementType;
@@ -895,10 +887,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             {/* Header Section */}
             <div className="flex flex-row items-center justify-between gap-2 relative mb-6">
                 <div className="flex-shrink-0">
-                     <span className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 shadow-sm cursor-default flex flex-col items-start gap-0.5 max-w-full">
-                        <span className="text-[10px] text-gray-500 dark:text-gray-400">{getTimeBasedGreeting()},</span>
-                        <strong className="truncate max-w-[120px] sm:max-w-[150px] text-sm">{profile?.ownerName || 'Owner'}</strong>
-                    </span>
+                     {/* Greeting Removed */}
                 </div>
 
                 <div className="flex-grow text-center">
@@ -908,7 +897,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 </div>
                 
                 <div className="flex-shrink-0">
-                    <DatePill />
+                    
                 </div>
             </div>
 

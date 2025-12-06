@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award, WifiOff } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -82,7 +82,7 @@ const SmartAnalystCard: React.FC<{
     expenses: Expense[], 
     ownerName: string 
 }> = ({ sales, products, customers, purchases, returns, expenses, ownerName }) => {
-    const { showToast, state } = useAppContext();
+    const { showToast } = useAppContext();
     const [aiBriefing, setAiBriefing] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -166,10 +166,6 @@ const SmartAnalystCard: React.FC<{
     }, [sales, products, customers, purchases, returns, expenses]);
 
     const handleGenerateBriefing = async () => {
-        if (!state.isOnline) {
-            showToast("You are offline.", 'error');
-            return;
-        }
         setIsGenerating(true);
         try {
             const apiKey = process.env.API_KEY || localStorage.getItem('gemini_api_key');
@@ -218,11 +214,6 @@ const SmartAnalystCard: React.FC<{
     const handlePlayBriefing = async () => {
         if (isPlaying) {
             handleStopAudio();
-            return;
-        }
-        
-        if (!state.isOnline) {
-            showToast("Offline. Cannot stream audio.", 'error');
             return;
         }
 
@@ -303,19 +294,18 @@ const SmartAnalystCard: React.FC<{
                     <div className="flex gap-2">
                         <button 
                             onClick={handlePlayBriefing}
-                            disabled={!state.isOnline}
-                            className={`p-2 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 disabled:opacity-50'}`}
-                            title={state.isOnline ? (isPlaying ? "Stop Briefing" : "Listen to Briefing") : "Offline"}
+                            className={`p-2 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500'}`}
+                            title={isPlaying ? "Stop Briefing" : "Listen to Briefing"}
                         >
                             {isPlaying ? <StopCircle size={18} /> : <Volume2 size={18} />}
                         </button>
                         <button 
                             onClick={handleGenerateBriefing} 
-                            disabled={isGenerating || !state.isOnline}
-                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors disabled:opacity-50"
-                            title={state.isOnline ? "Refresh AI Insights" : "Offline"}
+                            disabled={isGenerating}
+                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors"
+                            title="Refresh AI Insights"
                         >
-                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : state.isOnline ? <RotateCw size={18} /> : <WifiOff size={18} />}
+                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <RotateCw size={18} />}
                         </button>
                     </div>
                 </div>
@@ -895,8 +885,8 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             )}
             
             {/* Header Section */}
-            <div className="mb-6 text-center">
-                <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
+            <div className="flex items-center justify-center mb-6">
+                <h1 className="text-xl font-bold text-primary tracking-tight drop-shadow-sm truncate">
                     Dashboard
                 </h1>
             </div>

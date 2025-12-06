@@ -1,13 +1,12 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal, FileSpreadsheet, TrendingUp, Scale, Settings } from 'lucide-react';
+import { Search, Edit, Save, X, Package, IndianRupee, Percent, PackageCheck, Barcode, Printer, Filter, Grid, List, Camera, Image as ImageIcon, Eye, Trash2, QrCode, Boxes, Maximize2, Minimize2, ArrowLeft, CheckSquare, Square, Plus, Clock, AlertTriangle, Share2, MoreHorizontal, LayoutGrid, Check, Wand2, Loader2, Sparkles, MessageCircle, CheckCircle, Copy, Share, GripVertical, GripHorizontal, FileSpreadsheet, TrendingUp, Scale, Settings, History } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Product, PurchaseItem } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import BarcodeModal from '../components/BarcodeModal';
 import BatchBarcodeModal from '../components/BatchBarcodeModal';
-import DatePill from '../components/DatePill';
 import { compressImage } from '../utils/imageUtils'; 
 import { Html5Qrcode } from 'html5-qrcode';
 import EmptyState from '../components/EmptyState';
@@ -15,6 +14,7 @@ import { useDialog } from '../context/DialogContext';
 import ImageCropperModal from '../components/ImageCropperModal';
 import { GoogleGenAI } from "@google/genai";
 import StockAdjustmentModal from '../components/StockAdjustmentModal';
+import ProductHistoryModal from '../components/ProductHistoryModal';
 
 interface ProductsPageProps {
   setIsDirty: (isDirty: boolean) => void;
@@ -99,6 +99,9 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     const [isEditing, setIsEditing] = useState(false);
     const [editedProduct, setEditedProduct] = useState<Product | null>(null);
     
+    // History Modal
+    const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+
     // Resizable Split Pane State
     const [detailSplitRatio, setDetailSplitRatio] = useState(0.75); // 75% for image default
     const [isResizing, setIsResizing] = useState(false);
@@ -822,8 +825,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                         <button onClick={() => setIsBarcodeModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium">
                                             <Barcode size={16} /> Print Barcode
                                         </button>
-                                        <button onClick={handleDuplicateProduct} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium text-primary">
+                                        <button onClick={() => handleDuplicateProduct} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium text-primary">
                                             <Copy size={16} /> Duplicate
+                                        </button>
+                                        <button 
+                                            onClick={() => setHistoryProduct(editedProduct)} 
+                                            className="flex items-center gap-2 px-3 py-2 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-100 dark:border-indigo-800 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-colors text-sm font-medium text-indigo-700 dark:text-indigo-300"
+                                        >
+                                            <History size={16} /> View Flow
                                         </button>
                                     </div>
                                 </div>
@@ -839,6 +848,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
         <div className="space-y-4 animate-fade-in-fast h-full flex flex-col">
             {isStockAdjustOpen && (
                 <StockAdjustmentModal isOpen={isStockAdjustOpen} onClose={() => setIsStockAdjustOpen(false)} />
+            )}
+            
+            {historyProduct && (
+                <ProductHistoryModal 
+                    isOpen={!!historyProduct} 
+                    onClose={() => setHistoryProduct(null)} 
+                    product={historyProduct} 
+                />
             )}
             
             {isBarcodeModalOpen && selectedProduct && (
@@ -903,7 +920,6 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 flex-shrink-0">
                 <div className="flex items-center gap-3">
                     <h1 className="text-2xl font-bold text-primary">Products</h1>
-                    <DatePill />
                 </div>
                 
                 <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
@@ -1042,6 +1058,12 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                 <p className={`text-xs font-medium ${product.quantity < 5 ? 'text-red-500' : 'text-gray-500'}`}>
                                     {product.quantity} in stock
                                 </p>
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setHistoryProduct(product); }}
+                                    className="mt-1 text-indigo-600 dark:text-indigo-400 text-xs hover:underline"
+                                >
+                                    History
+                                </button>
                             </div>
                         </div>
                     ))}
@@ -1074,6 +1096,17 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                         {selectedIds.has(product.id) && <div className="w-3 h-3 bg-indigo-500 rounded-full" />}
                                     </div>
                                 </div>
+                            )}
+
+                            {/* History Button Overlay */}
+                            {!isSelectionMode && (
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); setHistoryProduct(product); }}
+                                    className="absolute top-2 right-2 z-10 p-1.5 bg-white/80 dark:bg-black/50 backdrop-blur-sm rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white hover:text-indigo-600 dark:hover:text-indigo-400 text-gray-600"
+                                    title="View History"
+                                >
+                                    <History size={16} />
+                                </button>
                             )}
 
                             {/* Image */}

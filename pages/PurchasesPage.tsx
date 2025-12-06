@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, Eye, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -12,7 +11,6 @@ import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
 import { generateDebitNotePDF, generateImagesToPDF } from '../utils/pdfGenerator';
-import DatePill from '../components/DatePill';
 import DateInput from '../components/DateInput';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PurchaseForm } from '../components/AddPurchaseView';
@@ -623,7 +621,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <h1 className="text-2xl font-bold text-primary">Purchases</h1>
-                        <DatePill />
+                        
                     </div>
                     <Button onClick={() => setView('add_purchase')}>
                         <Plus size={16} className="mr-2"/> Create Purchase
