@@ -45,17 +45,15 @@
           background-color: inherit;
           z-index: 9999;
       }
-      .pre-loader-logo-wrapper {
-          animation: entrance-zoom 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-      }
       .pre-loader-om {
           font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-          font-size: 250px !important;
+          font-size: 300px !important;
           line-height: 1;
           font-weight: 700;
           color: rgb(var(--primary-color));
           animation: pulse-om 3s ease-in-out infinite;
-          text-shadow: 0 4px 10px rgba(0,0,0,0.05);
+          /* Subtle Glow */
+          text-shadow: 0 0 20px rgba(var(--primary-color), 0.2); 
           margin-bottom: 32px;
           user-select: none;
           display: block;
@@ -67,7 +65,6 @@
           align-items: center;
           gap: 16px;
           width: 256px;
-          animation: fade-in 1s ease-out 0.5s both;
       }
       .pre-loader-text {
           font-size: 1.125rem; /* 18px */
@@ -100,6 +97,8 @@
       }
       .pre-loader-bar-fill {
           height: 100%;
+          /* Use fallback color for gradients to ensure visibility */
+          background: rgb(var(--primary-color)); 
           background: linear-gradient(to right, rgba(var(--primary-color), 0.4), rgb(var(--primary-color)));
           width: 100%;
           transform-origin: left;
@@ -107,18 +106,22 @@
       }
 
       /* Animation Keyframes */
-      @keyframes entrance-zoom {
-          0% { transform: scale(0.5); opacity: 0; }
-          100% { transform: scale(1); opacity: 1; }
-      }
-      @keyframes fade-in {
-          0% { opacity: 0; transform: translateY(10px); }
-          100% { opacity: 1; transform: translateY(0); }
-      }
       @keyframes pulse-om {
-          0% { transform: scale(0.95); opacity: 0.9; }
-          50% { transform: scale(1.05); opacity: 1; text-shadow: 0 0 15px rgba(var(--primary-color), 0.3); }
-          100% { transform: scale(0.95); opacity: 0.9; }
+          0% { 
+            transform: scale(0.95); 
+            opacity: 0.85; 
+            text-shadow: 0 0 15px rgba(var(--primary-color), 0.1);
+          }
+          50% { 
+            transform: scale(1.05); 
+            opacity: 1; 
+            text-shadow: 0 0 30px rgba(var(--primary-color), 0.3);
+          }
+          100% { 
+            transform: scale(0.95); 
+            opacity: 0.85; 
+            text-shadow: 0 0 15px rgba(var(--primary-color), 0.1);
+          }
       }
       @keyframes progress-indeterminate {
           0% { transform: translateX(-100%); }
@@ -281,9 +284,7 @@
   <body class="bg-background dark:bg-slate-900 text-text dark:text-slate-300 antialiased selection:bg-primary selection:text-white">
     <div id="root">
       <div class="pre-loader-container">
-        <div class="pre-loader-logo-wrapper">
-            <div class="pre-loader-om">ॐ</div>
-        </div>
+        <div class="pre-loader-om">ॐ</div>
         <div class="pre-loader-info">
             <div class="pre-loader-text">
                 LOADING
