@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award, Wallet, ArrowRight, Phone, UserX, Zap, Activity } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -31,22 +31,19 @@ const MetricCard: React.FC<{
 }> = ({ icon: Icon, title, value, color, iconBgColor, textColor, unit = '₹', subValue, onClick, delay }) => (
     <div
         onClick={onClick}
-        className={`bg-white dark:bg-slate-800 rounded-2xl p-4 shadow-sm border border-slate-100 dark:border-slate-700 flex flex-col items-start justify-between transition-all duration-300 hover:shadow-md hover:scale-[1.02] cursor-pointer animate-slide-up-fade relative overflow-hidden group h-full`}
+        className={`rounded-lg shadow-md p-3 sm:p-5 flex items-center transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group`}
         style={{ animationDelay: `${delay || 0}ms` }}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
         onKeyDown={onClick ? (e) => (e.key === 'Enter' || e.key === ' ') && onClick() : undefined}
     >
-        <div className={`p-3 rounded-full mb-3 ${iconBgColor} transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
-            <Icon className={`w-6 h-6 ${textColor}`} />
+        <div className={`p-3 sm:p-4 ${iconBgColor} rounded-full flex-shrink-0 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
+            <Icon className={`w-6 h-6 sm:w-8 sm:h-8 ${textColor}`} />
         </div>
-        
-        <div className="w-full">
-            <p className={`text-sm font-semibold text-gray-500 dark:text-gray-400 mb-0.5`}>{title}</p>
-            <h3 className={`text-xl sm:text-2xl font-bold ${textColor} break-all leading-tight tracking-tight`}>
-                {unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}
-            </h3>
-            {subValue && <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 font-medium truncate">{subValue}</p>}
+        <div className="ml-3 sm:ml-5 flex-grow min-w-0">
+            <p className={`font-bold text-sm sm:text-xl ${textColor} truncate`}>{title}</p>
+            <p className={`text-xl sm:text-3xl font-extrabold ${textColor} break-all mt-0.5 sm:mt-1`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
+            {subValue && <p className={`text-xs sm:text-sm font-medium mt-0.5 sm:mt-1 opacity-90 ${textColor} truncate`}>{subValue}</p>}
         </div>
     </div>
 );
@@ -83,90 +80,71 @@ const SmartAnalystCard: React.FC<{
     purchases: Purchase[], 
     returns: Return[], 
     expenses: Expense[], 
-    ownerName: string 
-}> = ({ sales, products, customers, purchases, returns, expenses, ownerName }) => {
+    ownerName: string,
+    onNavigate: (page: Page, id: string) => void;
+}> = ({ sales, products, customers, purchases, returns, expenses, ownerName, onNavigate }) => {
     const { showToast } = useAppContext();
+    const [detailType, setDetailType] = useState<'deadStock' | 'churn' | null>(null);
     const [aiBriefing, setAiBriefing] = useState<string | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isPlaying, setIsPlaying] = useState(false);
     const audioContextRef = useRef<AudioContext | null>(null);
     const audioSourceRef = useRef<AudioBufferSourceNode | null>(null);
 
-    const staticInsights = useMemo(() => {
-        const list: { icon: React.ElementType, text: string, color: string, type: string }[] = [];
+    const analysis = useMemo(() => {
         const now = new Date();
-        const currentMonth = now.getMonth();
-        const currentYear = now.getFullYear();
-        const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
-        const currentDay = Math.max(1, now.getDate());
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
 
-        const thisMonthSales = sales.filter(s => {
-            const d = new Date(s.date);
-            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+        // 1. Today's Collection (Payments received today)
+        let todaysCollection = 0;
+        sales.forEach(s => {
+            s.payments?.forEach(p => {
+                const pDate = new Date(p.date);
+                if (pDate >= todayStart) {
+                    todaysCollection += Number(p.amount);
+                }
+            });
         });
-        const currentRevenue = thisMonthSales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
-        
-        if (currentRevenue > 0) {
-            const dailyRunRate = currentRevenue / currentDay;
-            const projectedRevenue = dailyRunRate * daysInMonth;
-            if (projectedRevenue > currentRevenue) {
-                list.push({
-                    icon: TrendingUp,
-                    type: 'Prediction',
-                    text: `On track for ₹${Math.round(projectedRevenue).toLocaleString('en-IN')} revenue this month.`,
-                    color: 'text-emerald-600 dark:text-emerald-400'
-                });
-            }
-        }
 
-        const thisMonthPurchases = purchases.filter(p => {
-            const d = new Date(p.date);
-            return d.getMonth() === currentMonth && d.getFullYear() === currentYear;
-        }).reduce((sum, p) => sum + Number(p.totalAmount), 0);
-
-        if (currentRevenue > 0 || thisMonthPurchases > 0) {
-            const flow = currentRevenue - thisMonthPurchases;
-            if (flow < 0) {
-                 list.push({
-                    icon: TrendingDown,
-                    type: 'Cash Flow Alert',
-                    text: `Spending > Income by ₹${Math.abs(flow).toLocaleString('en-IN')} this month. Watch stock purchases.`,
-                    color: 'text-orange-600 dark:text-orange-400'
-                });
-            }
-        }
-
+        // 2. Dead Stock (No sales in 60 days)
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
-        const activeProductIds = new Set();
+        const activeProductIds = new Set<string>();
         sales.forEach(s => {
-            if (new Date(s.date) > sixtyDaysAgo) s.items.forEach(i => activeProductIds.add(i.productId));
+            if (new Date(s.date) > sixtyDaysAgo) {
+                s.items.forEach(i => activeProductIds.add(i.productId));
+            }
         });
-        const deadStock = products
-            .filter(p => !activeProductIds.has(p.id) && p.quantity > 5)
-            .sort((a, b) => (b.quantity * b.purchasePrice) - (a.quantity * a.purchasePrice))
-            .slice(0, 1);
+        
+        const deadStockList = products
+            .filter(p => !activeProductIds.has(p.id) && p.quantity > 0)
+            .sort((a, b) => (b.quantity * b.purchasePrice) - (a.quantity * a.purchasePrice));
 
-        if (deadStock.length > 0) {
-            list.push({
-                icon: Archive,
-                type: 'Inventory Alert',
-                text: `"${deadStock[0].name}" hasn't sold in 60 days. Consider a discount to clear ${deadStock[0].quantity} units.`,
-                color: 'text-amber-600 dark:text-amber-400'
-            });
-        }
+        // 3. Churn Risk (Active historically but no purchase in 60 days)
+        const recentCustomerIds = new Set<string>();
+        sales.forEach(s => {
+            if (new Date(s.date) > sixtyDaysAgo) {
+                recentCustomerIds.add(s.customerId);
+            }
+        });
+        
+        const customersWithHistory = new Set(sales.map(s => s.customerId));
+        const churnList = customers
+            .filter(c => customersWithHistory.has(c.id) && !recentCustomerIds.has(c.id))
+            .map(c => {
+                 const cSales = sales.filter(s => s.customerId === c.id);
+                 const lastSale = cSales.reduce((latest, s) => new Date(s.date) > new Date(latest.date) ? s : latest, cSales[0]);
+                 return { ...c, lastSeen: lastSale ? new Date(lastSale.date) : null };
+            })
+            .sort((a, b) => (b.lastSeen?.getTime() || 0) - (a.lastSeen?.getTime() || 0));
 
-        if (list.length === 0) {
-            list.push({
-                icon: Sparkles,
-                type: 'AI Assistant',
-                text: "Analyze trends by adding more sales data.",
-                color: 'text-primary dark:text-teal-400'
-            });
-        }
+        // Briefing
+        const greeting = now.getHours() < 12 ? 'Good Morning' : now.getHours() < 17 ? 'Good Afternoon' : 'Good Evening';
+        const briefing = `${greeting}, ${ownerName}. Today's collection so far is ₹${todaysCollection.toLocaleString()}. You have ${deadStockList.length} dead stock items and ${churnList.length} customers at risk.`;
 
-        return list.slice(0, 2); 
-    }, [sales, products, customers, purchases, returns, expenses]);
+        return { todaysCollection, deadStockList, churnList, briefing };
+    }, [sales, products, customers, ownerName]);
 
     const handleGenerateBriefing = async () => {
         setIsGenerating(true);
@@ -176,8 +154,6 @@ const SmartAnalystCard: React.FC<{
 
             const ai = new GoogleGenAI({ apiKey });
             
-            const recentSales = sales.slice(-10);
-            const totalRev = sales.reduce((acc, s) => acc + Number(s.totalAmount), 0);
             const totalDue = customers.reduce((acc, c) => {
                 const cSales = sales.filter(s => s.customerId === c.id);
                 const paid = cSales.reduce((sum, s) => sum + s.payments.reduce((p, pay) => p + Number(pay.amount), 0), 0);
@@ -186,9 +162,8 @@ const SmartAnalystCard: React.FC<{
             }, 0);
 
             const prompt = `Act as a business analyst for owner ${ownerName}. 
-            Data: Total Revenue ₹${totalRev}, Outstanding Dues ₹${totalDue}.
-            Recent 10 Sales Total: ₹${recentSales.reduce((acc, s) => acc + Number(s.totalAmount), 0)}.
-            Write a 2-bullet point executive briefing. Focus on cash flow or action items. Keep it encouraging but realistic. Max 30 words per bullet.`;
+            Data: Today's Collection ₹${analysis.todaysCollection}, Outstanding Dues ₹${totalDue}, Dead Stock Items ${analysis.deadStockList.length}.
+            Write a 2-bullet point executive briefing. Focus on today's cash flow or inventory action. Keep it encouraging but realistic. Max 30 words per bullet.`;
 
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
@@ -223,12 +198,18 @@ const SmartAnalystCard: React.FC<{
         setIsPlaying(true);
         try {
             const apiKey = process.env.API_KEY || localStorage.getItem('gemini_api_key');
-            if (!apiKey) throw new Error("API Key not found");
+            if (!apiKey) {
+                // Fallback to browser speech synthesis if no API key
+                 const utterance = new SpeechSynthesisUtterance(aiBriefing || analysis.briefing);
+                 utterance.onend = () => setIsPlaying(false);
+                 window.speechSynthesis.speak(utterance);
+                 return;
+            }
 
             const ai = new GoogleGenAI({ apiKey });
-            const briefingText = aiBriefing || "Your business is running smoothly. Check your sales and stock levels for more details.";
+            const briefingText = aiBriefing || analysis.briefing;
             
-            const prompt = `Say in a professional, encouraging news-anchor voice: "Here is your business briefing, ${ownerName}. ${briefingText.replace(/[*#]/g, '')}"`;
+            const prompt = `Say in a professional, encouraging news-anchor voice: "${briefingText.replace(/[*#]/g, '')}"`;
 
             const response = await ai.models.generateContent({
                 model: "gemini-2.5-flash-preview-tts",
@@ -266,70 +247,171 @@ const SmartAnalystCard: React.FC<{
 
         } catch (e) {
             console.error("TTS Error", e);
-            showToast("Failed to play audio briefing.", 'error');
-            setIsPlaying(false);
+            // Fallback to browser speech
+            const utterance = new SpeechSynthesisUtterance(aiBriefing || analysis.briefing);
+            utterance.onend = () => setIsPlaying(false);
+            window.speechSynthesis.speak(utterance);
         }
     };
 
-    const displayInsights = aiBriefing 
-        ? aiBriefing.split('\n').filter(line => line.trim().startsWith('*') || line.trim().startsWith('-') || line.trim().length > 0).slice(0, 2).map(text => ({
-            icon: Sparkles,
-            type: 'AI Briefing',
-            text: text.replace(/^[\*\-]\s*/, ''),
-            color: 'text-indigo-600 dark:text-indigo-400'
-        }))
-        : staticInsights;
-
     return (
-        <div className="relative overflow-hidden rounded-xl bg-white dark:bg-slate-800 shadow-lg border border-primary/10 dark:border-slate-700 transition-all hover:shadow-xl animate-slide-up-fade group">
-            <div className="absolute top-0 left-0 w-full h-1 bg-primary"></div>
-            <div className="p-5">
-                <div className="flex justify-between items-start mb-4">
+        <>
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-md p-4 animate-slide-up-fade border-t-4 border-primary transition-all hover:shadow-xl hover:scale-[1.01]">
+                <div className="flex justify-between items-center mb-3">
                     <div className="flex items-center gap-2">
-                        <div className="p-2 bg-primary/10 rounded-full animate-pulse">
-                            <BrainCircuit className="w-6 h-6 text-primary transition-transform duration-700 group-hover:rotate-12" />
+                        <div className="p-1.5 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+                            <BrainCircuit className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="font-bold text-xl text-gray-800 dark:text-white">Smart Analyst</h3>
-                            <span className="text-[10px] font-bold bg-primary/10 text-primary px-2 py-0.5 rounded-full border border-primary/20">AI Powered</span>
+                            <h3 className="font-bold text-base text-slate-800 dark:text-white">Smart Analyst</h3>
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <button 
+                            <button 
                             onClick={handlePlayBriefing}
-                            className={`p-2 rounded-full transition-colors ${isPlaying ? 'bg-red-100 text-red-600 animate-pulse' : 'hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500'}`}
-                            title={isPlaying ? "Stop Briefing" : "Listen to Briefing"}
+                            className={`p-1.5 rounded-full transition-all border ${isPlaying ? 'bg-red-50 text-red-600 border-red-200 animate-pulse' : 'bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600 hover:bg-slate-50'}`}
                         >
-                            {isPlaying ? <StopCircle size={18} /> : <Volume2 size={18} />}
+                            {isPlaying ? <StopCircle size={16} /> : <Volume2 size={16} />}
                         </button>
-                        <button 
+                            <button 
                             onClick={handleGenerateBriefing} 
                             disabled={isGenerating}
-                            className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700 text-gray-500 transition-colors"
+                            className="p-1.5 rounded-full bg-white dark:bg-slate-700 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-600 hover:bg-slate-50 transition-colors"
                             title="Refresh AI Insights"
                         >
-                            {isGenerating ? <Loader2 size={18} className="animate-spin" /> : <RotateCw size={18} />}
+                            {isGenerating ? <Loader2 size={16} className="animate-spin" /> : <RotateCw size={16} />}
                         </button>
                     </div>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {displayInsights.map((insight, idx) => (
-                        <div key={idx} className="flex gap-3 p-3 rounded-lg bg-gray-50 dark:bg-slate-700/30 hover:bg-primary/5 transition-colors border border-transparent hover:border-primary/10 animate-slide-up-fade group/item" style={{ animationDelay: `${idx * 100}ms` }}>
-                            <div className="mt-1 flex-shrink-0 transition-transform group-hover/item:scale-110 duration-300">
-                                <insight.icon className={`w-5 h-5 ${insight.color}`} />
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Today's Collection */}
+                    <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-lg shadow-sm text-white group/card">
+                            <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover/card:opacity-20 transition-opacity transform rotate-12">
+                            <IndianRupee size={80} />
                             </div>
-                            <div>
-                                <p className={`text-xs font-bold uppercase mb-0.5 ${insight.color}`}>{insight.type}</p>
-                                <p className="text-sm sm:text-base text-gray-700 dark:text-gray-300 leading-relaxed font-medium">
-                                    {insight.text}
-                                </p>
+                            <div className="relative z-10">
+                            <p className="text-emerald-100 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide mb-0.5">
+                                <Wallet size={12}/> Today
+                            </p>
+                            <p className="font-bold text-2xl tracking-tight">₹{analysis.todaysCollection.toLocaleString()}</p>
                             </div>
+                            <div className="absolute bottom-3 right-3 bg-white/20 p-1.5 rounded-full backdrop-blur-sm">
+                            <TrendingUp size={16} className="text-white" />
+                            </div>
+                    </div>
+
+                    <button 
+                        onClick={() => setDetailType('deadStock')}
+                        className="p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-all text-left group relative"
+                    >
+                        <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ArrowRight size={14} className="text-amber-600 dark:text-amber-400" />
                         </div>
-                    ))}
+                        <div className="flex items-center gap-2 mb-1">
+                            <div className="p-1 bg-amber-100 dark:bg-amber-900/30 rounded text-amber-600 dark:text-amber-400">
+                                <Archive size={14}/>
+                            </div>
+                            <p className="text-[10px] font-bold text-amber-700 dark:text-amber-300 uppercase tracking-wide">Dead Stock</p>
+                        </div>
+                        <p className="font-bold text-xl text-slate-800 dark:text-white">{analysis.deadStockList.length}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">Items > 60 days</p>
+                    </button>
+
+                    <button 
+                        onClick={() => setDetailType('churn')}
+                        className="p-3 rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/20 transition-all text-left group relative"
+                    >
+                        <div className="absolute right-2 top-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <ArrowRight size={14} className="text-red-600 dark:text-red-400" />
+                        </div>
+                        <div className="flex items-center gap-2 mb-1">
+                             <div className="p-1 bg-red-100 dark:bg-red-900/30 rounded text-red-600 dark:text-red-400">
+                                <UserX size={14}/>
+                            </div>
+                            <p className="text-[10px] font-bold text-red-700 dark:text-red-300 uppercase tracking-wide">Churn Risk</p>
+                        </div>
+                        <p className="font-bold text-xl text-slate-800 dark:text-white">{analysis.churnList.length}</p>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-400">Inactive users</p>
+                    </button>
+                </div>
+                
+                <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                    <div className="flex items-start gap-2">
+                        <Sparkles size={14} className="text-indigo-500 mt-0.5 shrink-0" />
+                        <p className="text-xs text-slate-600 dark:text-slate-300 italic leading-relaxed line-clamp-2">
+                            "{aiBriefing || analysis.briefing}"
+                        </p>
+                    </div>
                 </div>
             </div>
-        </div>
+
+            {/* Details Modal */}
+            {detailType && (
+                <div 
+                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-fade-in-fast" 
+                    onClick={() => setDetailType(null)}
+                >
+                    <div 
+                        className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden animate-scale-in border dark:border-slate-700" 
+                        onClick={e => e.stopPropagation()}
+                    >
+                        <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-gray-50 dark:bg-slate-800">
+                            <h3 className="font-bold text-lg text-gray-800 dark:text-white flex items-center gap-2">
+                                {detailType === 'deadStock' ? <Archive className="w-5 h-5 text-amber-600" /> : <UserX className="w-5 h-5 text-red-600" />}
+                                {detailType === 'deadStock' ? 'Dead Stock Items' : 'At-Risk Customers'}
+                            </h3>
+                            <button onClick={() => setDetailType(null)} className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="overflow-y-auto p-4 space-y-3 bg-white dark:bg-slate-900 custom-scrollbar">
+                            {detailType === 'deadStock' ? (
+                                analysis.deadStockList.length > 0 ? (
+                                    analysis.deadStockList.map(p => (
+                                        <div key={p.id} className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm hover:border-indigo-200 dark:hover:border-indigo-800 cursor-pointer transition-colors" onClick={() => { setDetailType(null); onNavigate('PRODUCTS', p.id); }}>
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-800 dark:text-white">{p.name}</p>
+                                                <p className="text-xs text-gray-500">ID: {p.id}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-red-600 text-sm">{p.quantity} Units</p>
+                                                <p className="text-[10px] text-gray-400">Value: ₹{(p.quantity * p.purchasePrice).toLocaleString()}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : <p className="text-center text-gray-500 py-8 italic">No dead stock found. Great job!</p>
+                            ) : (
+                                analysis.churnList.length > 0 ? (
+                                    analysis.churnList.map(c => (
+                                        <div key={c.id} className="flex justify-between items-center p-3 bg-white dark:bg-slate-800 rounded-xl border border-gray-100 dark:border-slate-700 shadow-sm hover:border-indigo-200 dark:hover:border-indigo-800 cursor-pointer transition-colors" onClick={() => { setDetailType(null); onNavigate('CUSTOMERS', c.id); }}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="p-2 bg-red-50 dark:bg-red-900/20 rounded-full text-red-600">
+                                                    <User size={16} />
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-sm text-gray-800 dark:text-white">{c.name}</p>
+                                                    <p className="text-xs text-gray-500 flex items-center gap-1"><Phone size={10} /> {c.phone}</p>
+                                                </div>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-gray-600 dark:text-gray-300 text-xs">Last Seen</p>
+                                                <p className="text-xs text-gray-500">{c.lastSeen ? c.lastSeen.toLocaleDateString() : 'Unknown'}</p>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : <p className="text-center text-gray-500 py-8 italic">No at-risk customers found.</p>
+                            )}
+                        </div>
+                        <div className="p-3 border-t dark:border-slate-700 bg-gray-50 dark:bg-slate-800">
+                            <Button onClick={() => setDetailType(null)} variant="secondary" className="w-full">Close</Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </>
     );
 };
 
@@ -945,6 +1027,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 returns={returns} 
                 expenses={expenses}
                 ownerName={profile?.ownerName || 'Owner'}
+                onNavigate={handleNavigate}
             />
             
             {/* Toolbar for Period Selectors */}
@@ -969,10 +1052,10 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             </div>
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <MetricCard icon={IndianRupee} title="Sales" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-white dark:bg-slate-800" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
-                <MetricCard icon={Package} title="Purchases" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-white dark:bg-slate-800" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
-                <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Total Receivable" color="bg-white dark:bg-slate-800" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
-                <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Total Payable" color="bg-white dark:bg-slate-800" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
+                <MetricCard icon={IndianRupee} title="Sales" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-primary/5 dark:bg-primary/10" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
+                <MetricCard icon={Package} title="Purchases" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-blue-50 dark:bg-blue-900/20" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
+                <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Total Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
+                <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Total Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
