@@ -1,9 +1,11 @@
 
+
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences, SaleDraft, ParkedSale } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
+import { getLocalDateString } from '../utils/dateUtils';
 
 interface ToastState {
   message: string;
@@ -40,18 +42,23 @@ export interface AppState {
   pin: string | null;
   theme: Theme;
   themeColor: string;
-  headerColor: string; // New: Explicit header color (override)
+  headerColor: string; 
   themeGradient: string;
-  font: string; // New: App Font
+  font: string; 
   googleUser: GoogleUser | null;
   syncStatus: SyncStatus;
-  lastSyncTime: null | number | string; // Allow string for legacy compatibility or strict number? Let's use number but handle string parsing
+  lastSyncTime: null | number | string;
   lastLocalUpdate: number;
   devMode: boolean;
   performanceMode: boolean;
-  navOrder: string[]; // List of page IDs in order
-  quickActions: string[]; // List of Quick Action IDs
-  isOnline: boolean; // New: Network Status
+  navOrder: string[]; 
+  quickActions: string[]; 
+  isOnline: boolean;
+  
+  // Sales Management State
+  currentSale: SaleDraft;
+  parkedSales: ParkedSale[];
+  
   restoreFromFileId?: (fileId: string) => Promise<void>;
 }
 
@@ -106,7 +113,13 @@ type Action =
   | { type: 'TOGGLE_PERFORMANCE_MODE' }
   | { type: 'SET_ONLINE_STATUS'; payload: boolean }
   | { type: 'CLEANUP_OLD_DATA' }
-  | { type: 'REPLACE_COLLECTION'; payload: { storeName: StoreName; data: any[] } };
+  | { type: 'REPLACE_COLLECTION'; payload: { storeName: StoreName; data: any[] } }
+  // Sales Draft Actions
+  | { type: 'UPDATE_CURRENT_SALE'; payload: Partial<SaleDraft> }
+  | { type: 'PARK_CURRENT_SALE' }
+  | { type: 'CLEAR_CURRENT_SALE' }
+  | { type: 'RESUME_PARKED_SALE'; payload: ParkedSale }
+  | { type: 'DELETE_PARKED_SALE'; payload: string };
 
 // Default Template to prevent crashes
 const DEFAULT_TEMPLATE: InvoiceTemplateConfig = {
@@ -136,6 +149,20 @@ const DEFAULT_UI_PREFS: AppMetadataUIPreferences = {
     density: 'comfortable'
 };
 
+// Default empty sale draft
+const DEFAULT_SALE_DRAFT: SaleDraft = {
+    customerId: '',
+    items: [],
+    discount: '0',
+    date: getLocalDateString(),
+    paymentDetails: {
+        amount: '',
+        method: 'CASH',
+        date: getLocalDateString(),
+        reference: ''
+    }
+};
+
 // --- Initial State Helper ---
 const getLocalStorageState = () => {
     if (typeof window === 'undefined') return {};
@@ -144,7 +171,6 @@ const getLocalStorageState = () => {
     const themeColor = localStorage.getItem('themeColor') || '#8b5cf6';
     const font = localStorage.getItem('font') || 'Inter';
     
-    // Handle specific gradient logic (none vs null vs value)
     let themeGradient = localStorage.getItem('themeGradient');
     if (themeGradient === null) {
         themeGradient = 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)';
@@ -163,8 +189,14 @@ const getLocalStorageState = () => {
         const storedTime = localStorage.getItem('lastSyncTime');
         if (storedTime) lastSyncTime = parseInt(storedTime, 10);
     } catch(e) {}
+    
+    let parkedSales = [];
+    try {
+        const storedDrafts = localStorage.getItem('parked_sales');
+        if (storedDrafts) parkedSales = JSON.parse(storedDrafts);
+    } catch(e) {}
 
-    return { theme, themeColor, themeGradient, font, googleUser, lastSyncTime };
+    return { theme, themeColor, themeGradient, font, googleUser, lastSyncTime, parkedSales };
 };
 
 const localDefaults = getLocalStorageState();
@@ -193,7 +225,6 @@ const initialState: AppState = {
     selection: null,
     pin: null,
     
-    // Initialize with LocalStorage values to prevent theme/auth flash
     theme: localDefaults.theme || 'light',
     themeColor: localDefaults.themeColor || '#8b5cf6',
     headerColor: '',
@@ -208,7 +239,10 @@ const initialState: AppState = {
     performanceMode: false,
     navOrder: DEFAULT_NAV_ORDER,
     quickActions: DEFAULT_QUICK_ACTIONS,
-    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true
+    isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+    
+    currentSale: DEFAULT_SALE_DRAFT,
+    parkedSales: localDefaults.parkedSales || [],
 };
 
 // Logging helper
@@ -236,15 +270,6 @@ const safeRemoveItem = (key: string) => {
         localStorage.removeItem(key);
     } catch (e) {
         console.warn(`Failed to remove ${key} from localStorage`, e);
-    }
-};
-
-const safeGetItem = (key: string): string | null => {
-    try {
-        return localStorage.getItem(key);
-    } catch (e) {
-        console.warn(`Failed to get ${key} from localStorage`, e);
-        return null;
     }
 };
 
@@ -310,7 +335,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'ADD_SALE':
         const newSale = action.payload;
         
-        // Update Customer Loyalty Points
         let customersAfterSale = [...state.customers];
         const saleCustomerIdx = state.customers.findIndex(c => c.id === newSale.customerId);
         
@@ -335,13 +359,11 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'UPDATE_SALE':
         const { oldSale, updatedSale } = action.payload;
         
-        // 1. Revert stock for old items
         const stockMap: Record<string, number> = {};
         oldSale.items.forEach(item => {
             stockMap[item.productId] = (stockMap[item.productId] || 0) + item.quantity;
         });
         
-        // 2. Deduct stock for new items
         updatedSale.items.forEach(item => {
             stockMap[item.productId] = (stockMap[item.productId] || 0) - item.quantity;
         });
@@ -366,13 +388,11 @@ const appReducer = (state: AppState, action: Action): AppState => {
         const saleToDelete = state.sales.find(s => s.id === action.payload);
         if (!saleToDelete) return state;
 
-        // Restore stock
         const restoredProducts = state.products.map(p => {
             const item = saleToDelete.items.find(i => i.productId === p.id);
             return item ? { ...p, quantity: p.quantity + item.quantity } : p;
         });
         
-        // Revert Customer Points
         let customersAfterDelete = [...state.customers];
         const delCustomerIdx = state.customers.findIndex(c => c.id === saleToDelete.customerId);
         if (delCustomerIdx >= 0) {
@@ -381,7 +401,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
             const pointsUsed = saleToDelete.loyaltyPointsUsed || 0;
             const pointsEarned = saleToDelete.loyaltyPointsEarned || 0;
             
-            // Reverse operation: Add back used points, subtract earned points
             customersAfterDelete[delCustomerIdx] = {
                 ...cust,
                 loyaltyPoints: Math.max(0, currentPoints + pointsUsed - pointsEarned)
@@ -409,12 +428,9 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
     case 'ADD_PURCHASE':
         const newPurchase = action.payload;
-        // Update Product Stock (logic moved from products page to here for consistency)
-        // Note: ProductsPage might also dispatch ADD_PRODUCT, handled idempotently
         const prodsAfterPurchase = state.products.map(p => {
             const item = newPurchase.items.find(i => i.productId === p.id);
             if (item) {
-                // Update quantity and costs
                 return { 
                     ...p, 
                     quantity: p.quantity + item.quantity,
@@ -425,7 +441,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return p;
         });
         
-        // Handle strictly new products that don't exist yet
         newPurchase.items.forEach(item => {
             if (!state.products.find(p => p.id === item.productId)) {
                 prodsAfterPurchase.push({
@@ -453,8 +468,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
         };
 
     case 'UPDATE_PURCHASE':
-        const { oldPurchase, updatedPurchase } = action.payload;
-        // Basic update - stock adjustments for edits are complex, assuming simple overwrite for now or handle manually
+        const { updatedPurchase } = action.payload;
         const updatedPurchasesList = state.purchases.map(p => p.id === updatedPurchase.id ? updatedPurchase : p);
         db.saveCollection('purchases', updatedPurchasesList);
         return { ...state, purchases: updatedPurchasesList, ...touch };
@@ -463,10 +477,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
         const purchaseToDelete = state.purchases.find(p => p.id === action.payload);
         if (!purchaseToDelete) return state;
         
-        // Reduce stock
         const reducedProducts = state.products.map(p => {
             const item = purchaseToDelete.items.find(i => i.productId === p.id);
-            // Ensure non-negative stock? Or allow negative to indicate error?
             return item ? { ...p, quantity: Math.max(0, p.quantity - item.quantity) } : p;
         });
 
@@ -489,16 +501,13 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
     case 'ADD_RETURN':
         const newReturn = action.payload;
-        // Adjust Stock based on Return Type
         let stockAdjProducts = [...state.products];
         if (newReturn.type === 'CUSTOMER') {
-            // Customer returned item -> Increase Stock
             stockAdjProducts = state.products.map(p => {
                 const item = newReturn.items.find(i => i.productId === p.id);
                 return item ? { ...p, quantity: p.quantity + item.quantity } : p;
             });
         } else {
-            // Returned to Supplier -> Decrease Stock
             stockAdjProducts = state.products.map(p => {
                 const item = newReturn.items.find(i => i.productId === p.id);
                 return item ? { ...p, quantity: Math.max(0, p.quantity - item.quantity) } : p;
@@ -513,7 +522,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return { ...state, returns: [...state.returns, newReturn], products: stockAdjProducts, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
     case 'UPDATE_RETURN':
-        // Complex to handle stock reversion, implementing simple replace for now
         const updatedReturns = state.returns.map(r => r.id === action.payload.updatedReturn.id ? action.payload.updatedReturn : r);
         db.saveCollection('returns', updatedReturns);
         return { ...state, returns: updatedReturns, ...touch };
@@ -557,7 +565,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
         db.saveCollection('profile', [action.payload]);
         return { ...state, profile: action.payload, ...touch };
 
-    // Update Theme actions to ALSO save to app_metadata so they sync to cloud
     case 'SET_THEME':
         const themeMeta: AppMetadataTheme = {
             id: 'themeSettings',
@@ -626,7 +633,6 @@ const appReducer = (state: AppState, action: Action): AppState => {
     case 'UPDATE_UI_PREFERENCES':
         const newPrefs = { ...state.uiPreferences, ...action.payload };
         const metaWithoutPrefs = state.app_metadata.filter(m => m.id !== 'uiPreferences');
-        // Ensure ID is set correctly
         newPrefs.id = 'uiPreferences';
         db.saveCollection('app_metadata', [...metaWithoutPrefs, newPrefs]);
         return { ...state, uiPreferences: newPrefs, app_metadata: [...metaWithoutPrefs, newPrefs], ...touch };
@@ -677,14 +683,11 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
     case 'SET_DOCUMENT_TEMPLATE':
         const { type, config } = action.payload;
-        // In a real app, you might save this to specific stores or a single config store
-        // For now, we update state and maybe persist to app_metadata or separate store
         const tmplKey = type === 'INVOICE' ? 'invoiceTemplate' : 
                         type === 'ESTIMATE' ? 'estimateTemplate' :
                         type === 'DEBIT_NOTE' ? 'debitNoteTemplate' :
                         type === 'RECEIPT' ? 'receiptTemplate' : 'reportTemplate';
         
-        // Persist to app_metadata for simplicity in this implementation
         const templateMeta: AppMetadata = { ...config, id: `${tmplKey}Config` as any };
         const otherMeta = state.app_metadata.filter(m => m.id !== templateMeta.id);
         db.saveCollection('app_metadata', [...otherMeta, templateMeta]);
@@ -728,20 +731,80 @@ const appReducer = (state: AppState, action: Action): AppState => {
         return { ...state, notifications: cleanNotifs, audit_logs: cleanLogs };
 
     case 'REPLACE_COLLECTION':
-        // Handle bulk import
         const { storeName, data } = action.payload;
         if (storeName && data) {
             db.saveCollection(storeName, data);
             return { ...state, [storeName]: data, ...touch };
         }
         return state;
+        
+    case 'UPDATE_CURRENT_SALE':
+        return { ...state, currentSale: { ...state.currentSale, ...action.payload } };
+
+    case 'PARK_CURRENT_SALE':
+        const draftToPark: ParkedSale = { 
+            ...state.currentSale, 
+            id: `DRAFT-${Date.now()}`,
+            parkedAt: Date.now() 
+        };
+        const newParkedList = [draftToPark, ...state.parkedSales];
+        safeSetItem('parked_sales', JSON.stringify(newParkedList));
+        
+        return { 
+            ...state, 
+            parkedSales: newParkedList,
+            currentSale: {
+                customerId: '',
+                items: [],
+                discount: '0',
+                date: getLocalDateString(),
+                paymentDetails: {
+                    amount: '',
+                    method: 'CASH',
+                    date: getLocalDateString(),
+                    reference: ''
+                }
+            } 
+        };
+
+    case 'CLEAR_CURRENT_SALE':
+        return { 
+            ...state, 
+            currentSale: {
+                customerId: '',
+                items: [],
+                discount: '0',
+                date: getLocalDateString(),
+                paymentDetails: {
+                    amount: '',
+                    method: 'CASH',
+                    date: getLocalDateString(),
+                    reference: ''
+                }
+            } 
+        };
+
+    case 'RESUME_PARKED_SALE':
+        const draftToResume = action.payload;
+        const remainingDrafts = state.parkedSales.filter(d => d.id !== draftToResume.id);
+        safeSetItem('parked_sales', JSON.stringify(remainingDrafts));
+        
+        return {
+            ...state,
+            parkedSales: remainingDrafts,
+            currentSale: draftToResume
+        };
+
+    case 'DELETE_PARKED_SALE':
+        const filteredDrafts = state.parkedSales.filter(d => d.id !== action.payload);
+        safeSetItem('parked_sales', JSON.stringify(filteredDrafts));
+        return { ...state, parkedSales: filteredDrafts };
 
     default:
         return state;
   }
 };
 
-// Exporting the Context itself to allow useContext usage directly if needed
 export const AppContext = createContext<{
   state: AppState;
   dispatch: React.Dispatch<any>;
@@ -758,18 +821,14 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const tokenClientRef = useRef<any>(null);
     const stateRef = useRef(state);
 
-    // Keep stateRef up to date for async access in token callbacks
     useEffect(() => {
         stateRef.current = state;
     }, [state]);
 
-    // --- Toast Logic ---
     const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'info') => {
         dispatch({ type: 'SHOW_TOAST', payload: { message, type } });
-        // The Toast component handles its own timeout logic
     }, []);
 
-    // --- Online/Offline Listener ---
     useEffect(() => {
         const handleOnline = () => dispatch({ type: 'SET_ONLINE_STATUS', payload: true });
         const handleOffline = () => {
@@ -786,7 +845,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
     }, []);
 
-    // --- Load Data from IDB on Mount ---
     useEffect(() => {
         const loadData = async () => {
             const customers = await db.getAll('customers');
@@ -803,7 +861,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const profileData = await db.getAll('profile');
             const audit_logs = await db.getAll('audit_logs');
 
-            // Parse Metadata
             const pinMeta = app_metadata.find(m => m.id === 'securityPin') as any;
             const pin = pinMeta ? pinMeta.pin : null;
             
@@ -813,22 +870,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const themeMeta = app_metadata.find(m => m.id === 'themeSettings') as AppMetadataTheme;
             const uiPrefsMeta = app_metadata.find(m => m.id === 'uiPreferences') as AppMetadataUIPreferences;
 
-            // Load Templates from Metadata or default to DEFAULT_TEMPLATE values if missing
             const invoiceTemplate = (app_metadata.find(m => m.id === 'invoiceTemplateConfig') as InvoiceTemplateConfig) || initialState.invoiceTemplate;
             const estimateTemplate = (app_metadata.find(m => m.id === 'estimateTemplateConfig') as InvoiceTemplateConfig) || initialState.estimateTemplate;
             const debitNoteTemplate = (app_metadata.find(m => m.id === 'debitNoteTemplateConfig') as InvoiceTemplateConfig) || initialState.debitNoteTemplate;
             const receiptTemplate = (app_metadata.find(m => m.id === 'receiptTemplateConfig') as InvoiceTemplateConfig) || initialState.receiptTemplate;
             const reportTemplate = (app_metadata.find(m => m.id === 'reportTemplateConfig') as InvoiceTemplateConfig) || initialState.reportTemplate;
 
-            // Theme Preferences: Prioritize metadata from DB (cloud sync), fall back to localStorage/initial
-            // IMPORTANT: If DB has a value, it wins over localStorage to ensure sync.
             const loadedTheme = themeMeta?.theme || state.theme;
             const loadedColor = themeMeta?.color || state.themeColor;
             const loadedHeaderColor = themeMeta?.headerColor || state.headerColor;
             const loadedFont = themeMeta?.font || state.font;
             let loadedGradient = themeMeta?.gradient;
             
-            // If DB didn't have preference, use current state (which came from localStorage)
             if (loadedGradient === undefined) {
                loadedGradient = state.themeGradient;
             }
@@ -845,7 +898,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     quickActions: quickActionsMeta ? quickActionsMeta.actions : DEFAULT_QUICK_ACTIONS,
                     invoiceTemplate, estimateTemplate, debitNoteTemplate, receiptTemplate, reportTemplate,
                     uiPreferences: uiPrefsMeta || DEFAULT_UI_PREFS,
-                    // Note: We do NOT overwrite googleUser here as it's already set from LocalStorage correctly
                     theme: loadedTheme,
                     themeColor: loadedColor,
                     headerColor: loadedHeaderColor,
@@ -858,11 +910,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         loadData();
     }, []);
 
-    // --- Google Drive Sync Logic ---
     const handleGoogleLoginResponse = async (response: any) => {
         if (response.access_token) {
             const userInfo = await getUserInfo(response.access_token);
-            // Calculate expiry (expires_in is in seconds, usually 3599)
             const expiresAt = Date.now() + (response.expires_in * 1000);
             
             const user: GoogleUser = {
@@ -887,7 +937,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    // Pre-initialize Google Client to avoid popup blocker on user click
     useEffect(() => {
         const init = async () => {
             try {
@@ -900,22 +949,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             }
         };
         init();
-    }, []); // Run once on mount
+    }, []);
 
     const googleSignIn = (options?: { forceConsent?: boolean }) => {
         if (!state.isOnline) {
             showToast("Cannot sign in while offline.", 'error');
             return;
         }
-        // Enforce prompt: 'select_account' to ensure the account chooser is always displayed
-        // If forceConsent is true, we also request consent (for scopes)
         const prompt = options?.forceConsent ? 'consent select_account' : 'select_account';
         
-        // Optimistic sync call if client is ready (prevents popup blocker)
         if (tokenClientRef.current) {
             tokenClientRef.current.requestAccessToken({ prompt });
         } else {
-            // Fallback for lazy loading (might trigger popup blocker but necessary if not loaded)
             loadGoogleScript().then(() => {
                 if (!tokenClientRef.current) {
                     tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
@@ -940,14 +985,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         showToast("Signed out.");
     };
 
-    // Helper to check token validity and refresh if needed
-    // Improved: Silent Refresh logic
     const ensureValidToken = async (): Promise<string | null> => {
         const currentUser = stateRef.current.googleUser;
         if (!currentUser) return null;
 
-        // Check if token is expired or about to expire (within 5 mins)
-        // If expiresAt is missing (old data), treat as potentially expired
         const isExpired = !currentUser.expiresAt || Date.now() > (currentUser.expiresAt - 5 * 60 * 1000);
 
         if (!isExpired) {
@@ -958,33 +999,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         console.log("Token expired/expiring, attempting refresh...");
         
-        // Return a promise that resolves when the token callback fires
         return new Promise((resolve) => {
-            // Re-init client with a one-time callback for this request
             if (!tokenClientRef.current) {
                  loadGoogleScript().then(() => {
                      tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse, handleGoogleLoginError);
-                     resolve(null); // Just fail this cycle if not init
+                     resolve(null); 
                  });
                  return;
             }
 
-            // SAFETY TIMEOUT: If popup closed or network fail without callback
             const timer = setTimeout(() => {
                 console.warn("Token refresh timed out (popup closed or blocked).");
-                // Restore original callback if needed (though it's just a ref reassignment)
                 if (tokenClientRef.current && originalCallback) {
                     tokenClientRef.current.callback = originalCallback;
                 }
                 resolve(null);
-            }, 60000); // 60s timeout for user interaction
+            }, 60000);
 
-            // Temporarily override callback to capture the new token
             const originalCallback = tokenClientRef.current.callback;
             
             tokenClientRef.current.callback = async (resp: any) => {
                 clearTimeout(timer);
-                // Restore original callback
                 tokenClientRef.current.callback = originalCallback;
                 
                 if (resp.access_token) {
@@ -995,34 +1030,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 }
             };
             
-            // Use prompt: '' to attempt silent refresh if possible (avoids consent screen if permission exists)
             tokenClientRef.current.requestAccessToken({ prompt: '' }); 
         });
     };
 
     const syncData = useCallback(async () => {
         if (!stateRef.current.isOnline) {
-            // Can't sync offline
             return;
         }
 
-        // 1. Check Auth & Refresh if needed
         let accessToken = stateRef.current.googleUser?.accessToken;
         
         if (!accessToken) {
-            // If user data exists but token is missing, try refresh flow
             if (stateRef.current.googleUser) {
                  accessToken = (await ensureValidToken()) || undefined;
             }
             
             if (!accessToken) {
-                // Silent fail for auto-sync if logged out
                 return;
             }
         } else {
-            // Check expiration
             if (stateRef.current.googleUser?.expiresAt && Date.now() > (stateRef.current.googleUser.expiresAt - 300000)) {
-                 dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' }); // Show spinner
+                 dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' }); 
                  const newToken = await ensureValidToken();
                  if (!newToken) {
                      dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
@@ -1036,15 +1065,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
         
         try {
-            // 2. Read Cloud Data
             const cloudData = await DriveService.read(accessToken);
             
-            // 3. Merge Cloud Data into Local DB (Read-Merge-Write Strategy)
             if (cloudData) {
                 console.log("Merging cloud data...");
                 await db.mergeData(cloudData);
                 
-                // Reload critical state from DB to reflect merged data
                 const customers = await db.getAll('customers');
                 const sales = await db.getAll('sales');
                 const products = await db.getAll('products');
@@ -1052,21 +1078,18 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const profileData = await db.getAll('profile');
                 const app_metadata = await db.getAll('app_metadata');
                 
-                // Extract settings from metadata to update UI state immediately
                 const themeMeta = app_metadata.find(m => m.id === 'themeSettings') as any;
                 const invSettings = app_metadata.find(m => m.id === 'invoiceSettings') as any;
                 const uiPrefsMeta = app_metadata.find(m => m.id === 'uiPreferences') as any;
                 const navOrderMeta = app_metadata.find(m => m.id === 'navOrder') as any;
                 const quickActionsMeta = app_metadata.find(m => m.id === 'quickActions') as any;
                 
-                // Load Templates if available
                 const invoiceTemplate = (app_metadata.find(m => m.id === 'invoiceTemplateConfig') as any);
                 const estimateTemplate = (app_metadata.find(m => m.id === 'estimateTemplateConfig') as any);
                 const debitNoteTemplate = (app_metadata.find(m => m.id === 'debitNoteTemplateConfig') as any);
                 const receiptTemplate = (app_metadata.find(m => m.id === 'receiptTemplateConfig') as any);
                 const reportTemplate = (app_metadata.find(m => m.id === 'reportTemplateConfig') as any);
 
-                // Build payload with fallbacks to current stateRefs to avoid overwriting with undefined if cloud data is partial
                 const payload: Partial<AppState> = { 
                     customers, 
                     sales, 
@@ -1076,7 +1099,6 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     app_metadata
                 };
 
-                // Helper to conditionally add to payload if exists in DB
                 if (themeMeta) {
                     payload.theme = themeMeta.theme;
                     payload.themeColor = themeMeta.color;
@@ -1101,32 +1123,26 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 });
             }
 
-            // 4. Export current merged data
             const currentData = await db.exportData();
             
-            // 5. Upload to Cloud
             await DriveService.write(accessToken, currentData);
             
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
             dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
             
-            // Only show toast if it was a manual action or first sync
             if (!stateRef.current.lastSyncTime) {
                  showToast("Sync Complete!", 'success'); 
             }
         } catch (error: any) {
             console.error("Sync failed:", error);
             
-            // Handle 401/403 specifically
             if (error.message && (error.message.includes('401') || error.message.includes('403'))) {
-                // Silent retry handled by ensureValidToken usually, but if we got here, it really failed
                 dispatch({ type: 'SET_GOOGLE_USER', payload: null }); 
             }
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
         }
     }, []);
     
-    // Exposed function for manual restore from Debug Modal
     const restoreFromFileId = async (fileId: string) => {
         if (!state.googleUser?.accessToken) return;
         try {
@@ -1141,14 +1157,10 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
-    // Inject restore function into state for easy access in modals
     useEffect(() => {
         dispatch({ type: 'SET_STATE', payload: { restoreFromFileId } });
     }, [state.googleUser]);
 
-    // --- AUTO SYNC LOGIC ---
-    
-    // 1. Initial Sync on Load (if logged in and online)
     useEffect(() => {
         if (isDbLoaded && state.googleUser && state.isOnline && state.syncStatus === 'idle' && !state.lastSyncTime) {
             console.log("Initial App Sync Triggered");
@@ -1156,31 +1168,27 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     }, [isDbLoaded, state.googleUser, state.isOnline]);
 
-    // 2. Debounced Sync on Changes
     useEffect(() => {
-        // Auto-sync if user is logged in, online, and data has changed locally
         if (state.googleUser && state.isOnline && state.lastLocalUpdate > 0 && state.syncStatus !== 'syncing') {
             const timer = setTimeout(() => {
                 console.log("Auto-sync triggered due to local changes");
                 syncData();
-            }, 2000); // 2-second debounce for faster sync
+            }, 2000);
 
             return () => clearTimeout(timer);
         }
     }, [state.lastLocalUpdate, state.googleUser, state.isOnline, syncData, state.syncStatus]);
 
-    // --- PROACTIVE TOKEN REFRESH ---
     useEffect(() => {
         const checkInterval = setInterval(() => {
             const user = stateRef.current.googleUser;
             if (user && user.expiresAt && stateRef.current.isOnline) {
                 const timeLeft = user.expiresAt - Date.now();
-                // If less than 2 minutes left, try to refresh silently
                 if (timeLeft < 2 * 60 * 1000 && timeLeft > 0) {
                     ensureValidToken();
                 }
             }
-        }, 60000); // Check every minute
+        }, 60000); 
         return () => clearInterval(checkInterval);
     }, []);
 

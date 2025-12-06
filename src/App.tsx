@@ -1,30 +1,16 @@
 
-import React, { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, Suspense } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download, Sun, Moon, CalendarClock
+  X, Download, Sun, Moon, CalendarClock, WifiOff, Database, PauseCircle, Trash2
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
 import { Page } from './types';
 
-// Pages
-import Dashboard from './pages/Dashboard';
-import CustomersPage from './pages/CustomersPage';
-import SalesPage from './pages/SalesPage';
-import PurchasesPage from './pages/PurchasesPage';
-import ProductsPage from './pages/ProductsPage';
-import ReportsPage from './pages/ReportsPage';
-import ReturnsPage from './pages/ReturnsPage';
-import InsightsPage from './pages/InsightsPage';
-import ExpensesPage from './pages/ExpensesPage';
-import QuotationsPage from './pages/QuotationsPage';
-import InvoiceDesigner from './pages/InvoiceDesigner';
-import SystemOptimizerPage from './pages/SystemOptimizerPage';
-
-// Components
+// Components (Eager Load)
 import MenuPanel from './components/MenuPanel';
 import NotificationsPanel from './components/NotificationsPanel';
 import AskAIModal from './components/AskAIModal';
@@ -33,16 +19,33 @@ import UniversalSearch from './components/UniversalSearch';
 import DeveloperToolsModal from './components/DeveloperToolsModal';
 import CloudDebugModal from './components/CloudDebugModal';
 import ProfileModal from './components/ProfileModal';
-import AppSkeletonLoader from './components/AppSkeletonLoader';
+import DevineLoader from './components/DevineLoader';
 import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
 import SignInModal from './components/SignInModal';
 import PinModal from './components/PinModal';
+import Card from './components/Card';
+import Button from './components/Button';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
 import { APP_VERSION } from './utils/changelogData';
+
+// Pages (Lazy Load for Performance)
+const Dashboard = React.lazy(() => import('./pages/Dashboard'));
+const CustomersPage = React.lazy(() => import('./pages/CustomersPage'));
+const SalesPage = React.lazy(() => import('./pages/SalesPage'));
+const PurchasesPage = React.lazy(() => import('./pages/PurchasesPage'));
+const ProductsPage = React.lazy(() => import('./pages/ProductsPage'));
+const ReportsPage = React.lazy(() => import('./pages/ReportsPage'));
+const ReturnsPage = React.lazy(() => import('./pages/ReturnsPage'));
+const InsightsPage = React.lazy(() => import('./pages/InsightsPage'));
+const ExpensesPage = React.lazy(() => import('./pages/ExpensesPage'));
+const QuotationsPage = React.lazy(() => import('./pages/QuotationsPage'));
+const InvoiceDesigner = React.lazy(() => import('./pages/InvoiceDesigner'));
+const SystemOptimizerPage = React.lazy(() => import('./pages/SystemOptimizerPage'));
+const SQLAssistantPage = React.lazy(() => import('./pages/SQLAssistantPage'));
 
 // Icon Map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -57,7 +60,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
     'RETURNS': Undo2,
     'QUOTATIONS': FileText,
     'INVOICE_DESIGNER': PenTool,
-    'SYSTEM_OPTIMIZER': Gauge
+    'SYSTEM_OPTIMIZER': Gauge,
+    'SQL_ASSISTANT': Database
 };
 
 const LABEL_MAP: Record<string, string> = {
@@ -72,7 +76,8 @@ const LABEL_MAP: Record<string, string> = {
     'RETURNS': 'Returns',
     'QUOTATIONS': 'Estimates',
     'INVOICE_DESIGNER': 'Designer',
-    'SYSTEM_OPTIMIZER': 'System'
+    'SYSTEM_OPTIMIZER': 'System',
+    'SQL_ASSISTANT': 'SQL AI'
 };
 
 const QUICK_ACTION_REGISTRY: Record<string, { icon: React.ElementType, label: string, page: Page, action?: string }> = {
@@ -125,7 +130,7 @@ const AppContent: React.FC = () => {
         try {
             const saved = localStorage.getItem('business_manager_last_page');
             // Exclude admin/utility pages from auto-restore to prevent getting stuck
-            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER'];
+            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER', 'SQL_ASSISTANT'];
             if (saved && Object.keys(ICON_MAP).includes(saved) && !excludedPages.includes(saved)) {
                 return saved as Page;
             }
@@ -188,6 +193,9 @@ const AppContent: React.FC = () => {
     const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
+    
+    // Park Sale Modal
+    const [parkModalState, setParkModalState] = useState<{ isOpen: boolean, targetPage: Page | null }>({ isOpen: false, targetPage: null });
 
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const mobileQuickAddRef = useRef<HTMLDivElement>(null);
@@ -282,14 +290,14 @@ const AppContent: React.FC = () => {
 
     // Apply Theme & Dynamic Icon
     useEffect(() => {
+        const root = document.documentElement;
+
         // 1. Dark Mode Class
         if (state.theme === 'dark') {
-            document.documentElement.classList.add('dark');
+            root.classList.add('dark');
         } else {
-            document.documentElement.classList.remove('dark');
+            root.classList.remove('dark');
         }
-        
-        const root = document.documentElement;
         
         // 2. Dynamic Primary Color
         const hex = state.themeColor.replace(/^#/, '');
@@ -311,23 +319,27 @@ const AppContent: React.FC = () => {
             root.style.setProperty('--theme-gradient', `linear-gradient(135deg, ${state.themeColor} 0%, ${state.themeColor} 100%)`);
         }
 
-        // 4. Persist to LocalStorage
+        // 4. App Font (This ensures font selection works instantly)
+        if (state.font) {
+            root.style.setProperty('--app-font', state.font);
+        }
+
+        // 5. Persist to LocalStorage
         localStorage.setItem('theme', state.theme);
         localStorage.setItem('themeColor', state.themeColor);
+        localStorage.setItem('font', state.font);
         if (state.themeGradient) {
             localStorage.setItem('themeGradient', state.themeGradient);
         } else {
             localStorage.removeItem('themeGradient');
         }
 
-        // 5. Dynamic Icons (Favicon, Apple Touch ONLY)
+        // 6. Dynamic Icons (Favicon, Apple Touch ONLY) - UPDATED TO REMOVE BOX
         const updateIcons = () => {
-            const bg = state.themeColor;
-            const fill = '#ffffff'; 
+            const bg = state.themeColor; // Use theme color for text now
             const svgString = `
                 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="512" height="512" rx="96" fill="${bg}"/>
-                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="280" font-family="serif" fill="${fill}" font-weight="bold">ॐ</text>
+                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="400" font-family="serif" fill="${bg}" font-weight="bold">ॐ</text>
                 </svg>
             `.trim();
             
@@ -346,16 +358,28 @@ const AppContent: React.FC = () => {
         };
         updateIcons();
 
-    }, [state.theme, state.themeColor, state.themeGradient]);
+    }, [state.theme, state.themeColor, state.themeGradient, state.font]);
 
     // Analytics: Log page changes
     useEffect(() => {
         logPageView(currentPage);
     }, [currentPage]);
 
-    // Handle Unsaved Changes
+    // Handle Unsaved Changes & Navigation Interception
     const handleNavigation = (page: Page) => {
-        if (isDirty) {
+        // Special Handling for Sales Page: Park or Clear
+        if (currentPage === 'SALES') {
+             const { customerId, items } = state.currentSale;
+             const hasActiveSale = !!customerId || items.length > 0;
+             
+             if (hasActiveSale) {
+                 setParkModalState({ isOpen: true, targetPage: page });
+                 return;
+             }
+        }
+
+        // Standard Dirty Check for other pages (Customers, Purchases etc.)
+        if (isDirty && currentPage !== 'SALES') {
             if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
                 setIsDirty(false);
                 setCurrentPage(page);
@@ -363,6 +387,27 @@ const AppContent: React.FC = () => {
         } else {
             setCurrentPage(page);
         }
+    };
+    
+    const handleParkAction = (action: 'park' | 'discard' | 'cancel') => {
+        if (action === 'cancel') {
+            setParkModalState({ isOpen: false, targetPage: null });
+            return;
+        }
+        
+        if (action === 'park') {
+            dispatch({ type: 'PARK_CURRENT_SALE' });
+            showToast("Sale parked successfully.", 'success');
+        } else if (action === 'discard') {
+            dispatch({ type: 'CLEAR_CURRENT_SALE' });
+        }
+        
+        if (parkModalState.targetPage) {
+            setCurrentPage(parkModalState.targetPage);
+        }
+        setParkModalState({ isOpen: false, targetPage: null });
+        // Force clear dirty flag if it was set by SalesPage logic
+        setIsDirty(false);
     };
 
     // Calculate Navigation Layout based on user preference order
@@ -396,12 +441,17 @@ const AppContent: React.FC = () => {
         dispatch({ type: 'SET_THEME', payload: newTheme });
     };
 
-    if (!isDbLoaded) return <AppSkeletonLoader />;
+    if (!isDbLoaded) return <DevineLoader />;
 
     // Main Content Class Logic
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
         : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
+    
+    // Nav Bar Styling based on Preference
+    const navClass = state.uiPreferences?.cardStyle === 'glass' 
+        ? 'glass border-t border-white/20 dark:border-slate-700/50' 
+        : 'bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700';
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
@@ -414,6 +464,29 @@ const AppContent: React.FC = () => {
                         onCorrectPin={() => setIsLocked(false)}
                         // No onCancel prop = no back button = forced lock
                     />
+                </div>
+            )}
+
+            {/* Park Sale Modal */}
+            {parkModalState.isOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000] p-4 animate-fade-in-fast backdrop-blur-sm">
+                    <Card className="w-full max-w-sm animate-scale-in border-l-4 border-amber-500">
+                        <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Sale in Progress</h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                            You have an unsaved sale. Would you like to park it for later or discard the changes?
+                        </p>
+                        <div className="flex flex-col gap-2">
+                            <Button onClick={() => handleParkAction('park')} className="w-full bg-amber-500 hover:bg-amber-600 text-white">
+                                <PauseCircle size={18} className="mr-2" /> Park Sale
+                            </Button>
+                            <Button onClick={() => handleParkAction('discard')} className="w-full bg-red-500 hover:bg-red-600 text-white">
+                                <Trash2 size={18} className="mr-2" /> Discard
+                            </Button>
+                            <Button onClick={() => handleParkAction('cancel')} variant="secondary" className="w-full">
+                                Cancel
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
             )}
 
@@ -446,31 +519,43 @@ const AppContent: React.FC = () => {
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
                                     {state.profile?.name || 'Business Manager'}
                                 </h1>
-                                {state.googleUser && (
-                                    <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
-                                        <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">
-                                            {state.googleUser.name}
-                                        </span>
-                                        
-                                        {/* Status Dot */}
-                                        <div className="relative flex h-2 w-2 shrink-0">
-                                          {state.syncStatus === 'syncing' && (
-                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-                                          )}
-                                          <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'error' ? 'bg-red-500' : 'bg-green-400'} shadow-sm`}></span>
-                                        </div>
+                                <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
+                                    {state.googleUser ? (
+                                        <>
+                                            <span className="text-[10px] sm:text-xs font-medium text-white/95 truncate max-w-[150px] drop-shadow-sm">
+                                                {state.googleUser.name}
+                                            </span>
+                                            
+                                            {/* Status Dot */}
+                                            <div className="relative flex h-2 w-2 shrink-0">
+                                              {state.syncStatus === 'syncing' && (
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                                              )}
+                                              <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'error' ? 'bg-red-500' : 'bg-green-400'} shadow-sm`}></span>
+                                            </div>
 
-                                        {/* Sync Time */}
-                                        <span className="text-[9px] sm:text-[10px] font-mono text-white/80 font-medium tracking-wide">
-                                            {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true}) : 'Connected'}
-                                        </span>
-                                    </div>
-                                )}
+                                            {/* Sync Time */}
+                                            <span className="text-[9px] sm:text-[10px] font-mono text-white/80 font-medium tracking-wide">
+                                                {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true}) : 'Connected'}
+                                            </span>
+                                        </>
+                                    ) : (
+                                        <span className="text-[10px] sm:text-xs text-white/80">Local Mode</span>
+                                    )}
+                                </div>
                             </button>
                         </div>
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-1 sm:gap-2 z-20">
+                            {/* Offline Indicator - Only visible when offline */}
+                            {!state.isOnline && (
+                                <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-red-500/20 rounded-full border border-red-400/50 mr-1 animate-pulse">
+                                    <WifiOff size={14} className="text-white" />
+                                    <span className="text-[10px] font-bold text-white">Offline</span>
+                                </div>
+                            )}
+
                             {/* Theme Toggle Button - New */}
                             <button 
                                 onClick={toggleTheme}
@@ -484,7 +569,8 @@ const AppContent: React.FC = () => {
                             <button 
                                 onClick={() => { 
                                     if (!state.googleUser) {
-                                        setIsSignInModalOpen(true);
+                                        if (state.isOnline) setIsSignInModalOpen(true);
+                                        else showToast("Connect to internet to sign in.", "error");
                                     } else {
                                         syncData(); 
                                     }
@@ -542,6 +628,7 @@ const AppContent: React.FC = () => {
                             <span>{getTimeBasedGreeting()}, <span className="font-bold">{state.profile?.ownerName || 'Owner'}</span></span>
                         </div>
                         <div className="flex-1 text-right opacity-90 truncate pl-2 flex items-center justify-end gap-2">
+                            {!state.isOnline && <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded sm:hidden">OFFLINE</span>}
                             <CalendarClock className="w-4 h-4 text-white/80" />
                             {currentDateTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} {currentDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
                         </div>
@@ -552,18 +639,21 @@ const AppContent: React.FC = () => {
             {/* Main Content Area */}
             <main className={`flex-grow w-full ${mainClass}`}>
                 <div className={`mx-auto ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'p-4 pb-32 max-w-7xl'}`}>
-                    {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
-                    {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
-                    {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'PURCHASES' && <PurchasesPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
-                    {currentPage === 'PRODUCTS' && <ProductsPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'REPORTS' && <ReportsPage setCurrentPage={handleNavigation} />}
-                    {currentPage === 'RETURNS' && <ReturnsPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'INSIGHTS' && <InsightsPage setCurrentPage={handleNavigation} />}
-                    {currentPage === 'EXPENSES' && <ExpensesPage setIsDirty={setIsDirty} />}
-                    {currentPage === 'QUOTATIONS' && <QuotationsPage />}
-                    {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
-                    {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
+                    <Suspense fallback={<DevineLoader />}>
+                        {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
+                        {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                        {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'PURCHASES' && <PurchasesPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                        {currentPage === 'PRODUCTS' && <ProductsPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'REPORTS' && <ReportsPage setCurrentPage={handleNavigation} />}
+                        {currentPage === 'RETURNS' && <ReturnsPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'INSIGHTS' && <InsightsPage setCurrentPage={handleNavigation} />}
+                        {currentPage === 'EXPENSES' && <ExpensesPage setIsDirty={setIsDirty} />}
+                        {currentPage === 'QUOTATIONS' && <QuotationsPage />}
+                        {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
+                        {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
+                        {currentPage === 'SQL_ASSISTANT' && <SQLAssistantPage setCurrentPage={handleNavigation} />}
+                    </Suspense>
                 </div>
             </main>
 
@@ -579,7 +669,7 @@ const AppContent: React.FC = () => {
                 onLockApp={handleLockApp}
             />
             <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
-            <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
+            <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} onNavigate={handleNavigation} />
             <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
             <DeveloperToolsModal isOpen={isDevToolsOpen} onClose={() => setIsDevToolsOpen(false)} onOpenCloudDebug={() => setIsCloudDebugOpen(true)} />
             <CloudDebugModal isOpen={isCloudDebugOpen} onClose={() => setIsCloudDebugOpen(false)} />
@@ -588,7 +678,7 @@ const AppContent: React.FC = () => {
             
             {/* Bottom Navigation */}
             {currentPage !== 'INVOICE_DESIGNER' && (
-            <nav className="fixed bottom-0 left-0 right-0 glass pb-[env(safe-area-inset-bottom)] z-50 border-t border-gray-200/50 dark:border-slate-700/50">
+            <nav className={`fixed bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)] z-50 transition-colors duration-300 ${navClass}`}>
                 {/* Desktop View - Scrollable */}
                 <div className="hidden md:flex w-full overflow-x-auto custom-scrollbar">
                     <div className="flex flex-nowrap mx-auto items-center gap-2 lg:gap-6 p-2 px-6 min-w-max">

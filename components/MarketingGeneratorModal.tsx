@@ -1,11 +1,12 @@
 
-import React, { useState } from 'react';
-import { X, Image as ImageIcon, Video, Loader2, Download, Wand2, RefreshCw, WifiOff } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { X, Image as ImageIcon, Video, Loader2, Download, Wand2, RefreshCw, WifiOff, Camera, Upload } from 'lucide-react';
 import { GoogleGenAI } from "@google/genai";
 import Card from './Card';
 import Button from './Button';
 import { Product } from '../types';
 import { useAppContext } from '../context/AppContext';
+import { compressImage } from '../utils/imageUtils';
 
 interface MarketingGeneratorModalProps {
     isOpen: boolean;
@@ -15,11 +16,12 @@ interface MarketingGeneratorModalProps {
 
 const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpen, onClose, product }) => {
     const { state, showToast } = useAppContext();
-    const [mode, setMode] = useState<'IMAGE' | 'VIDEO'>('IMAGE');
+    const [mode, setMode] = useState<'IMAGE' | 'VIDEO' | 'REMIX'>('IMAGE');
     const [prompt, setPrompt] = useState(`Professional studio shot of ${product.name}, ${product.category || 'product'}, cinematic lighting, 4k resolution.`);
     const [isGenerating, setIsGenerating] = useState(false);
     const [resultUrl, setResultUrl] = useState<string | null>(null);
-    const [videoOperation, setVideoOperation] = useState<any>(null);
+    const [uploadedImage, setUploadedImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const checkApiKey = async () => {
         const aistudio = (window as any).aistudio;
@@ -33,11 +35,27 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
         }
         return !!process.env.API_KEY || !!localStorage.getItem('gemini_api_key');
     };
+    
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            try {
+                const base64 = await compressImage(e.target.files[0], 1024, 0.8);
+                setUploadedImage(base64);
+            } catch (err) {
+                showToast("Failed to upload image", 'error');
+            }
+        }
+    };
 
     const handleGenerate = async () => {
         if (!state.isOnline) {
             showToast("Offline. Cannot generate.", 'error');
             return;
+        }
+        
+        if (mode === 'REMIX' && !uploadedImage) {
+             showToast("Please upload a product photo first.", 'info');
+             return;
         }
 
         setIsGenerating(true);
@@ -45,19 +63,17 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
         
         try {
             const hasKey = await checkApiKey();
-            if (!hasKey && !(window as any).aistudio) { // If no shim and no key
+            if (!hasKey && !(window as any).aistudio) {
                  showToast("API Key required. Please configure in Settings.", 'error');
                  setIsGenerating(false);
                  return;
             }
 
             const apiKey = process.env.API_KEY || localStorage.getItem('gemini_api_key');
-            // If using shim, the key is injected, but we might need to instantiate specifically.
-            // Assuming standard instantiation works if env is populated by shim or manual entry.
             const ai = new GoogleGenAI({ apiKey: apiKey || 'dummy' }); 
 
             if (mode === 'IMAGE') {
-                // Use Imagen for high quality generation
+                // Use Imagen for pure generation
                 const response = await ai.models.generateImages({
                     model: 'imagen-3.0-generate-001',
                     prompt: prompt,
@@ -72,6 +88,41 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
                     const base64 = response.generatedImages[0].image.imageBytes;
                     setResultUrl(`data:image/jpeg;base64,${base64}`);
                 }
+            } else if (mode === 'REMIX') {
+                // Use Gemini 2.5 Flash Image for editing/remixing
+                // We send the image and the prompt instruction
+                const parts = [
+                    {
+                         inlineData: {
+                             mimeType: 'image/jpeg',
+                             data: uploadedImage!.split(',')[1]
+                         }
+                    },
+                    {
+                        text: `Edit this image: ${prompt}. Keep the main product intact but change the background/lighting as described. Return the edited image.`
+                    }
+                ];
+
+                const response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash-image',
+                    contents: { parts }
+                });
+                
+                // Find image part in response
+                let foundImage = false;
+                if (response.candidates?.[0]?.content?.parts) {
+                    for (const part of response.candidates[0].content.parts) {
+                        if (part.inlineData) {
+                            setResultUrl(`data:image/png;base64,${part.inlineData.data}`);
+                            foundImage = true;
+                            break;
+                        }
+                    }
+                }
+                if (!foundImage) {
+                    showToast("AI did not return an image. Try refining prompt.", 'info');
+                }
+
             } else {
                 // Use Veo for video
                 let operation = await ai.models.generateVideos({
@@ -84,9 +135,6 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
                     }
                 });
                 
-                setVideoOperation(operation);
-                
-                // Poll for completion
                 while (!operation.done) {
                     await new Promise(resolve => setTimeout(resolve, 5000));
                     operation = await ai.operations.getVideosOperation({operation: operation});
@@ -94,18 +142,11 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
                 
                 const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
                 if (videoUri) {
-                    // Fetch the actual video bytes using the key
-                    // Note: In a real browser env with CORS, this fetch might need a proxy or direct link handling.
-                    // For this demo, we'll try to display it or provide a link.
-                    // Ideally, we fetch it and convert to blob url.
                     try {
                         const vidRes = await fetch(`${videoUri}&key=${apiKey}`);
                         const vidBlob = await vidRes.blob();
                         setResultUrl(URL.createObjectURL(vidBlob));
                     } catch (e) {
-                        console.error("Failed to fetch video blob", e);
-                        // Fallback: just try setting the URI directly (might fail due to auth headers requirements in src)
-                        // Or open in new tab
                         setResultUrl(`${videoUri}&key=${apiKey}`);
                     }
                 }
@@ -120,7 +161,6 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
             showToast(msg, 'error');
         } finally {
             setIsGenerating(false);
-            setVideoOperation(null);
         }
     };
 
@@ -144,34 +184,52 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
                             <div className="flex bg-gray-100 dark:bg-slate-800 p-1 rounded-lg">
                                 <button 
                                     onClick={() => { setMode('IMAGE'); setResultUrl(null); }}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${mode === 'IMAGE' ? 'bg-white dark:bg-slate-700 shadow text-pink-600 dark:text-pink-400' : 'text-gray-500'}`}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${mode === 'IMAGE' ? 'bg-white dark:bg-slate-700 shadow text-pink-600 dark:text-pink-400' : 'text-gray-500'}`}
                                 >
-                                    <ImageIcon size={16} /> Product Image
+                                    <ImageIcon size={14} /> Create
+                                </button>
+                                <button 
+                                    onClick={() => { setMode('REMIX'); setResultUrl(null); }}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${mode === 'REMIX' ? 'bg-white dark:bg-slate-700 shadow text-blue-600 dark:text-blue-400' : 'text-gray-500'}`}
+                                >
+                                    <RefreshCw size={14} /> Remix
                                 </button>
                                 <button 
                                     onClick={() => { setMode('VIDEO'); setResultUrl(null); }}
-                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-sm font-semibold transition-all ${mode === 'VIDEO' ? 'bg-white dark:bg-slate-700 shadow text-purple-600 dark:text-purple-400' : 'text-gray-500'}`}
+                                    className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-md text-xs sm:text-sm font-semibold transition-all ${mode === 'VIDEO' ? 'bg-white dark:bg-slate-700 shadow text-purple-600 dark:text-purple-400' : 'text-gray-500'}`}
                                 >
-                                    <Video size={16} /> Promo Video
+                                    <Video size={14} /> Video
                                 </button>
                             </div>
 
-                            {/* Result Area */}
+                            {/* Preview Area / Upload Area */}
                             <div className="aspect-video bg-gray-50 dark:bg-slate-800 rounded-xl border-2 border-dashed border-gray-200 dark:border-slate-700 flex items-center justify-center overflow-hidden relative">
                                 {isGenerating ? (
                                     <div className="text-center p-6">
                                         <Loader2 className="w-10 h-10 animate-spin text-purple-500 mx-auto mb-3" />
                                         <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                                            {mode === 'VIDEO' ? 'Generating Video (this takes a moment)...' : 'Creating Image...'}
+                                            Generating...
                                         </p>
-                                        {mode === 'VIDEO' && <p className="text-xs text-gray-400 mt-1">AI is dreaming up your scene</p>}
                                     </div>
                                 ) : resultUrl ? (
-                                    mode === 'IMAGE' ? (
-                                        <img src={resultUrl} alt="Generated" className="w-full h-full object-cover" />
-                                    ) : (
+                                    mode === 'VIDEO' ? (
                                         <video src={resultUrl} controls className="w-full h-full object-contain bg-black" />
+                                    ) : (
+                                        <img src={resultUrl} alt="Generated" className="w-full h-full object-contain" />
                                     )
+                                ) : mode === 'REMIX' ? (
+                                    // Upload UI for Remix
+                                    <div className="text-center flex flex-col items-center justify-center w-full h-full cursor-pointer hover:bg-gray-100 dark:hover:bg-slate-700/50 transition-colors" onClick={() => fileInputRef.current?.click()}>
+                                        {uploadedImage ? (
+                                            <img src={uploadedImage} className="w-full h-full object-contain" />
+                                        ) : (
+                                            <>
+                                                <Upload size={32} className="text-gray-400 mb-2" />
+                                                <p className="text-sm text-gray-500">Click to upload product photo</p>
+                                            </>
+                                        )}
+                                        <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                                    </div>
                                 ) : (
                                     <div className="text-center text-gray-400">
                                         <Wand2 size={40} className="mx-auto mb-2 opacity-50" />
@@ -183,10 +241,13 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
                             {/* Controls */}
                             <div className="space-y-3">
                                 <div>
-                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Creative Prompt</label>
+                                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">
+                                        {mode === 'REMIX' ? 'Edit Instructions' : 'Creative Prompt'}
+                                    </label>
                                     <textarea 
                                         value={prompt}
                                         onChange={(e) => setPrompt(e.target.value)}
+                                        placeholder={mode === 'REMIX' ? "Place on a wooden table, cinematic lighting..." : "Describe the image..."}
                                         className="w-full p-3 text-sm border rounded-lg bg-gray-50 dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none resize-none"
                                         rows={3}
                                     />
@@ -196,15 +257,15 @@ const MarketingGeneratorModal: React.FC<MarketingGeneratorModalProps> = ({ isOpe
                                     <Button 
                                         onClick={handleGenerate} 
                                         disabled={isGenerating}
-                                        className={`flex-1 py-3 text-white shadow-lg ${mode === 'IMAGE' ? 'bg-pink-600 hover:bg-pink-700' : 'bg-purple-600 hover:bg-purple-700'}`}
+                                        className={`flex-1 py-3 text-white shadow-lg ${mode === 'IMAGE' ? 'bg-pink-600 hover:bg-pink-700' : mode === 'REMIX' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'}`}
                                     >
-                                        {isGenerating ? 'Working Magic...' : `Generate ${mode === 'IMAGE' ? 'Image' : 'Video'}`}
+                                        {isGenerating ? 'Working Magic...' : 'Generate'}
                                     </Button>
                                     
                                     {resultUrl && (
                                         <a 
                                             href={resultUrl} 
-                                            download={`marketing-${mode.toLowerCase()}-${Date.now()}.${mode === 'IMAGE' ? 'jpg' : 'mp4'}`}
+                                            download={`marketing-${mode.toLowerCase()}-${Date.now()}.${mode === 'VIDEO' ? 'mp4' : 'jpg'}`}
                                             className="px-4 flex items-center justify-center bg-gray-100 dark:bg-slate-700 hover:bg-gray-200 dark:hover:bg-slate-600 rounded-lg text-gray-700 dark:text-gray-200 transition-colors"
                                         >
                                             <Download size={20} />

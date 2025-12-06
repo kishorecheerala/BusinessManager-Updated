@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useRef } from 'react';
 import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone, FileSpreadsheet, Type, PaintBucket, Plus, Trash2, Database } from 'lucide-react';
 import { Page } from '../types';
@@ -30,13 +28,36 @@ interface MenuPanelProps {
 interface ThemeColor {
     hex: string;
     name: string;
-    gradient?: string; // Optional gradient override for header
 }
 
 interface ThemeGroup {
     name: string;
     colors: ThemeColor[];
 }
+
+interface GradientPreset {
+    name: string;
+    value: string;
+}
+
+const GRADIENT_PRESETS: GradientPreset[] = [
+    { name: 'Nebula', value: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)' },
+    { name: 'Sunset', value: 'linear-gradient(135deg, #f59e0b 0%, #ef4444 100%)' },
+    { name: 'Ocean', value: 'linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%)' },
+    { name: 'Forest', value: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' },
+    { name: 'Midnight', value: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)' },
+    { name: 'Royal', value: 'linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%)' },
+    { name: 'Candy', value: 'linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%)' },
+    { name: 'Minimal', value: 'linear-gradient(135deg, #94a3b8 0%, #64748b 100%)' },
+    { name: 'Peachy', value: 'linear-gradient(135deg, #FF9A9E 0%, #FECFEF 100%)' },
+    { name: 'Deep Sea', value: 'linear-gradient(135deg, #2E3192 0%, #1BFFFF 100%)' },
+    { name: 'Night', value: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' },
+    { name: 'Love', value: 'linear-gradient(135deg, #ff9a9e 0%, #fad0c4 99%, #fad0c4 100%)' },
+    { name: 'Lemon', value: 'linear-gradient(135deg, #f6d365 0%, #fda085 100%)' },
+    { name: 'Sky', value: 'linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%)' },
+    { name: 'Horizon', value: 'linear-gradient(135deg, #00c6fb 0%, #005bea 100%)' },
+    { name: 'Rose', value: 'linear-gradient(135deg, #f43b47 0%, #453a94 100%)' },
+];
 
 const THEME_GROUPS: ThemeGroup[] = [
     {
@@ -78,10 +99,10 @@ const THEME_GROUPS: ThemeGroup[] = [
 ];
 
 const APP_FONTS = [
-    { name: 'Inter', label: 'Inter (Default)', class: 'font-sans' },
+    { name: 'Inter', label: 'Inter (Default)', style: { fontFamily: 'Inter, sans-serif' } },
     { name: 'Poppins', label: 'Poppins', style: { fontFamily: 'Poppins, sans-serif' } },
     { name: 'Roboto', label: 'Roboto', style: { fontFamily: 'Roboto, sans-serif' } },
-    { name: 'Playfair Display', label: 'Playfair (Serif)', style: { fontFamily: '"Playfair Display", serif' } },
+    { name: 'Playfair Display', label: 'Playfair', style: { fontFamily: '"Playfair Display", serif' } },
     { name: 'Space Mono', label: 'Space Mono', style: { fontFamily: '"Space Mono", monospace' } },
 ];
 
@@ -127,15 +148,23 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
     };
 
     const handleColorSelect = (color: ThemeColor) => {
+        // Set Accent Color
         dispatch({ type: 'SET_THEME_COLOR', payload: color.hex });
-        // Also set the header gradient if provided by the preset
-        if (color.gradient) {
-            dispatch({ type: 'SET_THEME_GRADIENT', payload: color.gradient });
-            dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
-        } else {
-            // Solid preset: Clear gradient, let accent color take over header unless overridden
-            dispatch({ type: 'SET_THEME_GRADIENT', payload: '' });
-            dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
+        // Clear Gradient so the solid color takes effect on the header
+        dispatch({ type: 'SET_THEME_GRADIENT', payload: '' });
+        // Clear specific header color override if any
+        dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
+    };
+
+    const handleGradientSelect = (gradient: string) => {
+        dispatch({ type: 'SET_THEME_GRADIENT', payload: gradient });
+        dispatch({ type: 'SET_HEADER_COLOR', payload: '' }); // Clear solid override
+        
+        // Extract the first hex color from the gradient to set as the primary app color
+        // This ensures the "whole app" feels cohesive with the header
+        const match = gradient.match(/#(?:[0-9a-fA-F]{3}){1,2}/);
+        if (match && match[0]) {
+            dispatch({ type: 'SET_THEME_COLOR', payload: match[0] });
         }
     };
 
@@ -154,11 +183,6 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
         document.head.appendChild(link);
         
         // Add to state list so it's selectable (persisted as custom font without base64 for now to keep it simple)
-        // We will misuse custom_fonts slightly to store just the name for now, 
-        // or just set it directly if we assume internet access.
-        // A better way is to treat it as a "system font" but load it.
-        
-        // Let's add it to customFonts so it appears in the list
         const newFont = {
             id: `gfont-${Date.now()}`,
             name: fontName,
@@ -245,9 +269,6 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
             initialColor={state.themeColor}
             onChange={(color) => {
                 dispatch({ type: 'SET_THEME_COLOR', payload: color });
-                // If user picks accent, reset specific header styles to default behavior (unless they want split)
-                // dispatch({ type: 'SET_THEME_GRADIENT', payload: '' }); 
-                // dispatch({ type: 'SET_HEADER_COLOR', payload: '' });
             }}
         />
 
@@ -465,10 +486,10 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                         </div>
                         <button 
                             onClick={resetTheme}
-                            className="p-1.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors"
+                            className="p-1.5 rounded bg-gray-100 dark:bg-slate-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-slate-600 transition-colors flex items-center gap-1 text-[10px] font-bold px-2"
                             title="Reset to Default"
                         >
-                            <RotateCcw size={14} />
+                            <RotateCcw size={12} /> Reset
                         </button>
                     </div>
 
@@ -488,17 +509,14 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                         </button>
                     </div>
 
-                    {/* Color Presets Grid */}
+                    {/* Accent Color Presets */}
                     <div className="space-y-4 px-1">
                         {THEME_GROUPS.map(group => (
                             <div key={group.name}>
                                 <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-2">{group.name} Colors</p>
                                 <div className="flex flex-wrap gap-3">
                                     {group.colors.map((t) => {
-                                        const isHexMatch = state.themeColor.toLowerCase() === t.hex.toLowerCase();
-                                        // For solid colors, check if header matches
-                                        const isGradientMatch = (state.themeGradient || '') === (t.gradient || '');
-                                        const isSelected = isHexMatch && (t.gradient ? isGradientMatch : !state.themeGradient && !state.headerColor);
+                                        const isSelected = state.themeColor.toLowerCase() === t.hex.toLowerCase();
 
                                         return (
                                             <button
@@ -509,7 +527,7 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                                                     ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-500 scale-110 shadow-md' 
                                                     : 'border border-gray-200 dark:border-slate-600 opacity-90 hover:opacity-100 hover:scale-105'
                                                 }`}
-                                                style={{ background: t.gradient || t.hex }}
+                                                style={{ background: t.hex }}
                                                 title={t.name}
                                             >
                                                 {isSelected && (
@@ -527,9 +545,42 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                             </div>
                         ))}
                         
+                        {/* Pre-Defined Gradients */}
+                        <div>
+                            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-2">Gradients</p>
+                            <div className="flex gap-3 overflow-x-auto p-2 custom-scrollbar -mx-1 px-4">
+                                {GRADIENT_PRESETS.map((g) => {
+                                    const isSelected = state.themeGradient === g.value;
+                                    return (
+                                        <button
+                                            key={g.name}
+                                            onClick={() => handleGradientSelect(g.value)}
+                                            className={`w-9 h-9 rounded-full flex-shrink-0 flex items-center justify-center transition-all relative ${
+                                                isSelected 
+                                                ? 'ring-2 ring-offset-2 ring-gray-400 dark:ring-gray-500 scale-110 shadow-md' 
+                                                : 'border border-gray-200 dark:border-slate-600 opacity-90 hover:opacity-100 hover:scale-105'
+                                            }`}
+                                            style={{ background: g.value }}
+                                            title={g.name}
+                                        >
+                                            {isSelected && <Check size={16} color="white" strokeWidth={3} className="drop-shadow-md" />}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
                         {/* Custom Colors & Header */}
                         <div>
-                            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 mb-2">Advanced Customization</p>
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500">Advanced Customization</p>
+                                <button 
+                                    onClick={resetTheme}
+                                    className="text-[10px] font-bold text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                                >
+                                    <RotateCcw size={10} /> Reset
+                                </button>
+                            </div>
                             <div className="grid grid-cols-2 gap-2">
                                 <button 
                                     className="p-2 rounded-lg bg-gray-50 dark:bg-slate-700 border border-gray-200 dark:border-slate-600 flex items-center gap-2 hover:bg-gray-100 dark:hover:bg-slate-600 transition-colors"

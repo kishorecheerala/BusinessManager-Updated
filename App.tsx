@@ -4,7 +4,7 @@ import {
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download, Sun, Moon, CalendarClock, WifiOff, Database
+  X, Download, Sun, Moon, CalendarClock, WifiOff, Database, PauseCircle, Trash2
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -19,12 +19,14 @@ import UniversalSearch from './components/UniversalSearch';
 import DeveloperToolsModal from './components/DeveloperToolsModal';
 import CloudDebugModal from './components/CloudDebugModal';
 import ProfileModal from './components/ProfileModal';
-import AppSkeletonLoader from './components/AppSkeletonLoader';
+import DevineLoader from './components/DevineLoader';
 import NavCustomizerModal from './components/NavCustomizerModal';
 import Toast from './components/Toast';
 import ChangeLogModal from './components/ChangeLogModal';
 import SignInModal from './components/SignInModal';
 import PinModal from './components/PinModal';
+import Card from './components/Card';
+import Button from './components/Button';
 import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
@@ -191,6 +193,9 @@ const AppContent: React.FC = () => {
     const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
+    
+    // Park Sale Modal
+    const [parkModalState, setParkModalState] = useState<{ isOpen: boolean, targetPage: Page | null }>({ isOpen: false, targetPage: null });
 
     const moreMenuRef = useRef<HTMLDivElement>(null);
     const mobileQuickAddRef = useRef<HTMLDivElement>(null);
@@ -285,14 +290,14 @@ const AppContent: React.FC = () => {
 
     // Apply Theme & Dynamic Icon
     useEffect(() => {
+        const root = document.documentElement;
+
         // 1. Dark Mode Class
         if (state.theme === 'dark') {
-            document.documentElement.classList.add('dark');
+            root.classList.add('dark');
         } else {
-            document.documentElement.classList.remove('dark');
+            root.classList.remove('dark');
         }
-        
-        const root = document.documentElement;
         
         // 2. Dynamic Primary Color
         const hex = state.themeColor.replace(/^#/, '');
@@ -314,16 +319,22 @@ const AppContent: React.FC = () => {
             root.style.setProperty('--theme-gradient', `linear-gradient(135deg, ${state.themeColor} 0%, ${state.themeColor} 100%)`);
         }
 
-        // 4. Persist to LocalStorage
+        // 4. App Font (This ensures font selection works instantly)
+        if (state.font) {
+            root.style.setProperty('--app-font', state.font);
+        }
+
+        // 5. Persist to LocalStorage
         localStorage.setItem('theme', state.theme);
         localStorage.setItem('themeColor', state.themeColor);
+        localStorage.setItem('font', state.font);
         if (state.themeGradient) {
             localStorage.setItem('themeGradient', state.themeGradient);
         } else {
             localStorage.removeItem('themeGradient');
         }
 
-        // 5. Dynamic Icons (Favicon, Apple Touch ONLY)
+        // 6. Dynamic Icons (Favicon, Apple Touch ONLY)
         const updateIcons = () => {
             const bg = state.themeColor;
             const fill = '#ffffff'; 
@@ -349,16 +360,28 @@ const AppContent: React.FC = () => {
         };
         updateIcons();
 
-    }, [state.theme, state.themeColor, state.themeGradient]);
+    }, [state.theme, state.themeColor, state.themeGradient, state.font]);
 
     // Analytics: Log page changes
     useEffect(() => {
         logPageView(currentPage);
     }, [currentPage]);
 
-    // Handle Unsaved Changes
+    // Handle Unsaved Changes & Navigation Interception
     const handleNavigation = (page: Page) => {
-        if (isDirty) {
+        // Special Handling for Sales Page: Park or Clear
+        if (currentPage === 'SALES') {
+             const { customerId, items } = state.currentSale;
+             const hasActiveSale = !!customerId || items.length > 0;
+             
+             if (hasActiveSale) {
+                 setParkModalState({ isOpen: true, targetPage: page });
+                 return;
+             }
+        }
+
+        // Standard Dirty Check for other pages (Customers, Purchases etc.)
+        if (isDirty && currentPage !== 'SALES') {
             if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
                 setIsDirty(false);
                 setCurrentPage(page);
@@ -366,6 +389,27 @@ const AppContent: React.FC = () => {
         } else {
             setCurrentPage(page);
         }
+    };
+    
+    const handleParkAction = (action: 'park' | 'discard' | 'cancel') => {
+        if (action === 'cancel') {
+            setParkModalState({ isOpen: false, targetPage: null });
+            return;
+        }
+        
+        if (action === 'park') {
+            dispatch({ type: 'PARK_CURRENT_SALE' });
+            showToast("Sale parked successfully.", 'success');
+        } else if (action === 'discard') {
+            dispatch({ type: 'CLEAR_CURRENT_SALE' });
+        }
+        
+        if (parkModalState.targetPage) {
+            setCurrentPage(parkModalState.targetPage);
+        }
+        setParkModalState({ isOpen: false, targetPage: null });
+        // Force clear dirty flag if it was set by SalesPage logic
+        setIsDirty(false);
     };
 
     // Calculate Navigation Layout based on user preference order
@@ -399,7 +443,7 @@ const AppContent: React.FC = () => {
         dispatch({ type: 'SET_THEME', payload: newTheme });
     };
 
-    if (!isDbLoaded) return <AppSkeletonLoader />;
+    if (!isDbLoaded) return <DevineLoader />;
 
     // Main Content Class Logic
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
@@ -422,6 +466,29 @@ const AppContent: React.FC = () => {
                         onCorrectPin={() => setIsLocked(false)}
                         // No onCancel prop = no back button = forced lock
                     />
+                </div>
+            )}
+
+            {/* Park Sale Modal */}
+            {parkModalState.isOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000] p-4 animate-fade-in-fast backdrop-blur-sm">
+                    <Card className="w-full max-w-sm animate-scale-in border-l-4 border-amber-500">
+                        <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Sale in Progress</h2>
+                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-6">
+                            You have an unsaved sale. Would you like to park it for later or discard the changes?
+                        </p>
+                        <div className="flex flex-col gap-2">
+                            <Button onClick={() => handleParkAction('park')} className="w-full bg-amber-500 hover:bg-amber-600 text-white">
+                                <PauseCircle size={18} className="mr-2" /> Park Sale
+                            </Button>
+                            <Button onClick={() => handleParkAction('discard')} className="w-full bg-red-500 hover:bg-red-600 text-white">
+                                <Trash2 size={18} className="mr-2" /> Discard
+                            </Button>
+                            <Button onClick={() => handleParkAction('cancel')} variant="secondary" className="w-full">
+                                Cancel
+                            </Button>
+                        </div>
+                    </Card>
                 </div>
             )}
 
@@ -574,7 +641,7 @@ const AppContent: React.FC = () => {
             {/* Main Content Area */}
             <main className={`flex-grow w-full ${mainClass}`}>
                 <div className={`mx-auto ${currentPage === 'INVOICE_DESIGNER' ? 'h-full' : 'p-4 pb-32 max-w-7xl'}`}>
-                    <Suspense fallback={<AppSkeletonLoader />}>
+                    <Suspense fallback={<DevineLoader />}>
                         {currentPage === 'DASHBOARD' && <Dashboard setCurrentPage={handleNavigation} />}
                         {currentPage === 'CUSTOMERS' && <CustomersPage setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
                         {currentPage === 'SALES' && <SalesPage setIsDirty={setIsDirty} />}
@@ -604,7 +671,7 @@ const AppContent: React.FC = () => {
                 onLockApp={handleLockApp}
             />
             <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={handleNavigation} />
-            <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} />
+            <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} onNavigate={handleNavigation} />
             <HelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
             <DeveloperToolsModal isOpen={isDevToolsOpen} onClose={() => setIsDevToolsOpen(false)} onOpenCloudDebug={() => setIsCloudDebugOpen(true)} />
             <CloudDebugModal isOpen={isCloudDebugOpen} onClose={() => setIsCloudDebugOpen(false)} />

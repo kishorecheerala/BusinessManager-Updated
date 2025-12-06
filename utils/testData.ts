@@ -170,7 +170,12 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
             stripedRows: false,
             bordered: false,
             compact: false
-        }
+        },
+        columnWidths: { qty: 15, rate: 20, amount: 35 },
+        tablePadding: 3,
+        borderRadius: 4,
+        spacing: 1.0,
+        elementSpacing: { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
     },
     content: {
         titleText: 'TAX INVOICE',
@@ -182,8 +187,10 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
         showCustomerDetails: true,
         showSignature: true,
         signatureText: 'Authorized Signatory',
-        showAmountInWords: true, // Default to true
+        showAmountInWords: true,
         showStatusStamp: false,
+        showTaxBreakdown: false,
+        showGst: true,
         labels: {
             billedTo: "Billed To",
             invoiceNo: "Invoice No",
@@ -211,7 +218,12 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
     fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
     layout: { 
         margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1,
-        tableOptions: { hideQty: false, hideRate: false, stripedRows: false }
+        tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false },
+        columnWidths: { qty: 15, rate: 20, amount: 35 },
+        tablePadding: 3,
+        borderRadius: 4,
+        spacing: 1.0,
+        elementSpacing: { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
     },
     content: { titleText: 'ESTIMATE', showTerms: true, showQr: false, termsText: '', footerText: 'Valid for 7 days.', showBusinessDetails: true, showCustomerDetails: true, showSignature: true, showAmountInWords: true }
   },
@@ -223,7 +235,12 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
     fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
     layout: { 
         margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1,
-        tableOptions: { hideQty: false, hideRate: false, stripedRows: false }
+        tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false },
+        columnWidths: { qty: 15, rate: 20, amount: 35 },
+        tablePadding: 3,
+        borderRadius: 4,
+        spacing: 1.0,
+        elementSpacing: { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
     },
     content: { titleText: 'DEBIT NOTE', showTerms: false, showQr: false, termsText: '', footerText: '', showBusinessDetails: true, showCustomerDetails: true, showSignature: true, showAmountInWords: true }
   },
@@ -235,7 +252,12 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
     fonts: { headerSize: 12, bodySize: 8, titleFont: 'helvetica', bodyFont: 'helvetica' },
     layout: { 
         margin: 2, logoSize: 15, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1,
-        tableOptions: { hideQty: false, hideRate: false, stripedRows: false }
+        tableOptions: { hideQty: false, hideRate: false, stripedRows: false, bordered: false, compact: false },
+        columnWidths: { qty: 10, rate: 15, amount: 25 },
+        tablePadding: 2,
+        borderRadius: 0,
+        spacing: 0.9,
+        elementSpacing: { logoBottom: 2, titleBottom: 1, addressBottom: 1, headerBottom: 2 }
     },
     content: { titleText: 'RECEIPT', showTerms: true, showQr: true, termsText: '', footerText: 'Thank You!', showBusinessDetails: true, showCustomerDetails: true, showSignature: false, showAmountInWords: true }
   },
@@ -247,7 +269,12 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
     fonts: { headerSize: 22, bodySize: 10, titleFont: 'helvetica', bodyFont: 'helvetica' },
     layout: { 
         margin: 10, logoSize: 25, logoPosition: 'center', logoOffsetX: 0, logoOffsetY: 0, headerAlignment: 'center', headerStyle: 'standard', footerStyle: 'standard', showWatermark: false, watermarkOpacity: 0.1,
-        tableOptions: { hideQty: false, hideRate: false, stripedRows: true, bordered: true, compact: true }
+        tableOptions: { hideQty: false, hideRate: false, stripedRows: true, bordered: true, compact: true },
+        columnWidths: { qty: 15, rate: 20, amount: 35 },
+        tablePadding: 3,
+        borderRadius: 4,
+        spacing: 1.0,
+        elementSpacing: { logoBottom: 5, titleBottom: 2, addressBottom: 1, headerBottom: 5 }
     },
     content: { 
         titleText: 'REPORT', showTerms: false, showQr: false, termsText: '', footerText: 'Generated Report', showBusinessDetails: true, showCustomerDetails: true, showSignature: false, signatureText: '', showAmountInWords: false, showStatusStamp: false, showTaxBreakdown: false, showGst: false,
@@ -276,5 +303,18 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'installPromptEven
     cardStyle: 'solid',
     toastPosition: 'top-center',
     density: 'comfortable'
-  }
+  },
+  currentSale: {
+      customerId: '',
+      items: [],
+      discount: '0',
+      date: new Date().toISOString().split('T')[0],
+      paymentDetails: {
+          amount: '',
+          method: 'CASH',
+          date: new Date().toISOString().split('T')[0],
+          reference: ''
+      }
+  },
+  parkedSales: []
 };

@@ -97,6 +97,26 @@ export interface Sale {
   loyaltyPointsEarned?: number; // New: Points awarded
 }
 
+// --- New Types for Sales Management ---
+export interface SaleDraft {
+    customerId: string;
+    items: SaleItem[];
+    discount: string; 
+    date: string;
+    paymentDetails: {
+        amount: string;
+        method: 'CASH' | 'UPI' | 'CHEQUE';
+        date: string;
+        reference: string;
+    };
+    editId?: string; // If editing an existing sale
+}
+
+export interface ParkedSale extends SaleDraft {
+    id: string; // Draft ID
+    parkedAt: number;
+}
+
 export interface QuoteItem {
   productId: string;
   productName: string;

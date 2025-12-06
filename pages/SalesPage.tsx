@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, Star } from 'lucide-react';
+
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { Sale, SaleItem, Customer, Product, Payment } from '../types';
+import { Sale, SaleItem, Customer, Product, Payment, SaleDraft, ParkedSale } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import jsPDF from 'jspdf';
@@ -29,52 +30,29 @@ const fetchImageAsBase64 = (url: string): Promise<string> =>
         reader.readAsDataURL(blob);
     }));
 
-// Interface for Draft/Parked Sales
-interface ParkedSale {
-    id: string;
-    customerId: string;
-    items: SaleItem[];
-    date: number;
-}
-
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
 }
 
 const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const { state, dispatch, showToast } = useAppContext();
+    const { currentSale, parkedSales } = state;
     
     const [mode, setMode] = useState<'add' | 'edit'>('add');
     const [saleToEdit, setSaleToEdit] = useState<Sale | null>(null);
 
-    const [customerId, setCustomerId] = useState('');
-    const [items, setItems] = useState<SaleItem[]>([]);
-    const [discount, setDiscount] = useState('0');
-    const [saleDate, setSaleDate] = useState(getLocalDateString());
-    
-    // Loyalty Points
-    const [redeemPoints, setRedeemPoints] = useState(false);
-    const [pointsToRedeem, setPointsToRedeem] = useState(0);
-    
-    const [paymentDetails, setPaymentDetails] = useState({
-        amount: '',
-        method: 'CASH' as 'CASH' | 'UPI' | 'CHEQUE',
-        date: getLocalDateString(),
-        reference: '',
-    });
+    // Derived state from global currentSale context
+    const { customerId, items, discount, date: saleDate, paymentDetails } = currentSale;
 
     const [isSelectingProduct, setIsSelectingProduct] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
-    const isDirtyRef = useRef(false);
 
     const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
     const customerDropdownRef = useRef<HTMLDivElement>(null);
     
-    // Parked Sales State
-    const [parkedSales, setParkedSales] = useState<ParkedSale[]>([]);
     const [isDraftsOpen, setIsDraftsOpen] = useState(false);
     
     useOnClickOutside(customerDropdownRef, () => {
@@ -83,20 +61,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         }
     });
 
-    const selectedCustomer = useMemo(() => customerId ? state.customers.find(c => c.id === customerId) : null, [customerId, state.customers]);
-
-    // Load Parked Sales from LocalStorage on mount
-    useEffect(() => {
-        const savedDrafts = localStorage.getItem('parked_sales');
-        if (savedDrafts) {
-            try {
-                setParkedSales(JSON.parse(savedDrafts));
-            } catch(e) {
-                console.error("Failed to load drafts");
-            }
-        }
-    }, []);
-
     // Effect to handle switching to edit mode from another page
     useEffect(() => {
         if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
@@ -104,54 +68,34 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             if (sale) {
                 setSaleToEdit(sale);
                 setMode('edit');
-                setCustomerId(sale.customerId);
-                setItems(sale.items.map(item => ({...item}))); // Deep copy
-                setDiscount(sale.discount.toString());
-                setSaleDate(getLocalDateString(new Date(sale.date)));
-                setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
                 
-                // If points were used, we just reflect that in the discount technically, 
-                // but edit logic for points is complex so we skip explicit point reversion in UI for now.
-                
+                // Dispatch update to populate current sale
+                const editDraft: Partial<SaleDraft> = {
+                    customerId: sale.customerId,
+                    items: sale.items.map(item => ({...item})), // Deep copy
+                    discount: sale.discount.toString(),
+                    date: getLocalDateString(new Date(sale.date)),
+                    paymentDetails: { amount: '', method: 'CASH', date: getLocalDateString(), reference: '' }, // Reset payment for edit
+                    editId: sale.id
+                };
+                dispatch({ type: 'UPDATE_CURRENT_SALE', payload: editDraft });
                 dispatch({ type: 'CLEAR_SELECTION' });
             }
         }
     }, [state.selection, state.sales, dispatch]);
 
-    useEffect(() => {
-        const dateIsDirty = mode === 'add' && saleDate !== getLocalDateString();
-        const formIsDirty = !!customerId || items.length > 0 || discount !== '0' || !!paymentDetails.amount || dateIsDirty;
-        const currentlyDirty = formIsDirty || isAddingCustomer;
-        if (currentlyDirty !== isDirtyRef.current) {
-            isDirtyRef.current = currentlyDirty;
-            setIsDirty(currentlyDirty);
-        }
-    }, [customerId, items, discount, paymentDetails.amount, isAddingCustomer, setIsDirty, saleDate, mode]);
-
-
-    // On unmount, we must always clean up.
+    // On unmount, clear mode state but keep context data intact for persistence
     useEffect(() => {
         return () => {
-            setIsDirty(false);
+            // No cleanup for dirty state here needed as App.tsx checks context
         };
-    }, [setIsDirty]);
+    }, []);
 
     const resetForm = () => {
-        setCustomerId('');
-        setItems([]);
-        setDiscount('0');
-        setSaleDate(getLocalDateString());
-        setPaymentDetails({
-            amount: '',
-            method: 'CASH',
-            date: getLocalDateString(),
-            reference: '',
-        });
+        dispatch({ type: 'CLEAR_CURRENT_SALE' });
         setIsSelectingProduct(false);
         setMode('add');
         setSaleToEdit(null);
-        setRedeemPoints(false);
-        setPointsToRedeem(0);
     };
     
     // --- Park/Draft Functions ---
@@ -160,52 +104,30 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             showToast("Cannot park an empty sale.", 'error');
             return;
         }
-
-        const newDraft: ParkedSale = {
-            id: `DRAFT-${Date.now()}`,
-            customerId,
-            items,
-            date: Date.now()
-        };
-
-        const updatedDrafts = [newDraft, ...parkedSales];
-        setParkedSales(updatedDrafts);
-        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
         
+        dispatch({ type: 'PARK_CURRENT_SALE' });
         showToast("Sale parked successfully.", 'success');
-        resetForm();
     };
 
     const handleResumeDraft = (draft: ParkedSale) => {
-        setCustomerId(draft.customerId);
-        setItems(draft.items);
-        
-        // Remove from drafts
-        const updatedDrafts = parkedSales.filter(d => d.id !== draft.id);
-        setParkedSales(updatedDrafts);
-        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
-        
+        dispatch({ type: 'RESUME_PARKED_SALE', payload: draft });
         setIsDraftsOpen(false);
         showToast("Draft resumed.", 'success');
     };
 
     const handleDeleteDraft = (draftId: string) => {
-        const updatedDrafts = parkedSales.filter(d => d.id !== draftId);
-        setParkedSales(updatedDrafts);
-        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+        dispatch({ type: 'DELETE_PARKED_SALE', payload: draftId });
+    };
+
+    const updateSaleField = (field: keyof SaleDraft, value: any) => {
+        dispatch({ type: 'UPDATE_CURRENT_SALE', payload: { [field]: value } });
     };
 
     const handleSelectProduct = (product: Product) => {
-        // Determine Price based on Customer Tier
-        let appliedPrice = product.salePrice;
-        if (selectedCustomer?.priceTier === 'WHOLESALE' && product.wholesalePrice) {
-            appliedPrice = product.wholesalePrice;
-        }
-
         const newItem = {
             productId: product.id,
             productName: product.name,
-            price: Number(appliedPrice),
+            price: Number(product.salePrice),
             quantity: 1,
         };
 
@@ -214,20 +136,22 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const originalQtyInSale = mode === 'edit' ? saleToEdit?.items.find(i => i.productId === product.id)?.quantity || 0 : 0;
         const availableStock = Number(product.quantity) + originalQtyInSale;
 
+        let newItems;
         if (existingItem) {
             if (existingItem.quantity + 1 > availableStock) {
                  showToast(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`, 'error');
                  return;
             }
-            setItems(items.map(i => i.productId === newItem.productId ? { ...i, quantity: i.quantity + 1 } : i));
+            newItems = items.map(i => i.productId === newItem.productId ? { ...i, quantity: i.quantity + 1 } : i);
         } else {
              if (1 > availableStock) {
                  showToast(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`, 'error');
                  return;
             }
-            setItems([...items, newItem]);
+            newItems = [...items, newItem];
         }
         
+        updateSaleField('items', newItems);
         setIsSelectingProduct(false);
     };
     
@@ -245,7 +169,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const numValue = parseFloat(value);
         if (isNaN(numValue) && value !== '') return;
 
-        setItems(prevItems => prevItems.map(item => {
+        const newItems = items.map(item => {
             if (item.productId === productId) {
                 if (field === 'quantity') {
                     const product = state.products.find(p => p.id === productId);
@@ -259,42 +183,20 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 return { ...item, [field]: numValue };
             }
             return item;
-        }));
+        });
+        
+        updateSaleField('items', newItems);
     };
 
-
     const handleRemoveItem = (productId: string) => {
-        setItems(items.filter(item => item.productId !== productId));
+        updateSaleField('items', items.filter(item => item.productId !== productId));
     };
 
     const calculations = useMemo(() => {
-        // Total before generic discount
-        const tempTotals = calculateTotals(items, 0, state.products);
-        
-        // Add Points Redemption to Discount
-        let extraDiscount = 0;
-        if (redeemPoints && selectedCustomer?.loyaltyPoints) {
-            // Logic: 1 Point = 1 Rupee (for simplicity)
-            // Limit points usage to total amount to prevent negative
-            const maxPoints = Math.min(selectedCustomer.loyaltyPoints, tempTotals.subTotal);
-            // We use effect to update state, but for render we calculate
-            extraDiscount = Math.min(pointsToRedeem, maxPoints);
-        }
+        return calculateTotals(items, parseFloat(discount) || 0, state.products);
+    }, [items, discount, state.products]);
 
-        const totalDiscount = (parseFloat(discount) || 0) + extraDiscount;
-        return calculateTotals(items, totalDiscount, state.products);
-    }, [items, discount, state.products, redeemPoints, pointsToRedeem, selectedCustomer]);
-
-    // Update max redeemable points when total changes
-    useEffect(() => {
-        if (redeemPoints && selectedCustomer?.loyaltyPoints) {
-            const currentSubtotal = items.reduce((sum, i) => sum + (i.price * i.quantity), 0);
-            const max = Math.min(selectedCustomer.loyaltyPoints, currentSubtotal);
-            if (pointsToRedeem > max) setPointsToRedeem(max);
-            else if (pointsToRedeem === 0 && max > 0) setPointsToRedeem(max); // Auto-fill max
-        }
-    }, [items, redeemPoints, selectedCustomer]);
-
+    const selectedCustomer = useMemo(() => customerId ? state.customers.find(c => c.id === customerId) : null, [customerId, state.customers]);
 
     // --- Last Purchase Information for Selected Customer ---
     const lastPurchaseInfo = useMemo(() => {
@@ -336,7 +238,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const handleAddCustomer = (customer: Customer) => {
         dispatch({ type: 'ADD_CUSTOMER', payload: customer });
-        setCustomerId(customer.id);
+        updateSaleField('customerId', customer.id);
         setIsAddingCustomer(false);
         showToast("Customer added successfully!");
     };
@@ -390,10 +292,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         
         const { totalAmount, gstAmount, discountAmount } = calculations;
 
-        // Calculate Points Earned (1 Point per 100 Rs)
-        const pointsEarned = Math.floor(totalAmount / 100);
-        const pointsUsed = redeemPoints ? pointsToRedeem : 0;
-
         if (mode === 'add') {
             const paidAmount = parseFloat(paymentDetails.amount) || 0;
             if (paidAmount > totalAmount + 0.01) {
@@ -414,15 +312,13 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             
             const newSale: Sale = {
                 id: saleId, customerId, items, discount: discountAmount, gstAmount, totalAmount,
-                date: saleDateWithTime.toISOString(), payments,
-                loyaltyPointsEarned: pointsEarned,
-                loyaltyPointsUsed: pointsUsed
+                date: saleDateWithTime.toISOString(), payments
             };
             dispatch({ type: 'ADD_SALE', payload: newSale });
             items.forEach(item => {
                 dispatch({ type: 'UPDATE_PRODUCT_STOCK', payload: { productId: item.productId, change: -Number(item.quantity) } });
             });
-            showToast(`Sale created! Earned ${pointsEarned} points.`);
+            showToast('Sale created successfully!');
             await generateAndSharePDF(newSale, customer, paidAmount);
 
         } else if (mode === 'edit' && saleToEdit) {
@@ -434,8 +330,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 return;
             }
 
-            // Note: Editing sale doesn't automatically adjust points logic perfectly here for simplicity,
-            // but we preserve the fields.
             const updatedSale: Sale = {
                 ...saleToEdit, items, discount: discountAmount, gstAmount, totalAmount,
             };
@@ -618,7 +512,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                             <li
                                                 key="select-customer-placeholder"
                                                 onClick={() => {
-                                                    setCustomerId('');
+                                                    updateSaleField('customerId', '');
                                                     setIsCustomerDropdownOpen(false);
                                                     setCustomerSearchTerm('');
                                                 }}
@@ -631,7 +525,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                                 <li
                                                     key={c.id}
                                                     onClick={() => {
-                                                        setCustomerId(c.id);
+                                                        updateSaleField('customerId', c.id);
                                                         setIsCustomerDropdownOpen(false);
                                                         setCustomerSearchTerm('');
                                                     }}
@@ -659,7 +553,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <DateInput 
                         label="Sale Date"
                         value={saleDate} 
-                        onChange={e => setSaleDate(e.target.value)}
+                        onChange={e => updateSaleField('date', e.target.value)}
                         disabled={mode === 'edit'}
                     />
 
@@ -679,28 +573,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             <p className={`text-xl font-bold ${customerTotalDue > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
                                 ₹{customerTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
-                        </div>
-                    )}
-                    
-                    {/* Loyalty Points Alert */}
-                    {selectedCustomer?.loyaltyPoints && selectedCustomer.loyaltyPoints > 0 && mode === 'add' && (
-                        <div className="flex items-center justify-between p-2 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                            <div className="flex items-center gap-2">
-                                <Star className="text-yellow-500" size={16} fill="currentColor" />
-                                <span className="text-sm font-bold text-yellow-800 dark:text-yellow-200">
-                                    {selectedCustomer.loyaltyPoints} Points Available
-                                </span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <input 
-                                    type="checkbox" 
-                                    checked={redeemPoints}
-                                    onChange={(e) => setRedeemPoints(e.target.checked)}
-                                    className="w-4 h-4 text-yellow-600 rounded"
-                                    id="redeemPoints"
-                                />
-                                <label htmlFor="redeemPoints" className="text-xs font-semibold cursor-pointer">Redeem</label>
-                            </div>
                         </div>
                     )}
                 </div>
@@ -744,14 +616,8 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                             <span>Discount:</span>
-                            <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600" />
+                            <input type="number" value={discount} onChange={e => updateSaleField('discount', e.target.value)} className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600" />
                         </div>
-                        {redeemPoints && (
-                            <div className="flex justify-between items-center text-green-600 font-medium">
-                                <span>Loyalty Redeemed:</span>
-                                <span>- ₹{pointsToRedeem}</span>
-                            </div>
-                        )}
                         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                             <span>GST Included:</span>
                             <span>₹{calculations.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -771,11 +637,21 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
-                                <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
+                                <input 
+                                    type="number" 
+                                    value={paymentDetails.amount} 
+                                    onChange={e => updateSaleField('paymentDetails', {...paymentDetails, amount: e.target.value })} 
+                                    placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} 
+                                    className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" 
+                                />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600">
+                                <select 
+                                    value={paymentDetails.method} 
+                                    onChange={e => updateSaleField('paymentDetails', { ...paymentDetails, method: e.target.value as any})} 
+                                    className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600"
+                                >
                                     <option value="CASH">Cash</option>
                                     <option value="UPI">UPI</option>
                                     <option value="CHEQUE">Cheque</option>
@@ -783,7 +659,13 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
-                                <input type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" />
+                                <input 
+                                    type="text" 
+                                    placeholder="e.g. UPI ID, Cheque No." 
+                                    value={paymentDetails.reference} 
+                                    onChange={e => updateSaleField('paymentDetails', {...paymentDetails, reference: e.target.value })} 
+                                    className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" 
+                                />
                             </div>
                         </div>
                     ) : (
@@ -799,11 +681,21 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid</label>
-                            <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={'Enter amount to pay dues'} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 dark:bg-slate-700 dark:border-red-400" />
+                            <input 
+                                type="number" 
+                                value={paymentDetails.amount} 
+                                onChange={e => updateSaleField('paymentDetails', {...paymentDetails, amount: e.target.value })} 
+                                placeholder={'Enter amount to pay dues'} 
+                                className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 dark:bg-slate-700 dark:border-red-400" 
+                            />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                            <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600">
+                            <select 
+                                value={paymentDetails.method} 
+                                onChange={e => updateSaleField('paymentDetails', { ...paymentDetails, method: e.target.value as any})} 
+                                className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600"
+                            >
                                 <option value="CASH">Cash</option>
                                 <option value="UPI">UPI</option>
                                 <option value="CHEQUE">Cheque</option>

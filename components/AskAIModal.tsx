@@ -1,14 +1,16 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Sparkles, Bot, User, Loader2, Key, AlertTriangle, Mic, Volume2, StopCircle, WifiOff } from 'lucide-react';
-import { GoogleGenAI, LiveServerMessage, Modality } from "@google/genai";
+import { GoogleGenAI, LiveServerMessage, Modality, FunctionDeclaration, Type } from "@google/genai";
 import { useAppContext } from '../context/AppContext';
 import Card from './Card';
 import Button from './Button';
+import { Page } from '../types';
 
 interface AskAIModalProps {
   isOpen: boolean;
   onClose: () => void;
+  onNavigate?: (page: Page, id: string) => void;
 }
 
 interface Message {
@@ -77,7 +79,29 @@ const getApiKey = (): string | undefined => {
   return process.env.API_KEY;
 };
 
-const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
+// Tool Definition for Navigation
+const navigationTool: FunctionDeclaration = {
+    name: 'navigate',
+    description: 'Navigate to a specific page in the application.',
+    parameters: {
+        type: Type.OBJECT,
+        properties: {
+            page: { 
+                type: Type.STRING, 
+                enum: ['DASHBOARD', 'SALES', 'CUSTOMERS', 'PURCHASES', 'PRODUCTS', 'REPORTS', 'INSIGHTS', 'EXPENSES', 'QUOTATIONS'],
+                description: 'The page to navigate to.'
+            },
+            action: {
+                type: Type.STRING,
+                enum: ['view', 'new'],
+                description: 'Action to perform on the page (view list or create new).'
+            }
+        },
+        required: ['page']
+    }
+};
+
+const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose, onNavigate }) => {
   const { state, showToast } = useAppContext();
   const [messages, setMessages] = useState<Message[]>([
     { id: '1', role: 'model', text: "Hi! I'm your Senior Business Analyst. Ask me about your finances, dues, or inventory." }
@@ -163,6 +187,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
 
     return `You are a business analyst for ${state.profile?.name}. 
     Stats: Revenue ₹${totalSales}, Dues ₹${totalDue}, Low Stock Items: ${lowStock}.
+    You can navigate the app. If the user says "Go to Sales" or "Create Invoice", use the navigate tool.
     Answer briefly and professionally.`;
   };
 
@@ -199,6 +224,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                       voiceConfig: { prebuiltVoiceConfig: { voiceName: 'Kore' } },
                   },
                   systemInstruction: generateSystemContext(),
+                  tools: [{ functionDeclarations: [navigationTool] }]
               },
               callbacks: {
                   onopen: () => {
@@ -222,6 +248,33 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                       processor.connect(inputCtx.destination);
                   },
                   onmessage: async (msg: LiveServerMessage) => {
+                      // Handle Function Calls
+                      if (msg.toolCall) {
+                          for (const fc of msg.toolCall.functionCalls) {
+                              if (fc.name === 'navigate') {
+                                  const args = fc.args as any;
+                                  const page = args.page as Page;
+                                  const action = args.action === 'new' ? 'new' : undefined;
+                                  
+                                  if (onNavigate) {
+                                      // Execute navigation on main thread
+                                      onNavigate(page, action || '');
+                                      // Close the modal if navigating (optional, but cleaner)
+                                      onClose();
+                                  }
+
+                                  // Respond to model
+                                  sessionPromise.then(session => session.sendToolResponse({
+                                      functionResponses: {
+                                          id: fc.id,
+                                          name: fc.name,
+                                          response: { result: 'ok' }
+                                      }
+                                  }));
+                              }
+                          }
+                      }
+
                       const audioData = msg.serverContent?.modelTurn?.parts?.[0]?.inlineData?.data;
                       if (audioData && audioContextRef.current) {
                           const ctx = audioContextRef.current;
@@ -438,8 +491,8 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                                 </h3>
                                 <p className="text-sm text-gray-500 max-w-xs mx-auto mt-2">
                                     {isLiveActive 
-                                        ? "Talk to your assistant naturally. Tap Stop to end." 
-                                        : "Tap Start to have a real-time voice conversation with your AI business analyst."}
+                                        ? "Talk to your assistant. Ask it to 'Go to Sales' or analyze data." 
+                                        : "Tap Start to control the app with your voice."}
                                 </p>
                             </div>
 
@@ -455,7 +508,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                             </Button>
                         </>
                     ) : (
-                        <div className="flex flex-col items-center gap-4 text-gray-500">
+                        <div className="flex flex-col items-center justify-center py-10 gap-4 text-gray-500">
                             <WifiOff size={48} />
                             <p>Live Voice requires an internet connection.</p>
                         </div>

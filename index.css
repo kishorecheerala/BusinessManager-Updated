@@ -111,7 +111,7 @@ body {
 
 .pre-loader-om {
     font-family: serif;
-    font-size: 80px;
+    font-size: min(25vw, 220px);
     font-weight: bold;
     color: #8b5cf6;
     animation: pulse-om 2s infinite ease-in-out;
