@@ -9,7 +9,7 @@ import Button from './Button';
 interface ProductHistoryModalProps {
     isOpen: boolean;
     onClose: () => void;
-    product: Product;
+    product?: Product;
 }
 
 interface HistoryEntry {
@@ -20,6 +20,7 @@ interface HistoryEntry {
     price: number;
     partyName: string;
     refId: string;
+    productName: string;
 }
 
 const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({ isOpen, onClose, product }) => {
@@ -30,42 +31,47 @@ const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({ isOpen, onClo
 
         // 1. Sales (Stock Out)
         state.sales.forEach(sale => {
-            const item = sale.items.find(i => i.productId === product.id);
-            if (item) {
+            sale.items.forEach(item => {
+                if (product && item.productId !== product.id) return;
+
                 const customer = state.customers.find(c => c.id === sale.customerId);
                 entries.push({
-                    id: `SALE-${sale.id}`,
+                    id: `SALE-${sale.id}-${item.productId}`,
                     date: sale.date,
                     type: 'SALE',
                     quantity: -item.quantity, // Negative for stock out
                     price: item.price,
                     partyName: customer?.name || 'Unknown Customer',
-                    refId: sale.id
+                    refId: sale.id,
+                    productName: item.productName
                 });
-            }
+            });
         });
 
         // 2. Purchases (Stock In)
         state.purchases.forEach(purchase => {
-            const item = purchase.items.find(i => i.productId === product.id);
-            if (item) {
+            purchase.items.forEach(item => {
+                if (product && item.productId !== product.id) return;
+
                 const supplier = state.suppliers.find(s => s.id === purchase.supplierId);
                 entries.push({
-                    id: `PUR-${purchase.id}`,
+                    id: `PUR-${purchase.id}-${item.productId}`,
                     date: purchase.date,
                     type: 'PURCHASE',
                     quantity: item.quantity, // Positive for stock in
                     price: item.price,
                     partyName: supplier?.name || 'Unknown Supplier',
-                    refId: purchase.supplierInvoiceId || purchase.id
+                    refId: purchase.supplierInvoiceId || purchase.id,
+                    productName: item.productName
                 });
-            }
+            });
         });
 
         // 3. Returns
         state.returns.forEach(ret => {
-            const item = ret.items.find(i => i.productId === product.id);
-            if (item) {
+            ret.items.forEach(item => {
+                if (product && item.productId !== product.id) return;
+
                 let partyName = 'Unknown';
                 let type: HistoryEntry['type'] = 'RETURN_IN';
                 let qty = item.quantity;
@@ -84,20 +90,21 @@ const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({ isOpen, onClo
                 }
 
                 entries.push({
-                    id: `RET-${ret.id}`,
+                    id: `RET-${ret.id}-${item.productId}`,
                     date: ret.returnDate,
                     type: type,
                     quantity: qty,
                     price: item.price,
                     partyName: partyName,
-                    refId: ret.id
+                    refId: ret.id,
+                    productName: item.productName
                 });
-            }
+            });
         });
 
         // Sort descending by date
         return entries.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    }, [state.sales, state.purchases, state.returns, state.customers, state.suppliers, product.id]);
+    }, [state.sales, state.purchases, state.returns, state.customers, state.suppliers, product]);
 
     const stats = useMemo(() => {
         const today = new Date();
@@ -137,9 +144,13 @@ const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({ isOpen, onClo
                     <div>
                         <div className="flex items-center gap-2">
                             <History className="text-indigo-500" size={20} />
-                            <h2 className="font-bold text-lg text-slate-800 dark:text-white">Product Flow</h2>
+                            <h2 className="font-bold text-lg text-slate-800 dark:text-white">
+                                {product ? 'Product Flow' : 'Global Stock Flow'}
+                            </h2>
                         </div>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{product.name}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                            {product ? product.name : 'All Products History'}
+                        </p>
                     </div>
                     <button onClick={onClose} className="p-1.5 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-full transition-colors">
                         <X size={20} className="text-slate-500" />
@@ -147,7 +158,7 @@ const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({ isOpen, onClo
                 </div>
 
                 {/* Stats Bar */}
-                <div className="grid grid-cols-4 gap-px bg-slate-200 dark:bg-slate-700 shrink-0">
+                <div className={`grid ${product ? 'grid-cols-4' : 'grid-cols-3'} gap-px bg-slate-200 dark:bg-slate-700 shrink-0`}>
                     <div className="bg-white dark:bg-slate-800 p-3 text-center">
                         <p className="text-[10px] text-slate-500 uppercase font-bold">Sold Today</p>
                         <p className="text-lg font-bold text-indigo-600 dark:text-indigo-400">{stats.soldToday}</p>
@@ -160,12 +171,14 @@ const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({ isOpen, onClo
                         <p className="text-[10px] text-slate-500 uppercase font-bold">Total Sold</p>
                         <p className="text-lg font-bold text-slate-700 dark:text-slate-200">{stats.totalSold}</p>
                     </div>
-                    <div className="bg-white dark:bg-slate-800 p-3 text-center">
-                        <p className="text-[10px] text-slate-500 uppercase font-bold">Current Stock</p>
-                        <p className={`text-lg font-bold ${product.quantity < 5 ? 'text-red-500' : 'text-green-600'}`}>
-                            {product.quantity}
-                        </p>
-                    </div>
+                    {product && (
+                        <div className="bg-white dark:bg-slate-800 p-3 text-center">
+                            <p className="text-[10px] text-slate-500 uppercase font-bold">Current Stock</p>
+                            <p className={`text-lg font-bold ${product.quantity < 5 ? 'text-red-500' : 'text-green-600'}`}>
+                                {product.quantity}
+                            </p>
+                        </div>
+                    )}
                 </div>
 
                 {/* Timeline List */}
@@ -194,10 +207,17 @@ const ProductHistoryModal: React.FC<ProductHistoryModalProps> = ({ isOpen, onClo
                                         
                                         <div className="flex-grow min-w-0">
                                             <div className="flex justify-between items-start">
-                                                <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
-                                                    {entry.type.replace('_', ' ')}
-                                                </p>
-                                                <span className={`text-sm font-bold font-mono ${isIncoming ? 'text-green-600' : 'text-red-500'}`}>
+                                                <div className="min-w-0 pr-2">
+                                                    <p className="text-sm font-bold text-slate-700 dark:text-slate-200 truncate">
+                                                        {product ? entry.type.replace('_', ' ') : entry.productName}
+                                                    </p>
+                                                    {!product && (
+                                                        <p className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold uppercase tracking-wide">
+                                                            {entry.type.replace('_', ' ')}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                                <span className={`text-sm font-bold font-mono whitespace-nowrap ${isIncoming ? 'text-green-600' : 'text-red-500'}`}>
                                                     {isIncoming ? '+' : ''}{entry.quantity}
                                                 </span>
                                             </div>

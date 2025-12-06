@@ -101,6 +101,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     
     // History Modal
     const [historyProduct, setHistoryProduct] = useState<Product | null>(null);
+    const [isGlobalHistoryOpen, setIsGlobalHistoryOpen] = useState(false);
 
     // Resizable Split Pane State
     const [detailSplitRatio, setDetailSplitRatio] = useState(0.75); // 75% for image default
@@ -825,7 +826,7 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                                         <button onClick={() => setIsBarcodeModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium">
                                             <Barcode size={16} /> Print Barcode
                                         </button>
-                                        <button onClick={() => handleDuplicateProduct} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium text-primary">
+                                        <button onClick={handleDuplicateProduct} className="flex items-center gap-2 px-3 py-2 bg-white dark:bg-slate-800 border dark:border-slate-600 rounded-lg hover:bg-gray-50 dark:hover:bg-slate-700 transition-colors text-sm font-medium text-primary">
                                             <Copy size={16} /> Duplicate
                                         </button>
                                         <button 
@@ -850,13 +851,12 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                 <StockAdjustmentModal isOpen={isStockAdjustOpen} onClose={() => setIsStockAdjustOpen(false)} />
             )}
             
-            {historyProduct && (
-                <ProductHistoryModal 
-                    isOpen={!!historyProduct} 
-                    onClose={() => setHistoryProduct(null)} 
-                    product={historyProduct} 
-                />
-            )}
+            {/* Product History Modal - Handles both single and global */}
+            <ProductHistoryModal 
+                isOpen={!!historyProduct || isGlobalHistoryOpen} 
+                onClose={() => { setHistoryProduct(null); setIsGlobalHistoryOpen(false); }} 
+                product={historyProduct || undefined} 
+            />
             
             {isBarcodeModalOpen && selectedProduct && (
                 <BarcodeModal 
@@ -938,6 +938,10 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
                             <Grid size={18} />
                         </button>
                     </div>
+
+                    <Button onClick={() => setIsGlobalHistoryOpen(true)} variant="secondary" className="px-3" title="Global Stock Flow">
+                        <History size={18} />
+                    </Button>
 
                     <Button onClick={() => setIsStockAdjustOpen(true)} variant="secondary" className="px-3" title="Audit Stock">
                         <Scale size={18} />
