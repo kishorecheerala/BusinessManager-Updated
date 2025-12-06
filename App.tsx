@@ -1,10 +1,12 @@
 
+
+
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, Suspense } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download, Sun, Moon, CalendarClock, WifiOff
+  X, Download, Sun, Moon, CalendarClock, WifiOff, Database
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -43,6 +45,7 @@ const ExpensesPage = React.lazy(() => import('./pages/ExpensesPage'));
 const QuotationsPage = React.lazy(() => import('./pages/QuotationsPage'));
 const InvoiceDesigner = React.lazy(() => import('./pages/InvoiceDesigner'));
 const SystemOptimizerPage = React.lazy(() => import('./pages/SystemOptimizerPage'));
+const SQLAssistantPage = React.lazy(() => import('./pages/SQLAssistantPage'));
 
 // Icon Map for dynamic rendering
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -57,7 +60,8 @@ const ICON_MAP: Record<string, React.ElementType> = {
     'RETURNS': Undo2,
     'QUOTATIONS': FileText,
     'INVOICE_DESIGNER': PenTool,
-    'SYSTEM_OPTIMIZER': Gauge
+    'SYSTEM_OPTIMIZER': Gauge,
+    'SQL_ASSISTANT': Database
 };
 
 const LABEL_MAP: Record<string, string> = {
@@ -72,7 +76,8 @@ const LABEL_MAP: Record<string, string> = {
     'RETURNS': 'Returns',
     'QUOTATIONS': 'Estimates',
     'INVOICE_DESIGNER': 'Designer',
-    'SYSTEM_OPTIMIZER': 'System'
+    'SYSTEM_OPTIMIZER': 'System',
+    'SQL_ASSISTANT': 'SQL AI'
 };
 
 const QUICK_ACTION_REGISTRY: Record<string, { icon: React.ElementType, label: string, page: Page, action?: string }> = {
@@ -125,7 +130,7 @@ const AppContent: React.FC = () => {
         try {
             const saved = localStorage.getItem('business_manager_last_page');
             // Exclude admin/utility pages from auto-restore to prevent getting stuck
-            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER'];
+            const excludedPages = ['INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER', 'SQL_ASSISTANT'];
             if (saved && Object.keys(ICON_MAP).includes(saved) && !excludedPages.includes(saved)) {
                 return saved as Page;
             }
@@ -579,6 +584,7 @@ const AppContent: React.FC = () => {
                         {currentPage === 'QUOTATIONS' && <QuotationsPage />}
                         {currentPage === 'INVOICE_DESIGNER' && <InvoiceDesigner setIsDirty={setIsDirty} setCurrentPage={handleNavigation} />}
                         {currentPage === 'SYSTEM_OPTIMIZER' && <SystemOptimizerPage />}
+                        {currentPage === 'SQL_ASSISTANT' && <SQLAssistantPage setCurrentPage={handleNavigation} />}
                     </Suspense>
                 </div>
             </main>

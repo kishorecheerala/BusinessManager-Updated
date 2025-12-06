@@ -136,6 +136,39 @@ const DEFAULT_UI_PREFS: AppMetadataUIPreferences = {
     density: 'comfortable'
 };
 
+// --- Initial State Helper ---
+const getLocalStorageState = () => {
+    if (typeof window === 'undefined') return {};
+    
+    const theme = (localStorage.getItem('theme') as Theme) || 'light';
+    const themeColor = localStorage.getItem('themeColor') || '#8b5cf6';
+    const font = localStorage.getItem('font') || 'Inter';
+    
+    // Handle specific gradient logic (none vs null vs value)
+    let themeGradient = localStorage.getItem('themeGradient');
+    if (themeGradient === null) {
+        themeGradient = 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)';
+    } else if (themeGradient === 'none') {
+        themeGradient = '';
+    }
+
+    let googleUser = null;
+    try {
+        const storedUser = localStorage.getItem('googleUser');
+        if (storedUser) googleUser = JSON.parse(storedUser);
+    } catch(e) {}
+
+    let lastSyncTime = null;
+    try {
+        const storedTime = localStorage.getItem('lastSyncTime');
+        if (storedTime) lastSyncTime = parseInt(storedTime, 10);
+    } catch(e) {}
+
+    return { theme, themeColor, themeGradient, font, googleUser, lastSyncTime };
+};
+
+const localDefaults = getLocalStorageState();
+
 const initialState: AppState = {
     customers: [],
     suppliers: [],
@@ -159,14 +192,17 @@ const initialState: AppState = {
     toast: { message: '', show: false, type: 'info' },
     selection: null,
     pin: null,
-    theme: 'light',
-    themeColor: '#8b5cf6',
+    
+    // Initialize with LocalStorage values to prevent theme/auth flash
+    theme: localDefaults.theme || 'light',
+    themeColor: localDefaults.themeColor || '#8b5cf6',
     headerColor: '',
-    themeGradient: 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)', // Default Nebula Gradient
-    font: 'Inter',
-    googleUser: null,
+    themeGradient: localDefaults.themeGradient ?? 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)', 
+    font: localDefaults.font || 'Inter',
+    googleUser: localDefaults.googleUser || null,
+    lastSyncTime: localDefaults.lastSyncTime || null,
+    
     syncStatus: 'idle',
-    lastSyncTime: null,
     lastLocalUpdate: 0,
     devMode: false,
     performanceMode: false,
@@ -784,36 +820,17 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const receiptTemplate = (app_metadata.find(m => m.id === 'receiptTemplateConfig') as InvoiceTemplateConfig) || initialState.receiptTemplate;
             const reportTemplate = (app_metadata.find(m => m.id === 'reportTemplateConfig') as InvoiceTemplateConfig) || initialState.reportTemplate;
 
-            // Restore Google User & Sync Time from LocalStorage safely
-            const storedUser = safeGetItem('googleUser');
-            const storedSyncTime = safeGetItem('lastSyncTime');
-            let googleUser = null;
-            let lastSyncTime = null;
-
-            try {
-                googleUser = storedUser ? JSON.parse(storedUser) : null;
-            } catch(e) { console.error("Failed to parse stored user", e); }
-
-            try {
-                // Ensure lastSyncTime is an integer
-                lastSyncTime = storedSyncTime ? parseInt(storedSyncTime, 10) : null;
-            } catch(e) { console.error("Failed to parse last sync time", e); }
-
             // Theme Preferences: Prioritize metadata from DB (cloud sync), fall back to localStorage/initial
+            // IMPORTANT: If DB has a value, it wins over localStorage to ensure sync.
             const loadedTheme = themeMeta?.theme || state.theme;
             const loadedColor = themeMeta?.color || state.themeColor;
             const loadedHeaderColor = themeMeta?.headerColor || state.headerColor;
             const loadedFont = themeMeta?.font || state.font;
             let loadedGradient = themeMeta?.gradient;
             
-            // If DB didn't have preference, and localStorage doesn't either, use Default Nebula
+            // If DB didn't have preference, use current state (which came from localStorage)
             if (loadedGradient === undefined) {
-               const lsGradient = safeGetItem('themeGradient');
-               if (lsGradient === 'none') {
-                   loadedGradient = ''; // User explicitly set no gradient
-               } else {
-                   loadedGradient = lsGradient || initialState.themeGradient;
-               }
+               loadedGradient = state.themeGradient;
             }
 
             dispatch({
@@ -828,7 +845,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     quickActions: quickActionsMeta ? quickActionsMeta.actions : DEFAULT_QUICK_ACTIONS,
                     invoiceTemplate, estimateTemplate, debitNoteTemplate, receiptTemplate, reportTemplate,
                     uiPreferences: uiPrefsMeta || DEFAULT_UI_PREFS,
-                    googleUser, lastSyncTime,
+                    // Note: We do NOT overwrite googleUser here as it's already set from LocalStorage correctly
                     theme: loadedTheme,
                     themeColor: loadedColor,
                     headerColor: loadedHeaderColor,

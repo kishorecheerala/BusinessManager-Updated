@@ -124,104 +124,6 @@
       })();
     </script>
 
-    <style>
-      :root {
-        /* Fallback if JS fails, though JS runs first */
-        --primary-color: 139 92 246; 
-        --header-bg: rgb(139, 92, 246);
-        --app-font: 'Inter';
-      }
-
-      html {
-        height: 100%;
-        overflow-x: hidden; /* Prevent horizontal scroll */
-      }
-
-      /* Clean Background for Light Mode */
-      body {
-        font-family: var(--app-font), sans-serif;
-        background-color: #f8fafc;
-        /* Subtle Tint based on Primary Color using mix-blend-mode logic simulation */
-        background-image: radial-gradient(circle at top left, rgba(var(--primary-color), 0.05), transparent 40%);
-        background-attachment: fixed;
-        -webkit-tap-highlight-color: transparent;
-        overscroll-behavior-x: none; 
-        min-height: 100%;
-      }
-
-      html.dark body {
-        background-color: #0f172a;
-        background-image: radial-gradient(circle at top left, rgba(var(--primary-color), 0.1), transparent 40%);
-      }
-      
-      /* Utility for Theme Gradient */
-      .bg-theme {
-          background: var(--header-bg);
-      }
-
-      /* Scrollbar Styling */
-      ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent; 
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #cbd5e1; 
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #94a3b8; 
-      }
-      .dark ::-webkit-scrollbar-thumb {
-        background: #334155;
-      }
-      .dark ::-webkit-scrollbar-thumb:hover {
-        background: #475569;
-      }
-
-      /* Glassmorphism Utilities */
-      .glass {
-        background: rgba(255, 255, 255, 0.8);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.3);
-      }
-      .dark .glass {
-        background: rgba(30, 41, 59, 0.8);
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      /* Pre-React loader styles - Modified: No Box, Just Text */
-      .pre-loader-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-        width: 100vw;
-        position: fixed;
-        top: 0;
-        left: 0;
-        z-index: 9999;
-      }
-      .pre-loader-om {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background-color: transparent;
-        color: rgb(var(--primary-color));
-        font-size: 10rem;
-        font-family: serif;
-        font-weight: bold;
-        animation: pulse-om 2s infinite ease-in-out;
-      }
-      @keyframes pulse-om {
-        0%, 100% { transform: scale(1); opacity: 1; }
-        50% { transform: scale(1.1); opacity: 0.8; }
-      }
-    </style>
-
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -295,6 +197,7 @@
 }
 </script>
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/alasql@4.0.0/dist/alasql.min.js"></script>
     
     <!-- Drag and Drop Polyfill for Mobile -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css">

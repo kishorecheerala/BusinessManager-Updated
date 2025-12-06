@@ -1,6 +1,8 @@
 
+
+
 import React, { useState, useRef } from 'react';
-import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone, FileSpreadsheet, Type, PaintBucket, Plus, Trash2 } from 'lucide-react';
+import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone, FileSpreadsheet, Type, PaintBucket, Plus, Trash2, Database } from 'lucide-react';
 import { Page } from '../types';
 import { useAppContext } from '../context/AppContext';
 import AuditLogPanel from './AuditLogPanel';
@@ -399,6 +401,12 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                     <span className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400">Admin</span>
                 </div>
                 <div className="p-2 space-y-1">
+                    <button onClick={() => { onClose(); onNavigate('SQL_ASSISTANT'); }} className="menu-item">
+                        <Database className="w-5 h-5 text-indigo-500" />
+                        <span className="flex-grow text-sm font-medium">SQL AI Assistant</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+
                     <button onClick={() => { onClose(); setIsImportOpen(true); }} className="menu-item">
                         <FileSpreadsheet className="w-5 h-5 text-orange-500" />
                         <span className="flex-grow text-sm font-medium">Import Data (CSV)</span>
