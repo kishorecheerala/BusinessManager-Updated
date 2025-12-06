@@ -111,6 +111,8 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'pin' | 'googleUse
   quotes: [],
   app_metadata: [],
   audit_logs: [],
+  notifications: [],
+  profile: testProfile,
   customFonts: [],
   theme: 'light',
   themeColor: '#8b5cf6',
@@ -189,6 +191,8 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'pin' | 'googleUse
         signatureText: 'Authorized Signatory',
         showAmountInWords: true,
         showStatusStamp: false,
+        showTaxBreakdown: false,
+        showGst: true,
         labels: {
             billedTo: "Billed To",
             invoiceNo: "Invoice No",

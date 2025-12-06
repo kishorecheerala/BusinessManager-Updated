@@ -191,6 +191,8 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'pin' | 'googleUse
         signatureText: 'Authorized Signatory',
         showAmountInWords: true,
         showStatusStamp: false,
+        showTaxBreakdown: false,
+        showGst: true,
         labels: {
             billedTo: "Billed To",
             invoiceNo: "Invoice No",
