@@ -71,7 +71,7 @@ const Dropdown: React.FC<DropdownProps> = ({
   const TriggerIcon = icon === 'search' ? Search : ChevronDown;
 
   return (
-    <div ref={dropdownRef} className={`relative w-full ${isOpen ? 'z-50' : ''}`}>
+    <div ref={dropdownRef} className={`relative w-full ${isOpen ? 'z-[1000]' : ''}`}>
       <button
         type="button"
         onClick={handleTriggerClick}
@@ -90,7 +90,7 @@ const Dropdown: React.FC<DropdownProps> = ({
       
       {isOpen && (
         <div 
-          className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 z-40 animate-scale-in flex flex-col"
+          className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 z-[1000] animate-scale-in flex flex-col"
           style={{ maxHeight: '300px' }}
         >
           {searchable && (

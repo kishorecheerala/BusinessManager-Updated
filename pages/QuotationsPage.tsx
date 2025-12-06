@@ -1,4 +1,5 @@
 
+
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { FileText, Plus, Search, Share2, Trash2, ShoppingCart, QrCode, X, Edit, Calendar, Check, Download } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -376,7 +377,7 @@ const QuotationsPage: React.FC = () => {
                                 onFocus={() => setShowProductDropdown(true)}
                             />
                             {showProductDropdown && productSearch && (
-                                <div className="absolute top-full left-0 w-full bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-lg mt-1 z-20 max-h-60 overflow-y-auto">
+                                <div className="absolute top-full left-0 w-full bg-white dark:bg-slate-800 shadow-xl border dark:border-slate-700 rounded-lg mt-1 z-[1000] max-h-60 overflow-y-auto">
                                     {filteredProducts.map(p => (
                                         <div 
                                             key={p.id} 

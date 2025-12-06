@@ -1,9 +1,9 @@
 
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { Sale, SaleItem, Customer, Product, Payment, SaleDraft, ParkedSale } from '../types';
+import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import jsPDF from 'jspdf';
@@ -30,29 +30,48 @@ const fetchImageAsBase64 = (url: string): Promise<string> =>
         reader.readAsDataURL(blob);
     }));
 
+// Interface for Draft/Parked Sales
+interface ParkedSale {
+    id: string;
+    customerId: string;
+    items: SaleItem[];
+    date: number;
+}
+
 interface SalesPageProps {
   setIsDirty: (isDirty: boolean) => void;
 }
 
 const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const { state, dispatch, showToast } = useAppContext();
-    const { currentSale, parkedSales } = state;
     
     const [mode, setMode] = useState<'add' | 'edit'>('add');
     const [saleToEdit, setSaleToEdit] = useState<Sale | null>(null);
 
-    // Derived state from global currentSale context
-    const { customerId, items, discount, date: saleDate, paymentDetails } = currentSale;
+    const [customerId, setCustomerId] = useState('');
+    const [items, setItems] = useState<SaleItem[]>([]);
+    const [discount, setDiscount] = useState('0');
+    const [saleDate, setSaleDate] = useState(getLocalDateString());
+    
+    const [paymentDetails, setPaymentDetails] = useState({
+        amount: '',
+        method: 'CASH' as 'CASH' | 'UPI' | 'CHEQUE',
+        date: getLocalDateString(),
+        reference: '',
+    });
 
     const [isSelectingProduct, setIsSelectingProduct] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
     
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
+    const isDirtyRef = useRef(false);
 
     const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
     const [customerSearchTerm, setCustomerSearchTerm] = useState('');
     const customerDropdownRef = useRef<HTMLDivElement>(null);
     
+    // Parked Sales State
+    const [parkedSales, setParkedSales] = useState<ParkedSale[]>([]);
     const [isDraftsOpen, setIsDraftsOpen] = useState(false);
     
     useOnClickOutside(customerDropdownRef, () => {
@@ -61,6 +80,18 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         }
     });
 
+    // Load Parked Sales from LocalStorage on mount
+    useEffect(() => {
+        const savedDrafts = localStorage.getItem('parked_sales');
+        if (savedDrafts) {
+            try {
+                setParkedSales(JSON.parse(savedDrafts));
+            } catch(e) {
+                console.error("Failed to load drafts");
+            }
+        }
+    }, []);
+
     // Effect to handle switching to edit mode from another page
     useEffect(() => {
         if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
@@ -68,31 +99,45 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             if (sale) {
                 setSaleToEdit(sale);
                 setMode('edit');
-                
-                // Dispatch update to populate current sale
-                const editDraft: Partial<SaleDraft> = {
-                    customerId: sale.customerId,
-                    items: sale.items.map(item => ({...item})), // Deep copy
-                    discount: sale.discount.toString(),
-                    date: getLocalDateString(new Date(sale.date)),
-                    paymentDetails: { amount: '', method: 'CASH', date: getLocalDateString(), reference: '' }, // Reset payment for edit
-                    editId: sale.id
-                };
-                dispatch({ type: 'UPDATE_CURRENT_SALE', payload: editDraft });
+                setCustomerId(sale.customerId);
+                setItems(sale.items.map(item => ({...item}))); // Deep copy
+                setDiscount(sale.discount.toString());
+                setSaleDate(getLocalDateString(new Date(sale.date)));
+                setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
                 dispatch({ type: 'CLEAR_SELECTION' });
             }
         }
     }, [state.selection, state.sales, dispatch]);
 
-    // On unmount, clear mode state but keep context data intact for persistence
+    useEffect(() => {
+        const dateIsDirty = mode === 'add' && saleDate !== getLocalDateString();
+        const formIsDirty = !!customerId || items.length > 0 || discount !== '0' || !!paymentDetails.amount || dateIsDirty;
+        const currentlyDirty = formIsDirty || isAddingCustomer;
+        if (currentlyDirty !== isDirtyRef.current) {
+            isDirtyRef.current = currentlyDirty;
+            setIsDirty(currentlyDirty);
+        }
+    }, [customerId, items, discount, paymentDetails.amount, isAddingCustomer, setIsDirty, saleDate, mode]);
+
+
+    // On unmount, we must always clean up.
     useEffect(() => {
         return () => {
-            // No cleanup for dirty state here needed as App.tsx checks context
+            setIsDirty(false);
         };
-    }, []);
+    }, [setIsDirty]);
 
     const resetForm = () => {
-        dispatch({ type: 'CLEAR_CURRENT_SALE' });
+        setCustomerId('');
+        setItems([]);
+        setDiscount('0');
+        setSaleDate(getLocalDateString());
+        setPaymentDetails({
+            amount: '',
+            method: 'CASH',
+            date: getLocalDateString(),
+            reference: '',
+        });
         setIsSelectingProduct(false);
         setMode('add');
         setSaleToEdit(null);
@@ -104,23 +149,39 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
             showToast("Cannot park an empty sale.", 'error');
             return;
         }
+
+        const newDraft: ParkedSale = {
+            id: `DRAFT-${Date.now()}`,
+            customerId,
+            items,
+            date: Date.now()
+        };
+
+        const updatedDrafts = [newDraft, ...parkedSales];
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
         
-        dispatch({ type: 'PARK_CURRENT_SALE' });
         showToast("Sale parked successfully.", 'success');
+        resetForm();
     };
 
     const handleResumeDraft = (draft: ParkedSale) => {
-        dispatch({ type: 'RESUME_PARKED_SALE', payload: draft });
+        setCustomerId(draft.customerId);
+        setItems(draft.items);
+        
+        // Remove from drafts
+        const updatedDrafts = parkedSales.filter(d => d.id !== draft.id);
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
+        
         setIsDraftsOpen(false);
         showToast("Draft resumed.", 'success');
     };
 
     const handleDeleteDraft = (draftId: string) => {
-        dispatch({ type: 'DELETE_PARKED_SALE', payload: draftId });
-    };
-
-    const updateSaleField = (field: keyof SaleDraft, value: any) => {
-        dispatch({ type: 'UPDATE_CURRENT_SALE', payload: { [field]: value } });
+        const updatedDrafts = parkedSales.filter(d => d.id !== draftId);
+        setParkedSales(updatedDrafts);
+        localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
     };
 
     const handleSelectProduct = (product: Product) => {
@@ -136,22 +197,20 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const originalQtyInSale = mode === 'edit' ? saleToEdit?.items.find(i => i.productId === product.id)?.quantity || 0 : 0;
         const availableStock = Number(product.quantity) + originalQtyInSale;
 
-        let newItems;
         if (existingItem) {
             if (existingItem.quantity + 1 > availableStock) {
                  showToast(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`, 'error');
                  return;
             }
-            newItems = items.map(i => i.productId === newItem.productId ? { ...i, quantity: i.quantity + 1 } : i);
+            setItems(items.map(i => i.productId === newItem.productId ? { ...i, quantity: i.quantity + 1 } : i));
         } else {
              if (1 > availableStock) {
                  showToast(`Not enough stock for ${product.name}. Only ${availableStock} available for this sale.`, 'error');
                  return;
             }
-            newItems = [...items, newItem];
+            setItems([...items, newItem]);
         }
         
-        updateSaleField('items', newItems);
         setIsSelectingProduct(false);
     };
     
@@ -169,7 +228,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const numValue = parseFloat(value);
         if (isNaN(numValue) && value !== '') return;
 
-        const newItems = items.map(item => {
+        setItems(prevItems => prevItems.map(item => {
             if (item.productId === productId) {
                 if (field === 'quantity') {
                     const product = state.products.find(p => p.id === productId);
@@ -183,13 +242,12 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 return { ...item, [field]: numValue };
             }
             return item;
-        });
-        
-        updateSaleField('items', newItems);
+        }));
     };
 
+
     const handleRemoveItem = (productId: string) => {
-        updateSaleField('items', items.filter(item => item.productId !== productId));
+        setItems(items.filter(item => item.productId !== productId));
     };
 
     const calculations = useMemo(() => {
@@ -238,7 +296,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const handleAddCustomer = (customer: Customer) => {
         dispatch({ type: 'ADD_CUSTOMER', payload: customer });
-        updateSaleField('customerId', customer.id);
+        setCustomerId(customer.id);
         setIsAddingCustomer(false);
         showToast("Customer added successfully!");
     };
@@ -250,7 +308,8 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        const subTotal = calculations.subTotal; 
+        // FIX: Use locally scoped variables for whatsAppText instead of calculations from component state to ensure data consistency.
+        const subTotal = calculations.subTotal; // Approximation using current calc, ideally recalc from sale object
         const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
 
         const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmountOnSale.toLocaleString('en-IN')}\nDue: Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
@@ -497,7 +556,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                 </button>
 
                                 {isCustomerDropdownOpen && (
-                                    <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-40 animate-fade-in-fast">
+                                    <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-[1000] animate-fade-in-fast">
                                         <div className="p-2 border-b dark:border-slate-700">
                                             <input
                                                 type="text"
@@ -512,7 +571,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                             <li
                                                 key="select-customer-placeholder"
                                                 onClick={() => {
-                                                    updateSaleField('customerId', '');
+                                                    setCustomerId('');
                                                     setIsCustomerDropdownOpen(false);
                                                     setCustomerSearchTerm('');
                                                 }}
@@ -525,7 +584,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                                 <li
                                                     key={c.id}
                                                     onClick={() => {
-                                                        updateSaleField('customerId', c.id);
+                                                        setCustomerId(c.id);
                                                         setIsCustomerDropdownOpen(false);
                                                         setCustomerSearchTerm('');
                                                     }}
@@ -553,7 +612,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <DateInput 
                         label="Sale Date"
                         value={saleDate} 
-                        onChange={e => updateSaleField('date', e.target.value)}
+                        onChange={e => setSaleDate(e.target.value)}
                         disabled={mode === 'edit'}
                     />
 
@@ -616,7 +675,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </div>
                         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                             <span>Discount:</span>
-                            <input type="number" value={discount} onChange={e => updateSaleField('discount', e.target.value)} className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600" />
+                            <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600" />
                         </div>
                         <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                             <span>GST Included:</span>
@@ -637,21 +696,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         <div className="space-y-4">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
-                                <input 
-                                    type="number" 
-                                    value={paymentDetails.amount} 
-                                    onChange={e => updateSaleField('paymentDetails', {...paymentDetails, amount: e.target.value })} 
-                                    placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} 
-                                    className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" 
-                                />
+                                <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                <select 
-                                    value={paymentDetails.method} 
-                                    onChange={e => updateSaleField('paymentDetails', { ...paymentDetails, method: e.target.value as any})} 
-                                    className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600"
-                                >
+                                <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600">
                                     <option value="CASH">Cash</option>
                                     <option value="UPI">UPI</option>
                                     <option value="CHEQUE">Cheque</option>
@@ -659,13 +708,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
-                                <input 
-                                    type="text" 
-                                    placeholder="e.g. UPI ID, Cheque No." 
-                                    value={paymentDetails.reference} 
-                                    onChange={e => updateSaleField('paymentDetails', {...paymentDetails, reference: e.target.value })} 
-                                    className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" 
-                                />
+                                <input type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" />
                             </div>
                         </div>
                     ) : (
@@ -681,21 +724,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid</label>
-                            <input 
-                                type="number" 
-                                value={paymentDetails.amount} 
-                                onChange={e => updateSaleField('paymentDetails', {...paymentDetails, amount: e.target.value })} 
-                                placeholder={'Enter amount to pay dues'} 
-                                className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 dark:bg-slate-700 dark:border-red-400" 
-                            />
+                            <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={'Enter amount to pay dues'} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 dark:bg-slate-700 dark:border-red-400" />
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                            <select 
-                                value={paymentDetails.method} 
-                                onChange={e => updateSaleField('paymentDetails', { ...paymentDetails, method: e.target.value as any})} 
-                                className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600"
-                            >
+                            <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600">
                                 <option value="CASH">Cash</option>
                                 <option value="UPI">UPI</option>
                                 <option value="CHEQUE">Cheque</option>

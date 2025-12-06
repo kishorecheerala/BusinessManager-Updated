@@ -334,14 +334,12 @@ const AppContent: React.FC = () => {
             localStorage.removeItem('themeGradient');
         }
 
-        // 6. Dynamic Icons (Favicon, Apple Touch ONLY)
+        // 6. Dynamic Icons (Favicon, Apple Touch ONLY) - UPDATED TO REMOVE BOX
         const updateIcons = () => {
-            const bg = state.themeColor;
-            const fill = '#ffffff'; 
+            const bg = state.themeColor; // Use theme color for text now
             const svgString = `
                 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="512" height="512" rx="96" fill="${bg}"/>
-                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="280" font-family="serif" fill="${fill}" font-weight="bold">ॐ</text>
+                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="400" font-family="serif" fill="${bg}" font-weight="bold">ॐ</text>
                 </svg>
             `.trim();
             
@@ -416,9 +414,11 @@ const AppContent: React.FC = () => {
     const { mainNavItems, pinnedItems, mobileMoreItems } = useMemo(() => {
         const order = state.navOrder || [];
         
-        const allDesktopItems = order.map(id => ({
-            page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
-        }));
+        const allDesktopItems = order
+            .filter(id => id !== 'SYSTEM_OPTIMIZER')
+            .map(id => ({
+                page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
+            }));
 
         // Mobile: 4 items + More + FAB (at end)
         const pinnedIds = order.slice(0, 4);
