@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, History, ArrowRight, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -46,6 +46,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     
     const [mode, setMode] = useState<'add' | 'edit'>('add');
     const [saleToEdit, setSaleToEdit] = useState<Sale | null>(null);
+    const [activeTab, setActiveTab] = useState<'form' | 'history'>('form');
 
     const [customerId, setCustomerId] = useState('');
     const [items, setItems] = useState<SaleItem[]>([]);
@@ -73,6 +74,9 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [parkedSales, setParkedSales] = useState<ParkedSale[]>([]);
     const [isDraftsOpen, setIsDraftsOpen] = useState(false);
     
+    // History Search State
+    const [historySearch, setHistorySearch] = useState('');
+
     useOnClickOutside(customerDropdownRef, () => {
         if (isCustomerDropdownOpen) {
             setIsCustomerDropdownOpen(false);
@@ -91,18 +95,27 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         }
     }, []);
 
+    // Helper to load a sale for editing (used by effect and recent list)
+    const loadSaleForEditing = (sale: Sale) => {
+        setSaleToEdit(sale);
+        setMode('edit');
+        setCustomerId(sale.customerId);
+        setItems(sale.items.map(item => ({...item}))); // Deep copy
+        setDiscount(sale.discount.toString());
+        setSaleDate(getLocalDateString(new Date(sale.date)));
+        setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
+        
+        // Switch to form tab and scroll to top
+        setActiveTab('form');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
     // Effect to handle switching to edit mode from another page
     useEffect(() => {
         if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
             const sale = state.sales.find(s => s.id === state.selection.id);
             if (sale) {
-                setSaleToEdit(sale);
-                setMode('edit');
-                setCustomerId(sale.customerId);
-                setItems(sale.items.map(item => ({...item}))); // Deep copy
-                setDiscount(sale.discount.toString());
-                setSaleDate(getLocalDateString(new Date(sale.date)));
-                setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
+                loadSaleForEditing(sale);
                 dispatch({ type: 'CLEAR_SELECTION' });
             }
         }
@@ -174,6 +187,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         localStorage.setItem('parked_sales', JSON.stringify(updatedDrafts));
         
         setIsDraftsOpen(false);
+        setActiveTab('form');
         showToast("Draft resumed.", 'success');
     };
 
@@ -293,6 +307,20 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         return totalBilled - totalPaid;
     }, [customerId, state.sales]);
 
+    // History List Logic
+    const filteredHistory = useMemo(() => {
+        const term = historySearch.toLowerCase();
+        return state.sales.filter(s => {
+            const customer = state.customers.find(c => c.id === s.customerId);
+            return (
+                s.id.toLowerCase().includes(term) ||
+                (customer && customer.name.toLowerCase().includes(term)) ||
+                (customer && customer.phone.includes(term))
+            );
+        }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+          .slice(0, 50); // Limit to last 50 for performance
+    }, [state.sales, state.customers, historySearch]);
+
     const handleAddCustomer = (customer: Customer) => {
         dispatch({ type: 'ADD_CUSTOMER', payload: customer });
         setCustomerId(customer.id);
@@ -307,8 +335,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         const pdfFile = new File([pdfBlob], `Invoice-${sale.id}.pdf`, { type: 'application/pdf' });
         const businessName = state.profile?.name || 'Your Business';
         
-        // FIX: Use locally scoped variables for whatsAppText instead of calculations from component state to ensure data consistency.
-        const subTotal = calculations.subTotal; // Approximation using current calc, ideally recalc from sale object
+        const subTotal = calculations.subTotal;
         const dueAmountOnSale = Number(sale.totalAmount) - paidAmountOnSale;
 
         const whatsAppText = `Thank you for your purchase from ${businessName}!\n\n*Invoice Summary:*\nInvoice ID: ${sale.id}\nDate: ${new Date(sale.date).toLocaleString()}\n\n*Items:*\n${sale.items.map(i => `- ${i.productName} (x${i.quantity}) - Rs. ${(Number(i.price) * Number(i.quantity)).toLocaleString('en-IN')}`).join('\n')}\n\nSubtotal: Rs. ${subTotal.toLocaleString('en-IN')}\nGST: Rs. ${Number(sale.gstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}\nDiscount: Rs. ${Number(sale.discount).toLocaleString('en-IN')}\n*Total: Rs. ${Number(sale.totalAmount).toLocaleString('en-IN')}*\nPaid: Rs. ${paidAmountOnSale.toLocaleString('en-IN')}\nDue: Rs. ${dueAmountOnSale.toLocaleString('en-IN', { minimumFractionDigits: 2 })}\n\nHave a blessed day!`;
@@ -330,9 +357,13 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         } else {
           doc.save(`Invoice-${sale.id}.pdf`);
         }
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === 'AbortError' || (error.message && error.message.includes('Share canceled'))) {
+             console.debug('Share canceled by user');
+             return;
+        }
         console.error("PDF generation or sharing failed:", error);
-        showToast(`Sale created, but PDF failed: ${(error as Error).message}`, 'error');
+        showToast(`Sale created, but PDF failed: ${error.message}`, 'error');
       }
     };
 
@@ -448,13 +479,22 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         resetForm();
     };
 
+    const handleEditFromHistory = (sale: Sale) => {
+        if (isDirtyRef.current) {
+            if (!window.confirm("You have unsaved changes. Discard and edit this sale?")) {
+                return;
+            }
+        }
+        loadSaleForEditing(sale);
+    };
+    
     const canCreateSale = customerId && items.length > 0 && mode === 'add';
     const canUpdateSale = customerId && items.length > 0 && mode === 'edit';
     const canRecordPayment = customerId && items.length === 0 && parseFloat(paymentDetails.amount || '0') > 0 && customerTotalDue != null && customerTotalDue > 0.01 && mode === 'add';
     const pageTitle = mode === 'edit' ? `Edit Sale: ${saleToEdit?.id}` : 'New Sale / Payment';
 
     return (
-        <>
+        <div className="space-y-4 animate-fade-in-fast relative">
             {isAddingCustomer && 
                 <AddCustomerModal 
                     isOpen={isAddingCustomer}
@@ -514,8 +554,8 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     </Card>
                 </div>
             )}
-            
-            <div className="space-y-4 animate-fade-in-fast relative">
+
+            <div className="flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                     <h1 className="text-2xl font-bold text-primary">{pageTitle}</h1>
                     
@@ -537,234 +577,328 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                         </Button>
                     </div>
                 </div>
-                
-                <Card>
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
-                            <div className="flex gap-2 items-center">
-                                <div className="relative w-full" ref={customerDropdownRef}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCustomerDropdownOpen(prev => !prev)}
-                                        className="w-full p-2 border rounded bg-white text-left custom-select dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
-                                        disabled={mode === 'edit' || (mode === 'add' && items.length > 0)}
-                                        aria-haspopup="listbox"
-                                        aria-expanded={isCustomerDropdownOpen}
-                                    >
-                                        {selectedCustomer ? `${selectedCustomer.name} - ${selectedCustomer.area}` : 'Select a Customer'}
-                                    </button>
 
-                                    {isCustomerDropdownOpen && (
-                                        <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-40 animate-fade-in-fast">
-                                            <div className="p-2 border-b dark:border-slate-700">
-                                                <input
-                                                    type="text"
-                                                    placeholder="Search by name or area..."
-                                                    value={customerSearchTerm}
-                                                    onChange={e => setCustomerSearchTerm(e.target.value)}
-                                                    className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white"
-                                                    autoFocus
-                                                />
-                                            </div>
-                                            <ul className="max-h-60 overflow-y-auto" role="listbox">
-                                                <li
-                                                    key="select-customer-placeholder"
-                                                    onClick={() => {
-                                                        setCustomerId('');
-                                                        setIsCustomerDropdownOpen(false);
-                                                        setCustomerSearchTerm('');
-                                                    }}
-                                                    className="px-4 py-2 hover:bg-teal-50 dark:hover:bg-slate-800 cursor-pointer text-gray-500"
-                                                    role="option"
-                                                >
-                                                    Select a Customer
-                                                </li>
-                                                {filteredCustomers.map(c => (
+                {/* TABS */}
+                <div className="flex p-1 bg-gray-100 dark:bg-slate-800 rounded-lg">
+                    <button 
+                        onClick={() => setActiveTab('form')} 
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'form' ? 'bg-white dark:bg-slate-700 shadow text-primary' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                        <div className="flex items-center justify-center gap-2">
+                            <Edit size={16} /> {mode === 'edit' ? 'Edit Mode' : 'Transaction Form'}
+                        </div>
+                    </button>
+                    <button 
+                        onClick={() => setActiveTab('history')} 
+                        className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeTab === 'history' ? 'bg-white dark:bg-slate-700 shadow text-primary' : 'text-gray-500 dark:text-gray-400'}`}
+                    >
+                         <div className="flex items-center justify-center gap-2">
+                            <History size={16} /> Sales History
+                        </div>
+                    </button>
+                </div>
+            </div>
+            
+            {activeTab === 'form' ? (
+                <>
+                    <Card>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
+                                <div className="flex gap-2 items-center">
+                                    <div className="relative w-full" ref={customerDropdownRef}>
+                                        <button
+                                            type="button"
+                                            onClick={() => setIsCustomerDropdownOpen(prev => !prev)}
+                                            className="w-full p-2 border rounded bg-white text-left custom-select dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200"
+                                            disabled={mode === 'edit' || (mode === 'add' && items.length > 0)}
+                                            aria-haspopup="listbox"
+                                            aria-expanded={isCustomerDropdownOpen}
+                                        >
+                                            {selectedCustomer ? `${selectedCustomer.name} - ${selectedCustomer.area}` : 'Select a Customer'}
+                                        </button>
+
+                                        {isCustomerDropdownOpen && (
+                                            <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-40 animate-fade-in-fast">
+                                                <div className="p-2 border-b dark:border-slate-700">
+                                                    <input
+                                                        type="text"
+                                                        placeholder="Search by name or area..."
+                                                        value={customerSearchTerm}
+                                                        onChange={e => setCustomerSearchTerm(e.target.value)}
+                                                        className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white"
+                                                        autoFocus
+                                                    />
+                                                </div>
+                                                <ul className="max-h-60 overflow-y-auto" role="listbox">
                                                     <li
-                                                        key={c.id}
+                                                        key="select-customer-placeholder"
                                                         onClick={() => {
-                                                            setCustomerId(c.id);
+                                                            setCustomerId('');
                                                             setIsCustomerDropdownOpen(false);
                                                             setCustomerSearchTerm('');
                                                         }}
-                                                        className="px-4 py-2 hover:bg-teal-50 dark:hover:bg-slate-800 cursor-pointer border-t dark:border-slate-800"
+                                                        className="px-4 py-2 hover:bg-teal-50 dark:hover:bg-slate-800 cursor-pointer text-gray-500"
                                                         role="option"
                                                     >
-                                                        {c.name} - {c.area}
+                                                        Select a Customer
                                                     </li>
-                                                ))}
-                                                {filteredCustomers.length === 0 && (
-                                                    <li className="px-4 py-2 text-gray-400">No customers found.</li>
-                                                )}
-                                            </ul>
-                                        </div>
+                                                    {filteredCustomers.map(c => (
+                                                        <li
+                                                            key={c.id}
+                                                            onClick={() => {
+                                                                setCustomerId(c.id);
+                                                                setIsCustomerDropdownOpen(false);
+                                                                setCustomerSearchTerm('');
+                                                            }}
+                                                            className="px-4 py-2 hover:bg-teal-50 dark:hover:bg-slate-800 cursor-pointer border-t dark:border-slate-800"
+                                                            role="option"
+                                                        >
+                                                            {c.name} - {c.area}
+                                                        </li>
+                                                    ))}
+                                                    {filteredCustomers.length === 0 && (
+                                                        <li className="px-4 py-2 text-gray-400">No customers found.</li>
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {mode === 'add' && (
+                                        <Button onClick={() => setIsAddingCustomer(true)} variant="secondary" className="flex-shrink-0">
+                                            <Plus size={16}/> New Customer
+                                        </Button>
                                     )}
                                 </div>
-                                {mode === 'add' && (
-                                    <Button onClick={() => setIsAddingCustomer(true)} variant="secondary" className="flex-shrink-0">
-                                        <Plus size={16}/> New Customer
-                                    </Button>
-                                )}
                             </div>
-                        </div>
-                        
-                        <DateInput 
-                            label="Sale Date"
-                            value={saleDate} 
-                            onChange={e => setSaleDate(e.target.value)}
-                            disabled={mode === 'edit'}
-                        />
+                            
+                            <DateInput 
+                                label="Sale Date"
+                                value={saleDate} 
+                                onChange={e => setSaleDate(e.target.value)}
+                                disabled={mode === 'edit'}
+                            />
 
-                        {/* Customer Last Purchase Context */}
-                        {lastPurchaseInfo && mode === 'add' && (
-                            <div className="text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800 flex items-center justify-between">
-                                <span>Last Order: <strong>{lastPurchaseInfo.date}</strong></span>
-                                <span>Amount: <strong>₹{lastPurchaseInfo.amount.toLocaleString('en-IN')}</strong></span>
-                            </div>
-                        )}
-
-                        {customerId && customerTotalDue !== null && mode === 'add' && (
-                            <div className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg text-center border dark:border-slate-700">
-                                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                                    Selected Customer's Total Outstanding Due:
-                                </p>
-                                <p className={`text-xl font-bold ${customerTotalDue > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
-                                    ₹{customerTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </Card>
-
-
-                <Card title="Sale Items">
-                    <div className="flex flex-col sm:flex-row gap-2">
-                        <Button onClick={() => setIsSelectingProduct(true)} className="w-full sm:w-auto flex-grow" disabled={!customerId}>
-                            <Search size={16} className="mr-2"/> Select Product
-                        </Button>
-                        <Button onClick={() => setIsScanning(true)} variant="secondary" className="w-full sm:w-auto flex-grow" disabled={!customerId}>
-                            <QrCode size={16} className="mr-2"/> Scan Product
-                        </Button>
-                    </div>
-                    <div className="mt-4 space-y-2">
-                        {items.map(item => (
-                            <div key={item.productId} className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded animate-fade-in-fast border dark:border-slate-700">
-                                <div className="flex justify-between items-start">
-                                    <p className="font-semibold flex-grow">{item.productName}</p>
-                                    <DeleteButton variant="remove" onClick={() => handleRemoveItem(item.productId)} />
+                            {/* Customer Last Purchase Context */}
+                            {lastPurchaseInfo && mode === 'add' && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800 flex items-center justify-between">
+                                    <span>Last Order: <strong>{lastPurchaseInfo.date}</strong></span>
+                                    <span>Amount: <strong>₹{lastPurchaseInfo.amount.toLocaleString('en-IN')}</strong></span>
                                 </div>
-                                <div className="flex items-center gap-2 text-sm mt-1">
-                                    <input type="number" value={item.quantity} onChange={e => handleItemChange(item.productId, 'quantity', e.target.value)} className="w-20 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Qty"/>
-                                    <span>x</span>
-                                    <input type="number" value={item.price} onChange={e => handleItemChange(item.productId, 'price', e.target.value)} className="w-24 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Price"/>
-                                    <span>= ₹{(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}</span>
+                            )}
+
+                            {customerId && customerTotalDue !== null && mode === 'add' && (
+                                <div className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg text-center border dark:border-slate-700">
+                                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+                                        Selected Customer's Total Outstanding Due:
+                                    </p>
+                                    <p className={`text-xl font-bold ${customerTotalDue > 0.01 ? 'text-red-600' : 'text-green-600'}`}>
+                                        ₹{customerTotalDue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+
+                    <Card title="Sale Items">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                            <Button onClick={() => setIsSelectingProduct(true)} className="w-full sm:w-auto flex-grow" disabled={!customerId}>
+                                <Search size={16} className="mr-2"/> Select Product
+                            </Button>
+                            <Button onClick={() => setIsScanning(true)} variant="secondary" className="w-full sm:w-auto flex-grow" disabled={!customerId}>
+                                <QrCode size={16} className="mr-2"/> Scan Product
+                            </Button>
+                        </div>
+                        <div className="mt-4 space-y-2">
+                            {items.map(item => (
+                                <div key={item.productId} className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded animate-fade-in-fast border dark:border-slate-700">
+                                    <div className="flex justify-between items-start">
+                                        <p className="font-semibold flex-grow">{item.productName}</p>
+                                        <DeleteButton variant="remove" onClick={() => handleRemoveItem(item.productId)} />
+                                    </div>
+                                    <div className="flex items-center gap-2 text-sm mt-1">
+                                        <input type="number" value={item.quantity} onChange={e => handleItemChange(item.productId, 'quantity', e.target.value)} className="w-20 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Qty"/>
+                                        <span>x</span>
+                                        <input type="number" value={item.price} onChange={e => handleItemChange(item.productId, 'price', e.target.value)} className="w-24 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Price"/>
+                                        <span>= ₹{(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </Card>
+
+                    <Card title="Transaction Details">
+                        <div className="space-y-6">
+                            {/* Section 1: Calculation Details */}
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
+                                    <span>Subtotal:</span>
+                                    <span>₹{calculations.subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
+                                    <span>Discount:</span>
+                                    <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600" />
+                                </div>
+                                <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
+                                    <span>GST Included:</span>
+                                    <span>₹{calculations.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
-                        ))}
-                    </div>
-                </Card>
 
-                <Card title="Transaction Details">
-                    <div className="space-y-6">
-                        {/* Section 1: Calculation Details */}
-                        <div className="space-y-3">
-                            <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
-                                <span>Subtotal:</span>
-                                <span>₹{calculations.subTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                            {/* Section 2: Grand Total */}
+                            <div className="text-center">
+                                <p className="text-sm text-gray-500 dark:text-gray-400">Grand Total</p>
+                                <p className="text-4xl font-bold text-primary">
+                                    ₹{calculations.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </p>
                             </div>
-                            <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
-                                <span>Discount:</span>
-                                <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600" />
-                            </div>
-                            <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
-                                <span>GST Included:</span>
-                                <span>₹{calculations.gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                            </div>
+
+                            {/* Section 3: Payment Details */}
+                            {mode === 'add' ? (
+                                <div className="space-y-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
+                                        <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
+                                        <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600">
+                                            <option value="CASH">Cash</option>
+                                            <option value="UPI">UPI</option>
+                                            <option value="CHEQUE">Cheque</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
+                                        <input type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" />
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="pt-4 border-t dark:border-slate-700 text-center">
+                                    <p className="text-sm text-gray-600 dark:text-gray-400">Payments for this invoice must be managed from the customer's details page.</p>
+                                </div>
+                            )}
                         </div>
-
-                        {/* Section 2: Grand Total */}
-                        <div className="text-center">
-                            <p className="text-sm text-gray-500 dark:text-gray-400">Grand Total</p>
-                            <p className="text-4xl font-bold text-primary">
-                                ₹{calculations.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                            </p>
-                        </div>
-
-                        {/* Section 3: Payment Details */}
-                        {mode === 'add' ? (
-                            <div className="space-y-4">
+                    </Card>
+                    
+                    {mode === 'add' && items.length === 0 && customerId && customerTotalDue != null && customerTotalDue > 0.01 && (
+                        <Card title="Record Payment for Dues">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
-                                    <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid</label>
+                                    <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={'Enter amount to pay dues'} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 dark:bg-slate-700 dark:border-red-400" />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                    <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600">
+                                    <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600">
                                         <option value="CASH">Cash</option>
                                         <option value="UPI">UPI</option>
                                         <option value="CHEQUE">Cheque</option>
                                     </select>
                                 </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
-                                    <input type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" />
-                                </div>
                             </div>
+                        </Card>
+                    )}
+
+                    <div className="space-y-2">
+                        {canCreateSale ? (
+                            <Button onClick={handleSubmitSale} variant="secondary" className="w-full">
+                                <Share2 className="w-4 h-4 mr-2"/>
+                                Create Sale & Share Invoice
+                            </Button>
+                        ) : canUpdateSale ? (
+                            <Button onClick={handleSubmitSale} className="w-full">
+                                <Save className="w-4 h-4 mr-2"/>
+                                Save Changes to Sale
+                            </Button>
+                        ) : canRecordPayment ? (
+                             <Button onClick={handleRecordStandalonePayment} className="w-full">
+                                <IndianRupee className="w-4 h-4 mr-2" />
+                                Record Standalone Payment
+                            </Button>
                         ) : (
-                            <div className="pt-4 border-t dark:border-slate-700 text-center">
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Payments for this invoice must be managed from the customer's details page.</p>
-                            </div>
+                             <Button className="w-full" disabled>
+                                {customerId ? (items.length === 0 ? 'Enter payment or add items' : 'Complete billing details') : 'Select a customer'}
+                            </Button>
+                        )}
+
+                        <Button onClick={resetForm} variant="secondary" className="w-full bg-teal-200 hover:bg-teal-300 focus:ring-teal-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600">
+                            {mode === 'edit' ? 'Cancel Edit' : 'Clear Form'}
+                        </Button>
+                    </div>
+                </>
+            ) : (
+                // HISTORY TAB CONTENT
+                <Card className="animate-fade-in-fast h-full flex flex-col">
+                    <div className="relative mb-4">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                        <input
+                            type="text"
+                            placeholder="Search history by customer or invoice..."
+                            value={historySearch}
+                            onChange={e => setHistorySearch(e.target.value)}
+                            className="w-full p-2 pl-10 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                        />
+                    </div>
+                    
+                    <div className="space-y-3">
+                        {filteredHistory.length > 0 ? (
+                            filteredHistory.map((sale) => {
+                                const saleCustomer = state.customers.find((c) => c.id === sale.customerId);
+                                const totalPaid = sale.payments.reduce((sum, p) => sum + Number(p.amount), 0);
+                                const dueAmount = Number(sale.totalAmount) - totalPaid;
+                                
+                                return (
+                                    <div
+                                        key={sale.id}
+                                        onClick={() => handleEditFromHistory(sale)}
+                                        className="p-3 bg-gradient-to-r from-slate-50 to-blue-50 dark:from-slate-700 dark:to-slate-600/30 rounded-lg border border-slate-200 dark:border-slate-600 cursor-pointer hover:shadow-md transition-all hover:scale-[1.01]"
+                                    >
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex-grow">
+                                                <p className="font-semibold text-sm text-slate-900 dark:text-white">
+                                                    {saleCustomer?.name || 'Unknown Customer'}
+                                                </p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-1 mt-1">
+                                                    <Clock size={12} />
+                                                    {new Date(sale.date).toLocaleString('en-IN')}
+                                                </p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-sm font-bold text-slate-900 dark:text-white">
+                                                    ₹{Number(sale.totalAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                                </p>
+                                                <p className={`text-xs font-semibold ${dueAmount > 0.01 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                                                    {dueAmount > 0.01 ? `Due: ₹${dueAmount.toLocaleString('en-IN')}` : 'Paid'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="mt-2 pt-2 border-t border-slate-300 dark:border-slate-500/30">
+                                            <div className="flex justify-between items-center text-xs">
+                                                <span className="text-slate-600 dark:text-slate-400">
+                                                    {sale.items.length} item{sale.items.length !== 1 ? 's' : ''}
+                                                </span>
+                                                <span className="text-slate-600 dark:text-slate-400 flex items-center gap-1">
+                                                    <FileText size={10} />
+                                                    {sale.id.slice(-6)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        
+                                        <p className="text-xs text-blue-600 dark:text-blue-400 mt-2 font-semibold flex items-center gap-1">
+                                            Edit this sale <ArrowRight size={10} />
+                                        </p>
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <p className="text-center text-gray-500 py-8">No sales found.</p>
                         )}
                     </div>
                 </Card>
-                
-                {mode === 'add' && items.length === 0 && customerId && customerTotalDue != null && customerTotalDue > 0.01 && (
-                    <Card title="Record Payment for Dues">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid</label>
-                                <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={'Enter amount to pay dues'} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 dark:bg-slate-700 dark:border-red-400" />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600">
-                                    <option value="CASH">Cash</option>
-                                    <option value="UPI">UPI</option>
-                                    <option value="CHEQUE">Cheque</option>
-                                </select>
-                            </div>
-                        </div>
-                    </Card>
-                )}
-
-                <div className="space-y-2">
-                    {canCreateSale ? (
-                        <Button onClick={handleSubmitSale} variant="secondary" className="w-full">
-                            <Share2 className="w-4 h-4 mr-2"/>
-                            Create Sale & Share Invoice
-                        </Button>
-                    ) : canUpdateSale ? (
-                        <Button onClick={handleSubmitSale} className="w-full">
-                            <Save className="w-4 h-4 mr-2"/>
-                            Save Changes to Sale
-                        </Button>
-                    ) : canRecordPayment ? (
-                         <Button onClick={handleRecordStandalonePayment} className="w-full">
-                            <IndianRupee className="w-4 h-4 mr-2" />
-                            Record Standalone Payment
-                        </Button>
-                    ) : (
-                         <Button className="w-full" disabled>
-                            {customerId ? (items.length === 0 ? 'Enter payment or add items' : 'Complete billing details') : 'Select a customer'}
-                        </Button>
-                    )}
-                    <Button onClick={resetForm} variant="secondary" className="w-full bg-teal-200 hover:bg-teal-300 focus:ring-teal-200 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600">
-                        {mode === 'edit' ? 'Cancel Edit' : 'Clear Form'}
-                    </Button>
-                </div>
-            </div>
-        </>
+            )}
+        </div>
     );
 };
 
