@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, Suspense } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
-  Receipt, Undo2, FileText, BarChart2, PenTool, Gauge, Search, 
+  Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
   X, Download, Sun, Moon, CalendarClock, WifiOff, Database, PauseCircle, Trash2
 } from 'lucide-react';
@@ -31,7 +31,6 @@ import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
 import { APP_VERSION } from './utils/changelogData';
-import { usePWAInstall } from './hooks/usePWAInstall';
 
 // Pages (Lazy Load for Performance)
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -173,6 +172,7 @@ const AppContent: React.FC = () => {
             dispatch({ type: 'SET_SELECTION', payload: { page: 'CUSTOMERS', id: 'new' } });
             // Clean URL safely
             try {
+                // Use replaceState with current path to remove query params if possible, otherwise ignore
                 const newUrl = window.location.pathname;
                 window.history.replaceState({}, '', newUrl);
             } catch (e) {
@@ -234,10 +234,62 @@ const AppContent: React.FC = () => {
     };
 
     // Persist current page navigation & Scroll to Top
+    // Use useLayoutEffect to ensure scroll happens before paint
     useLayoutEffect(() => {
         localStorage.setItem('business_manager_last_page', currentPage);
         window.scrollTo(0, 0); 
     }, [currentPage]);
+
+    // Double Back to Exit Logic
+    useEffect(() => {
+        // Wrapper for safer history manipulation (avoids crashes in restricted frames/blobs)
+        const safePushState = (data: any, title: string, url?: string | null) => {
+            try {
+                window.history.pushState(data, title, url);
+            } catch (e) {
+                console.debug('History pushState restricted');
+            }
+        };
+
+        // Push a dummy state initially so 'back' event is captured by popstate
+        // Passing null for URL respects current location (safer for blobs)
+        safePushState(null, '', null); 
+
+        let backPressCount = 0;
+        let backPressTimer: any;
+
+        const handlePopState = (event: PopStateEvent) => {
+            // Prevent default back navigation if we want to intercept it
+            // However, popstate fires AFTER the history change.
+            // So we need to re-push the state if we want to stay.
+            
+            backPressCount++;
+            
+            if (backPressCount === 1) {
+                // First press: Show warning and stay in app
+                showToast("Press back again to exit", "info");
+                // Push state again so next back press triggers popstate again
+                safePushState(null, '', null);
+                
+                // Reset counter after 2 seconds
+                backPressTimer = setTimeout(() => {
+                    backPressCount = 0;
+                }, 2000);
+            } else {
+                // Second press: Do nothing (allow exit/back)
+                // Or explicitly close if in a PWA wrapper?
+                // Standard behavior is just letting the history pop naturally now.
+                clearTimeout(backPressTimer);
+            }
+        };
+
+        window.addEventListener('popstate', handlePopState);
+        
+        return () => {
+            window.removeEventListener('popstate', handlePopState);
+            clearTimeout(backPressTimer);
+        };
+    }, []);
 
     // Apply Theme & Dynamic Icon
     useEffect(() => {
@@ -270,7 +322,7 @@ const AppContent: React.FC = () => {
             root.style.setProperty('--theme-gradient', `linear-gradient(135deg, ${state.themeColor} 0%, ${state.themeColor} 100%)`);
         }
 
-        // 4. App Font
+        // 4. App Font (This ensures font selection works instantly)
         if (state.font) {
             root.style.setProperty('--app-font', state.font);
         }
@@ -285,19 +337,27 @@ const AppContent: React.FC = () => {
             localStorage.removeItem('themeGradient');
         }
 
-        // 6. Dynamic Icons
+        // 6. Dynamic Icons (Favicon, Apple Touch ONLY) - UPDATED TO REMOVE BOX
         const updateIcons = () => {
-            const bg = state.themeColor;
+            const bg = state.themeColor; // Use theme color for text now
             const svgString = `
                 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="400" font-family="serif" fill="${bg}" font-weight="bold">ॐ</text>
                 </svg>
             `.trim();
+            
             const dataUrl = `data:image/svg+xml,${encodeURIComponent(svgString)}`;
+            
+            // Update Favicon links
             const links = document.querySelectorAll("link[rel*='icon']");
             links.forEach(link => (link as HTMLLinkElement).href = dataUrl);
+
+            // Update Meta Theme Color
             const metaTheme = document.querySelector("meta[name='theme-color']");
             if (metaTheme) metaTheme.setAttribute("content", bg);
+
+            // IMPORTANT: Do NOT update manifest link dynamically. 
+            // WebAPKs require a static manifest URL to install correctly on Android.
         };
         updateIcons();
 
@@ -310,14 +370,18 @@ const AppContent: React.FC = () => {
 
     // Handle Unsaved Changes & Navigation Interception
     const handleNavigation = (page: Page) => {
+        // Special Handling for Sales Page: Park or Clear
         if (currentPage === 'SALES') {
              const { customerId, items } = state.currentSale;
              const hasActiveSale = !!customerId || items.length > 0;
+             
              if (hasActiveSale) {
                  setParkModalState({ isOpen: true, targetPage: page });
                  return;
              }
         }
+
+        // Standard Dirty Check for other pages (Customers, Purchases etc.)
         if (isDirty && currentPage !== 'SALES') {
             if (window.confirm('You have unsaved changes. Are you sure you want to leave?')) {
                 setIsDirty(false);
@@ -345,18 +409,21 @@ const AppContent: React.FC = () => {
             setCurrentPage(parkModalState.targetPage);
         }
         setParkModalState({ isOpen: false, targetPage: null });
+        // Force clear dirty flag if it was set by SalesPage logic
         setIsDirty(false);
     };
 
     // Calculate Navigation Layout based on user preference order
     const { mainNavItems, pinnedItems, mobileMoreItems } = useMemo(() => {
         const order = state.navOrder || [];
+        
         const allDesktopItems = order
             .filter(id => id !== 'SYSTEM_OPTIMIZER')
             .map(id => ({
                 page: id, label: LABEL_MAP[id], icon: ICON_MAP[id]
             }));
 
+        // Mobile: 4 items + More + FAB (at end)
         const pinnedIds = order.slice(0, 4);
         const menuIds = order.slice(4);
 
@@ -381,16 +448,31 @@ const AppContent: React.FC = () => {
 
     if (!isDbLoaded) return <DevineLoader />;
 
+    // Main Content Class Logic
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
-        : `min-h-screen pt-[7rem]`; 
+        : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
     
-    const navClass = state.uiPreferences?.cardStyle === 'glass' 
-        ? 'glass border-t border-white/20 dark:border-slate-700/50' 
-        : 'bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700';
+    // UI Preference Classes
+    const navStyle = state.uiPreferences?.navStyle || 'docked';
+    const isFloatingNav = navStyle === 'floating';
+    
+    const fontSize = state.uiPreferences?.fontSize || 'normal';
+    const fontClass = fontSize === 'small' ? 'text-sm' : fontSize === 'large' ? 'text-[17px]' : 'text-base';
+    
+    // Nav Bar Styling based on Preference
+    let navContainerClass = state.uiPreferences?.cardStyle === 'glass' 
+        ? 'glass border-white/20 dark:border-slate-700/50' 
+        : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700';
+
+    if (isFloatingNav) {
+        navContainerClass += ' bottom-4 left-4 right-4 rounded-2xl shadow-xl border';
+    } else {
+        navContainerClass += ' bottom-0 left-0 right-0 border-t';
+    }
 
     return (
-        <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
+        <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme} ${fontClass}`}>
             {/* Lock Screen Overlay */}
             {isLocked && (
                 <div className="fixed inset-0 z-[1000] bg-background dark:bg-slate-950 flex items-center justify-center">
@@ -398,6 +480,7 @@ const AppContent: React.FC = () => {
                         mode="enter" 
                         correctPin={state.pin} 
                         onCorrectPin={() => setIsLocked(false)}
+                        // No onCancel prop = no back button = forced lock
                     />
                 </div>
             )}
@@ -429,13 +512,13 @@ const AppContent: React.FC = () => {
             <ChangeLogModal isOpen={isChangeLogOpen} onClose={handleCloseChangeLog} />
             <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
             
-            {/* Header */}
+            {/* Header - Hidden on Invoice Designer to maximize space */}
             {currentPage !== 'INVOICE_DESIGNER' && (
                 <header className="fixed top-0 left-0 right-0 z-40 bg-theme shadow-lg transition-all duration-300">
                     
-                    {/* Top Row: Navigation & Actions */}
+                    {/* Top Row: Navigation & Actions (h-16) */}
                     <div className="h-16 px-3 sm:px-4 flex items-center justify-between text-white relative">
-                        {/* Left: Menu & Search & AI */}
+                        {/* Left: Menu & Search */}
                         <div className="flex items-center gap-1 sm:gap-2 z-20">
                             <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Menu (Ctrl+M)">
                                 <Menu size={24} />
@@ -443,13 +526,9 @@ const AppContent: React.FC = () => {
                             <button onClick={() => setIsSearchOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Search (Ctrl+K)">
                                 <Search size={20} />
                             </button>
-                            {/* AI Button - Moved Here */}
-                            <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="AI Assistant">
-                                <Sparkles size={20} />
-                            </button>
                         </div>
 
-                        {/* Center: Title */}
+                        {/* Center: Title - Absolutely Centered */}
                         <div className="absolute left-0 right-0 top-0 bottom-0 flex flex-col justify-center items-center pointer-events-none z-10 px-16">
                             <button 
                                 onClick={() => handleNavigation('DASHBOARD')}
@@ -465,6 +544,7 @@ const AppContent: React.FC = () => {
                                                 {state.googleUser.name}
                                             </span>
                                             
+                                            {/* Status Dot */}
                                             <div className="relative flex h-2 w-2 shrink-0">
                                               {state.syncStatus === 'syncing' && (
                                                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -472,6 +552,7 @@ const AppContent: React.FC = () => {
                                               <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'error' ? 'bg-red-500' : 'bg-green-400'} shadow-sm`}></span>
                                             </div>
 
+                                            {/* Sync Time */}
                                             <span className="text-[9px] sm:text-[10px] font-mono text-white/80 font-medium tracking-wide">
                                                 {state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', hour12: true}) : 'Connected'}
                                             </span>
@@ -485,6 +566,7 @@ const AppContent: React.FC = () => {
 
                         {/* Right: Actions */}
                         <div className="flex items-center gap-1 sm:gap-2 z-20">
+                            {/* Offline Indicator - Only visible when offline */}
                             {!state.isOnline && (
                                 <div className="hidden sm:flex items-center gap-1 px-2 py-1 bg-red-500/20 rounded-full border border-red-400/50 mr-1 animate-pulse">
                                     <WifiOff size={14} className="text-white" />
@@ -492,10 +574,16 @@ const AppContent: React.FC = () => {
                                 </div>
                             )}
 
-                            <button onClick={toggleTheme} className="p-2 hover:bg-white/20 rounded-full transition-colors hidden sm:block" title="Toggle Theme">
+                            {/* Theme Toggle Button - New */}
+                            <button 
+                                onClick={toggleTheme}
+                                className="p-2 hover:bg-white/20 rounded-full transition-colors hidden sm:block"
+                                title="Toggle Theme"
+                            >
                                 {state.theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                             </button>
 
+                            {/* Cloud Sync / Sign In Button */}
                             <button 
                                 onClick={() => { 
                                     if (!state.googleUser) {
@@ -510,6 +598,7 @@ const AppContent: React.FC = () => {
                                     setIsCloudDebugOpen(true);
                                 }}
                                 className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
+                                title={!state.googleUser ? 'Sign In to Backup' : state.syncStatus === 'error' ? 'Sync Failed (Click to Retry)' : state.syncStatus === 'syncing' ? 'Auto-Sync in progress...' : `Last Backup: ${state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleString() : 'Not synced yet'}`}
                             >
                                 {state.syncStatus === 'syncing' ? (
                                     <RefreshCw size={20} className="animate-spin" />
@@ -519,10 +608,20 @@ const AppContent: React.FC = () => {
                                     <Cloud size={20} className={!state.googleUser ? "opacity-70" : ""} />
                                 )}
                                 {state.googleUser && state.syncStatus !== 'syncing' && (
-                                    <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white/20 ${state.syncStatus === 'success' ? 'bg-green-400' : state.syncStatus === 'error' ? 'bg-red-500' : 'bg-gray-300'}`}></span>
+                                    <span className={`absolute top-1.5 right-1.5 w-2.5 h-2.5 rounded-full border-2 border-white/20 ${
+                                        state.syncStatus === 'success' ? 'bg-green-400' : 
+                                        state.syncStatus === 'error' ? 'bg-red-500' : 
+                                        'bg-gray-300'
+                                    }`}></span>
                                 )}
                             </button>
 
+                            {/* AI Button - Always visible */}
+                            <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                                <Sparkles size={20} />
+                            </button>
+
+                            {/* Notifications */}
                             <div className="relative" ref={notificationsRef}>
                                 <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="p-2 hover:bg-white/20 rounded-full transition-colors relative">
                                     <Bell size={20} />
@@ -533,13 +632,14 @@ const AppContent: React.FC = () => {
                                 <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
                             </div>
 
-                            <button onClick={() => setIsHelpOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
+                            {/* Help Button - Hidden on small mobile */}
+                            <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
                                 <HelpCircle size={20} />
                             </button>
                         </div>
                     </div>
 
-                    {/* Bottom Row: Info Banner */}
+                    {/* Bottom Row: Info Banner (h-10) */}
                     <div className="h-10 bg-white/10 backdrop-blur-md border-t border-white/10 flex items-center justify-between px-4 text-white text-xs sm:text-sm font-medium">
                         <div className="flex-1 text-left opacity-90 truncate pr-2 flex items-center gap-2">
                             {getGreetingIcon()}
@@ -597,8 +697,8 @@ const AppContent: React.FC = () => {
             
             {/* Bottom Navigation */}
             {currentPage !== 'INVOICE_DESIGNER' && (
-            <nav className={`fixed bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)] z-50 transition-colors duration-300 ${navClass}`}>
-                {/* Desktop View */}
+            <nav className={`fixed pb-[env(safe-area-inset-bottom)] z-50 transition-all duration-300 ${navContainerClass}`}>
+                {/* Desktop View - Scrollable */}
                 <div className="hidden md:flex w-full overflow-x-auto custom-scrollbar">
                     <div className="flex flex-nowrap mx-auto items-center gap-2 lg:gap-6 p-2 px-6 min-w-max">
                         {mainNavItems.map(item => (
@@ -615,8 +715,9 @@ const AppContent: React.FC = () => {
                     </div>
                 </div>
 
-                {/* Mobile View */}
+                {/* Mobile View - Custom Layout */}
                 <div className="flex md:hidden justify-between items-end px-3 pb-2 pt-1 mx-auto w-full max-w-md relative">
+                    {/* Pinned Items (First 4) */}
                     {pinnedItems.map(item => (
                         <NavItem 
                             key={item.page}
@@ -628,6 +729,7 @@ const AppContent: React.FC = () => {
                         />
                     ))}
                     
+                    {/* More Menu */}
                     <div className="relative flex flex-col items-center justify-center w-full" ref={moreMenuRef}>
                         <button
                             onClick={() => { setIsMoreMenuOpen(prev => !prev); setIsMobileQuickAddOpen(false); }}
@@ -660,7 +762,9 @@ const AppContent: React.FC = () => {
                                             <span className="text-sm">{item.label}</span>
                                         </button>
                                     ))}
+                                    
                                     <div className="my-1 border-t dark:border-slate-700/50"></div>
+                                    
                                     <button 
                                         onClick={() => { setIsNavCustomizerOpen(true); setIsMoreMenuOpen(false); }} 
                                         className="w-full flex items-center gap-3 p-2.5 text-left rounded-xl transition-all hover:bg-gray-50 dark:hover:bg-slate-700/50 text-indigo-600 dark:text-indigo-400 font-medium"
@@ -673,6 +777,7 @@ const AppContent: React.FC = () => {
                         )}
                     </div>
 
+                    {/* Quick Add FAB - Moved to End */}
                     <div className="relative -top-4 ml-1 flex flex-col items-center justify-center w-auto shrink-0" ref={mobileQuickAddRef}>
                         <button 
                             onClick={() => { setIsMobileQuickAddOpen(!isMobileQuickAddOpen); setIsMoreMenuOpen(false); }}
@@ -682,18 +787,18 @@ const AppContent: React.FC = () => {
                             <Plus size={32} strokeWidth={2.5} />
                         </button>
                         {isMobileQuickAddOpen && (
-                            <div className="absolute bottom-[calc(100%+12px)] right-0 w-64 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-3 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
-                                <div className="flex justify-between items-center mb-2 px-1">
-                                    <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-center flex-grow pl-4">Quick Actions</div>
+                            <div className="absolute bottom-[calc(100%+12px)] right-0 w-72 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-4 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
+                                <div className="flex justify-between items-center mb-3 px-1">
+                                    <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Quick Actions</div>
                                     <button 
                                         onClick={() => { setIsNavCustomizerOpen(true); setIsMobileQuickAddOpen(false); }}
-                                        className="text-primary hover:text-primary/80 transition-colors p-1 rounded-full hover:bg-primary/5"
+                                        className="text-primary hover:text-primary/80 transition-colors p-1.5 rounded-full hover:bg-primary/5"
                                         title="Edit Quick Actions"
                                     >
                                         <Edit size={14} />
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-3 gap-2">
                                     {state.quickActions.map((actionId, idx) => {
                                         const action = QUICK_ACTION_REGISTRY[actionId];
                                         if (!action) return null;
@@ -707,10 +812,12 @@ const AppContent: React.FC = () => {
                                                     handleNavigation(action.page);
                                                     setIsMobileQuickAddOpen(false);
                                                 }}
-                                                className="flex flex-col items-center justify-center gap-1 p-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl transition-colors group/item border border-gray-100 dark:border-slate-600"
+                                                className="flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 group/item hover:bg-gray-50 dark:hover:bg-slate-700/30"
                                             >
-                                                <action.icon size={20} className="text-primary group-hover/item:scale-110 transition-transform" />
-                                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{action.label}</span>
+                                                <div className="p-3 rounded-full bg-primary/10 text-primary mb-1.5 group-hover/item:scale-110 transition-transform shadow-sm dark:bg-primary/20">
+                                                    <action.icon size={22} strokeWidth={2} />
+                                                </div>
+                                                <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 text-center leading-tight">{action.label}</span>
                                             </button>
                                         );
                                     })}

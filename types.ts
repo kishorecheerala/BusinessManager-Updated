@@ -380,6 +380,8 @@ export interface AppMetadataUIPreferences {
   cardStyle: 'glass' | 'solid' | 'bordered';
   toastPosition: 'top-center' | 'top-right' | 'bottom-center' | 'bottom-right';
   density: 'comfortable' | 'compact';
+  navStyle?: 'docked' | 'floating';
+  fontSize?: 'small' | 'normal' | 'large';
 }
 
 export type AppMetadata = AppMetadataPin | AppMetadataBackup | AppMetadataRevenueGoal | AppMetadataLastModified | AppMetadataTheme | AppMetadataInvoiceSettings | AppMetadataNavOrder | AppMetadataQuickActions | AppMetadataUIPreferences | InvoiceTemplateConfig;

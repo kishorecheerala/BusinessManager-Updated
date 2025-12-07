@@ -774,18 +774,18 @@ const AppContent: React.FC = () => {
                             <Plus size={32} strokeWidth={2.5} />
                         </button>
                         {isMobileQuickAddOpen && (
-                            <div className="absolute bottom-[calc(100%+12px)] right-0 w-64 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-3 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
-                                <div className="flex justify-between items-center mb-2 px-1">
-                                    <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-center flex-grow pl-4">Quick Actions</div>
+                            <div className="absolute bottom-[calc(100%+12px)] right-0 w-72 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-4 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
+                                <div className="flex justify-between items-center mb-3 px-1">
+                                    <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Quick Actions</div>
                                     <button 
                                         onClick={() => { setIsNavCustomizerOpen(true); setIsMobileQuickAddOpen(false); }}
-                                        className="text-primary hover:text-primary/80 transition-colors p-1 rounded-full hover:bg-primary/5"
+                                        className="text-primary hover:text-primary/80 transition-colors p-1.5 rounded-full hover:bg-primary/5"
                                         title="Edit Quick Actions"
                                     >
                                         <Edit size={14} />
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-3 gap-2">
                                     {state.quickActions.map((actionId, idx) => {
                                         const action = QUICK_ACTION_REGISTRY[actionId];
                                         if (!action) return null;
@@ -799,10 +799,12 @@ const AppContent: React.FC = () => {
                                                     handleNavigation(action.page);
                                                     setIsMobileQuickAddOpen(false);
                                                 }}
-                                                className="flex flex-col items-center justify-center gap-1 p-3 bg-gray-50 dark:bg-slate-700/50 hover:bg-primary/10 dark:hover:bg-primary/20 rounded-xl transition-colors group/item border border-gray-100 dark:border-slate-600"
+                                                className="flex flex-col items-center justify-center w-full p-2 rounded-xl transition-all duration-300 group hover:bg-gray-50 dark:hover:bg-slate-700/30"
                                             >
-                                                <action.icon size={20} className="text-primary group-hover/item:scale-110 transition-transform" />
-                                                <span className="text-xs font-medium text-gray-700 dark:text-gray-300">{action.label}</span>
+                                                <div className="p-2 rounded-full transition-all duration-300 group-hover:bg-primary/10 group-hover:scale-110 text-gray-500 group-hover:text-primary dark:text-gray-400 dark:group-hover:text-primary">
+                                                    <action.icon className="w-6 h-6 transition-transform duration-300" strokeWidth={2} />
+                                                </div>
+                                                <span className="text-[10px] font-semibold mt-1 leading-tight text-gray-500 group-hover:text-primary dark:text-gray-400 dark:group-hover:text-primary transition-colors">{action.label}</span>
                                             </button>
                                         );
                                     })}

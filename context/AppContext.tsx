@@ -151,7 +151,9 @@ const DEFAULT_UI_PREFS: AppMetadataUIPreferences = {
     buttonStyle: 'rounded',
     cardStyle: 'solid',
     toastPosition: 'top-center',
-    density: 'comfortable'
+    density: 'comfortable',
+    navStyle: 'docked',
+    fontSize: 'normal'
 };
 
 // Default empty sale draft

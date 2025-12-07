@@ -20,9 +20,10 @@ const Toast: React.FC = () => {
   if (!show) return null;
 
   const bgColors = {
-    success: 'bg-emerald-600',
-    error: 'bg-red-600',
-    info: 'bg-blue-600',
+    success: 'bg-teal-600 dark:bg-teal-500 text-white',
+    error: 'bg-rose-600 dark:bg-rose-500 text-white',
+    // Using bg-primary allows the color to be manually adjusted via the Theme settings
+    info: 'bg-primary text-white',
   };
 
   const icons = {
@@ -31,28 +32,30 @@ const Toast: React.FC = () => {
     info: <Info className="w-5 h-5 text-white" />,
   };
 
-  let positionClasses = 'top-6 left-1/2 -translate-x-1/2'; // Default top-center
-  if (position === 'top-right') positionClasses = 'top-6 right-6';
-  if (position === 'bottom-center') positionClasses = 'bottom-6 left-1/2 -translate-x-1/2';
-  if (position === 'bottom-right') positionClasses = 'bottom-6 right-6';
+  // Adjusted top position to top-28 (7rem/112px) to clear the header + greeting banner (approx 104px)
+  let positionClasses = 'top-28 left-1/2 -translate-x-1/2'; 
+  if (position === 'top-right') positionClasses = 'top-28 right-4 sm:right-6';
+  // Adjusted bottom position to clear bottom navigation bar
+  if (position === 'bottom-center') positionClasses = 'bottom-20 left-1/2 -translate-x-1/2';
+  if (position === 'bottom-right') positionClasses = 'bottom-20 right-4 sm:right-6';
 
   return (
-    <div className={`fixed ${positionClasses} z-[9999] flex items-center justify-center pointer-events-none`}>
-      <div className={`${bgColors[type]} pointer-events-auto rounded-full shadow-xl py-2 px-4 min-w-[200px] max-w-sm flex items-center gap-3 animate-scale-in border border-white/20 backdrop-blur-md relative`}>
+    <div className={`fixed ${positionClasses} z-[9999] flex items-center justify-center pointer-events-none transition-all duration-300`}>
+      <div className={`${bgColors[type]} pointer-events-auto rounded-xl shadow-2xl py-3 px-4 min-w-[280px] max-w-sm flex items-center gap-3 animate-scale-in border border-white/10 relative`}>
         {/* Content */}
-        <div className="flex items-center gap-3">
-          <div className="shrink-0">
+        <div className="flex items-start gap-3 w-full">
+          <div className="shrink-0 mt-0.5">
             {icons[type]}
           </div>
-          <p className="text-white font-medium text-sm leading-tight drop-shadow-sm pr-6">{message}</p>
+          <p className="font-medium text-sm leading-snug drop-shadow-sm pr-6 flex-grow">{message}</p>
         </div>
         
         {/* Close Button */}
         <button 
           onClick={() => dispatch({ type: 'HIDE_TOAST' })}
-          className="absolute right-1.5 top-1/2 -translate-y-1/2 text-white/70 hover:text-white transition-colors p-1 rounded-full hover:bg-white/10"
+          className="absolute right-2 top-2 text-white/70 hover:text-white transition-colors p-1 rounded-full hover:bg-white/20"
         >
-          <X size={14} />
+          <X size={16} />
         </button>
       </div>
     </div>
