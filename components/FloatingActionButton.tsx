@@ -89,12 +89,12 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onNavigate 
     };
 
     const actions: FabAction[] = [
-        { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS', action: 'new' },
-        { icon: ShoppingCart, label: 'New Sale', page: 'SALES' },
-        { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES', action: 'new' },
-        { icon: Receipt, label: 'Add Expense', page: 'EXPENSES' },
-        { icon: FileText, label: 'New Estimate', page: 'QUOTATIONS' },
-        { icon: Undo2, label: 'New Return', page: 'RETURNS' },
+        { icon: UserPlus, label: 'Customer', page: 'CUSTOMERS', action: 'new' },
+        { icon: ShoppingCart, label: 'Sale', page: 'SALES' },
+        { icon: PackagePlus, label: 'Purchase', page: 'PURCHASES', action: 'new' },
+        { icon: Receipt, label: 'Expense', page: 'EXPENSES' },
+        { icon: FileText, label: 'Estimate', page: 'QUOTATIONS' },
+        { icon: Undo2, label: 'Return', page: 'RETURNS' },
     ];
     
     const handleActionClick = (page: Page, action?: 'new') => {
@@ -122,20 +122,22 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({ onNavigate 
             {/* Card Menu */}
             {isOpen && (
                 <div 
-                    className={`absolute ${isTopHalf ? 'top-[110%]' : 'bottom-[110%]'} ${isLeftHalf ? 'left-0' : 'right-0'} w-60 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 p-2 animate-scale-in z-50 ring-1 ring-black/5 origin-${isTopHalf ? 'top' : 'bottom'}-${isLeftHalf ? 'left' : 'right'}`}
+                    className={`absolute ${isTopHalf ? 'top-[110%]' : 'bottom-[110%]'} ${isLeftHalf ? 'left-0' : 'right-0'} w-72 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-4 animate-scale-in z-50 ring-1 ring-black/5 origin-${isTopHalf ? 'top' : 'bottom'}-${isLeftHalf ? 'left' : 'right'}`}
                 >
-                    {actions.map((action, idx) => (
-                        <button
-                            key={idx}
-                            onClick={(e) => { e.stopPropagation(); handleActionClick(action.page, action.action); }}
-                            className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-slate-700/50 rounded-xl transition-colors text-left group/item"
-                        >
-                            <div className="p-2 bg-gray-100 dark:bg-slate-700 group-hover/item:bg-white dark:group-hover/item:bg-slate-600 rounded-lg text-primary shadow-sm transition-transform group-hover/item:scale-110">
-                                <action.icon size={18} />
-                            </div>
-                            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{action.label}</span>
-                        </button>
-                    ))}
+                    <div className="grid grid-cols-3 gap-2">
+                        {actions.map((action, idx) => (
+                            <button
+                                key={idx}
+                                onClick={(e) => { e.stopPropagation(); handleActionClick(action.page, action.action); }}
+                                className="flex flex-col items-center justify-center p-2.5 rounded-xl bg-gray-50 dark:bg-slate-800/50 border border-transparent hover:border-primary/20 dark:hover:border-primary/40 hover:bg-white dark:hover:bg-slate-700 hover:shadow-md transition-all duration-200 group/item active:scale-95"
+                            >
+                                <div className="p-2.5 rounded-full bg-white dark:bg-slate-700 text-primary shadow-sm mb-2 group-hover/item:scale-110 transition-transform ring-1 ring-gray-100 dark:ring-slate-600">
+                                    <action.icon size={20} strokeWidth={2.5} />
+                                </div>
+                                <span className="text-[10px] font-bold text-gray-600 dark:text-gray-300 text-center leading-tight group-hover/item:text-primary transition-colors">{action.label}</span>
+                            </button>
+                        ))}
+                    </div>
                 </div>
             )}
 

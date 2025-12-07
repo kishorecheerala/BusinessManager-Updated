@@ -453,26 +453,19 @@ const AppContent: React.FC = () => {
         ? 'h-[100dvh] overflow-hidden' 
         : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
     
-    // UI Preference Classes
-    const navStyle = state.uiPreferences?.navStyle || 'docked';
-    const isFloatingNav = navStyle === 'floating';
-    
-    const fontSize = state.uiPreferences?.fontSize || 'normal';
-    const fontClass = fontSize === 'small' ? 'text-sm' : fontSize === 'large' ? 'text-[17px]' : 'text-base';
-    
     // Nav Bar Styling based on Preference
     let navContainerClass = state.uiPreferences?.cardStyle === 'glass' 
         ? 'glass border-white/20 dark:border-slate-700/50' 
         : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700';
 
-    if (isFloatingNav) {
+    if (state.uiPreferences?.navStyle === 'floating') {
         navContainerClass += ' bottom-4 left-4 right-4 rounded-2xl shadow-xl border';
     } else {
         navContainerClass += ' bottom-0 left-0 right-0 border-t';
     }
 
     return (
-        <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme} ${fontClass}`}>
+        <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             {/* Lock Screen Overlay */}
             {isLocked && (
                 <div className="fixed inset-0 z-[1000] bg-background dark:bg-slate-950 flex items-center justify-center">
@@ -585,10 +578,10 @@ const AppContent: React.FC = () => {
 
                             {/* Cloud Sync / Sign In Button */}
                             <button 
-                                onClick={() => { 
+                                onClick={(e) => { 
+                                    e.stopPropagation();
                                     if (!state.googleUser) {
-                                        if (state.isOnline) setIsSignInModalOpen(true);
-                                        else showToast("Connect to internet to sign in.", "error");
+                                        setIsSignInModalOpen(true);
                                     } else {
                                         syncData(); 
                                     }
@@ -814,10 +807,10 @@ const AppContent: React.FC = () => {
                                                 }}
                                                 className="flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 group/item hover:bg-gray-50 dark:hover:bg-slate-700/30"
                                             >
-                                                <div className="p-3 rounded-full bg-primary/10 text-primary mb-1.5 group-hover/item:scale-110 transition-transform shadow-sm dark:bg-primary/20">
-                                                    <action.icon size={22} strokeWidth={2} />
+                                                <div className="p-2 rounded-full transition-all duration-300 group-hover:bg-primary/10 group-hover:scale-110 text-gray-500 group-hover:text-primary dark:text-gray-400 dark:group-hover:text-primary">
+                                                    <action.icon className="w-6 h-6 transition-transform duration-300" strokeWidth={2} />
                                                 </div>
-                                                <span className="text-[10px] font-semibold text-gray-700 dark:text-gray-300 text-center leading-tight">{action.label}</span>
+                                                <span className="text-[10px] font-semibold mt-1 leading-tight text-gray-500 group-hover:text-primary dark:text-gray-400 dark:group-hover:text-primary transition-colors">{action.label}</span>
                                             </button>
                                         );
                                     })}

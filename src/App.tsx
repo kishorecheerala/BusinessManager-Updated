@@ -454,9 +454,15 @@ const AppContent: React.FC = () => {
         : `min-h-screen pt-[7rem]`; // 64px header + 40px banner = ~104px (6.5rem), using 7rem for safety
     
     // Nav Bar Styling based on Preference
-    const navClass = state.uiPreferences?.cardStyle === 'glass' 
-        ? 'glass border-t border-white/20 dark:border-slate-700/50' 
-        : 'bg-white dark:bg-slate-800 border-t border-gray-200 dark:border-slate-700';
+    let navContainerClass = state.uiPreferences?.cardStyle === 'glass' 
+        ? 'glass border-white/20 dark:border-slate-700/50' 
+        : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700';
+
+    if (state.uiPreferences?.navStyle === 'floating') {
+        navContainerClass += ' bottom-4 left-4 right-4 rounded-2xl shadow-xl border';
+    } else {
+        navContainerClass += ' bottom-0 left-0 right-0 border-t';
+    }
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
@@ -505,13 +511,16 @@ const AppContent: React.FC = () => {
                     
                     {/* Top Row: Navigation & Actions (h-16) */}
                     <div className="h-16 px-3 sm:px-4 flex items-center justify-between text-white relative">
-                        {/* Left: Menu & Search */}
+                        {/* Left: Menu & Search & AI */}
                         <div className="flex items-center gap-1 sm:gap-2 z-20">
                             <button onClick={() => setIsMenuOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Menu (Ctrl+M)">
                                 <Menu size={24} />
                             </button>
                             <button onClick={() => setIsSearchOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="Search (Ctrl+K)">
                                 <Search size={20} />
+                            </button>
+                            <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors" title="AI Assistant">
+                                <Sparkles size={20} />
                             </button>
                         </div>
 
@@ -572,10 +581,10 @@ const AppContent: React.FC = () => {
 
                             {/* Cloud Sync / Sign In Button */}
                             <button 
-                                onClick={() => { 
+                                onClick={(e) => { 
+                                    e.stopPropagation();
                                     if (!state.googleUser) {
-                                        if (state.isOnline) setIsSignInModalOpen(true);
-                                        else showToast("Connect to internet to sign in.", "error");
+                                        setIsSignInModalOpen(true);
                                     } else {
                                         syncData(); 
                                     }
@@ -601,11 +610,6 @@ const AppContent: React.FC = () => {
                                         'bg-gray-300'
                                     }`}></span>
                                 )}
-                            </button>
-
-                            {/* AI Button - Always visible */}
-                            <button onClick={() => setIsAskAIOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
-                                <Sparkles size={20} />
                             </button>
 
                             {/* Notifications */}
@@ -684,7 +688,7 @@ const AppContent: React.FC = () => {
             
             {/* Bottom Navigation */}
             {currentPage !== 'INVOICE_DESIGNER' && (
-            <nav className={`fixed bottom-0 left-0 right-0 pb-[env(safe-area-inset-bottom)] z-50 transition-colors duration-300 ${navClass}`}>
+            <nav className={`fixed pb-[env(safe-area-inset-bottom)] z-50 transition-all duration-300 ${navContainerClass}`}>
                 {/* Desktop View - Scrollable */}
                 <div className="hidden md:flex w-full overflow-x-auto custom-scrollbar">
                     <div className="flex flex-nowrap mx-auto items-center gap-2 lg:gap-6 p-2 px-6 min-w-max">
@@ -799,7 +803,7 @@ const AppContent: React.FC = () => {
                                                     handleNavigation(action.page);
                                                     setIsMobileQuickAddOpen(false);
                                                 }}
-                                                className="flex flex-col items-center justify-center w-full p-2 rounded-xl transition-all duration-300 group hover:bg-gray-50 dark:hover:bg-slate-700/30"
+                                                className="flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 group/item hover:bg-gray-50 dark:hover:bg-slate-700/30"
                                             >
                                                 <div className="p-2 rounded-full transition-all duration-300 group-hover:bg-primary/10 group-hover:scale-110 text-gray-500 group-hover:text-primary dark:text-gray-400 dark:group-hover:text-primary">
                                                     <action.icon className="w-6 h-6 transition-transform duration-300" strokeWidth={2} />

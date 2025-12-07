@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award, Wallet, ArrowRight, Phone, UserX, Zap, Activity, LayoutDashboard } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award, Wallet, ArrowRight, Phone, UserX, Zap, Activity } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -285,9 +285,9 @@ const SmartAnalystCard: React.FC<{
                 </div>
                 
                 {/* Metrics Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {/* Today's Collection */}
-                    <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-lg shadow-sm text-white group/card">
+                    <div className="col-span-2 sm:col-span-1 relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-lg shadow-sm text-white group/card">
                             <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover/card:opacity-20 transition-opacity transform rotate-12">
                             <IndianRupee size={80} />
                             </div>
@@ -970,10 +970,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             )}
             
             {/* Header Section */}
-            <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-primary/10 rounded-lg text-primary">
-                    <LayoutDashboard className="w-6 h-6" />
-                </div>
+            <div className="mb-6 text-center">
                 <h1 className="text-3xl font-bold text-primary">Dashboard</h1>
             </div>
 
