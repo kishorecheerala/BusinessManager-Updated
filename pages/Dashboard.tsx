@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
 import Button from '../components/Button';
+import Dropdown from '../components/Dropdown';
 import { Page, Customer, Sale, Purchase, Supplier, Product, Return, AppMetadataBackup, Expense } from '../types';
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
@@ -41,7 +42,7 @@ const MetricCard: React.FC<{
             <Icon className={`w-6 h-6 sm:w-8 sm:h-8 ${textColor}`} />
         </div>
         <div className="ml-3 sm:ml-5 flex-grow min-w-0">
-            <p className={`font-bold text-xl sm:text-xl ${textColor} truncate`}>{title}</p>
+            <p className={`font-bold text-sm sm:text-xl ${textColor} truncate`}>{title}</p>
             <p className={`text-xl sm:text-3xl font-extrabold ${textColor} break-all mt-0.5 sm:mt-1`}>{unit}{typeof value === 'number' ? value.toLocaleString('en-IN') : value}</p>
             {subValue && <p className={`text-xs sm:text-sm font-medium mt-0.5 sm:mt-1 opacity-90 ${textColor} truncate`}>{subValue}</p>}
         </div>
@@ -1033,25 +1034,23 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
             {/* Toolbar for Period Selectors */}
             <div className="flex justify-end items-center mb-1">
                  <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-                     <select 
-                        value={selectedMonth} 
-                        onChange={(e) => setSelectedMonth(e.target.value)} 
-                        className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
-                    >
-                        {monthOptions.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-                    </select>
+                     <Dropdown 
+                        options={monthOptions}
+                        value={selectedMonth}
+                        onChange={setSelectedMonth}
+                        className="w-32"
+                     />
                     <div className="h-4 w-px bg-gray-300 dark:bg-slate-600"></div>
-                    <select 
-                        value={selectedYear} 
-                        onChange={(e) => setSelectedYear(e.target.value)} 
-                        className="p-1.5 border-none bg-transparent text-sm font-semibold text-gray-700 dark:text-gray-200 focus:ring-0 cursor-pointer hover:text-primary transition-colors"
-                    >
-                        {getYears.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
+                     <Dropdown 
+                        options={getYears.map(y => ({ value: y, label: y }))}
+                        value={selectedYear}
+                        onChange={setSelectedYear}
+                        className="w-24"
+                     />
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
                 <MetricCard icon={IndianRupee} title="Sales" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-primary/5 dark:bg-primary/10" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
                 <MetricCard icon={Package} title="Purchases" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-blue-50 dark:bg-blue-900/20" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
                 <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Total Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />

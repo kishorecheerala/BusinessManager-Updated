@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect } from 'react';
 import { Supplier } from '../types';
 import Button from './Button';
 import Card from './Card';
+import Input from './Input';
 import { X, User, Phone, MapPin, CreditCard, FileText, Hash } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 
@@ -24,7 +26,6 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
     useEffect(() => {
         if (isOpen || inline) {
             if (initialData) {
-                // Merge initialData with default state to ensure all fields exist (since Supplier type has optional fields)
                 setFormData({ ...defaultSupplierState, ...initialData });
             } else {
                 setFormData(defaultSupplierState);
@@ -43,7 +44,6 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
             return;
         }
 
-        // Only check for duplicates if we are in Add mode
         if (!isEditMode) {
             const finalId = `SUPP-${trimmedId}`;
             if (existingSuppliers.some(s => s.id.toLowerCase() === finalId.toLowerCase())) {
@@ -55,7 +55,6 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
             onSave(formData);
         }
         
-        // If inline, the parent handles the view change, but we call onClose to signal completion
         if (!inline) onClose();
     };
 
@@ -77,12 +76,12 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
                 ) : (
                     <div className="flex items-center">
                         <span className="bg-gray-100 dark:bg-slate-700/50 border border-r-0 border-gray-200 dark:border-slate-600 px-3 py-3 rounded-l-xl text-sm text-gray-500 font-mono">SUPP-</span>
-                        <input 
+                        <Input 
                             type="text" 
                             placeholder="unique id" 
                             value={formData.id} 
                             onChange={e => handleChange('id', e.target.value)}
-                            className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-r-xl focus:ring-2 focus:ring-primary outline-none transition-all font-mono dark:text-white" 
+                            className="rounded-l-none font-mono"
                             autoFocus={!isEditMode}
                         />
                     </div>
@@ -97,39 +96,38 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
                 </h3>
                 
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Supplier Name *</label>
-                    <input 
+                    <Input 
+                        label="Supplier Name *"
                         type="text" 
                         placeholder="Enter Supplier Name" 
                         value={formData.name} 
                         onChange={e => handleChange('name', e.target.value)} 
-                        className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
                     />
                 </div>
                 
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Phone Number *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number *</label>
                     <div className="relative">
-                        <input 
+                        <Input 
                             type="tel" 
                             placeholder="Enter Phone Number" 
                             value={formData.phone} 
                             onChange={e => handleChange('phone', e.target.value)} 
-                            className="w-full p-3 pl-10 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
+                            className="pl-10"
                         />
                         <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
                     </div>
                 </div>
 
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Location *</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Location *</label>
                     <div className="relative">
-                        <input 
+                        <Input 
                             type="text"
                             value={formData.location} 
                             onChange={(e) => handleChange('location', e.target.value)}
                             placeholder="City / Area"
-                            className="w-full p-3 pl-10 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all"
+                            className="pl-10"
                         />
                         <MapPin size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
                     </div>
@@ -143,23 +141,22 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
                     Official Details
                 </h3>
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">GST Number</label>
-                    <input 
+                    <Input 
+                        label="GST Number"
                         type="text" 
                         placeholder="Optional" 
                         value={formData.gstNumber} 
                         onChange={e => handleChange('gstNumber', e.target.value)} 
-                        className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all uppercase" 
+                        className="uppercase"
                     />
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Reference</label>
-                    <input 
+                    <Input 
+                        label="Reference"
                         type="text" 
                         placeholder="Optional" 
                         value={formData.reference} 
                         onChange={e => handleChange('reference', e.target.value)} 
-                        className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
                     />
                 </div>
             </div>
@@ -172,18 +169,16 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
                 </h3>
                 <div className="grid grid-cols-2 gap-3">
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">Account 1</label>
-                        <input type="text" value={formData.account1} onChange={e => handleChange('account1', e.target.value)} className="w-full p-2.5 text-sm bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg outline-none" placeholder="Acc No."/>
+                        <Input label="Account 1" type="text" value={formData.account1} onChange={e => handleChange('account1', e.target.value)} placeholder="Acc No."/>
                     </div>
                     <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">Account 2</label>
-                        <input type="text" value={formData.account2} onChange={e => handleChange('account2', e.target.value)} className="w-full p-2.5 text-sm bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg outline-none" placeholder="Acc No."/>
+                        <Input label="Account 2" type="text" value={formData.account2} onChange={e => handleChange('account2', e.target.value)} placeholder="Acc No."/>
                     </div>
                 </div>
                 <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1 ml-1">UPI ID</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">UPI ID</label>
                     <div className="relative">
-                        <input type="text" value={formData.upi} onChange={e => handleChange('upi', e.target.value)} className="w-full p-2.5 pl-9 text-sm bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-lg outline-none" placeholder="user@upi"/>
+                        <Input type="text" value={formData.upi} onChange={e => handleChange('upi', e.target.value)} className="pl-9" placeholder="user@upi"/>
                         <Hash size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"/>
                     </div>
                 </div>

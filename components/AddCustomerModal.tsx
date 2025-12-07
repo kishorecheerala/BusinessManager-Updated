@@ -2,6 +2,8 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import Button from './Button';
+import Input from './Input';
+import Dropdown from './Dropdown';
 import { Customer } from '../types';
 import { useAppContext } from '../context/AppContext';
 import { X, User, Phone, MapPin, FileText, Hash, Tag } from 'lucide-react';
@@ -76,14 +78,14 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
                     <div>
                         <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Customer ID</label>
                         <div className="flex items-center">
-                            <span className="bg-gray-100 dark:bg-slate-700/50 border border-r-0 border-gray-200 dark:border-slate-600 px-3 py-3 rounded-l-xl text-sm text-gray-500 font-mono">CUST-</span>
-                            <input 
+                            <span className="bg-gray-100 dark:bg-slate-700/50 border border-r-0 border-gray-200 dark:border-slate-600 px-3 py-3 rounded-l-lg text-sm text-gray-500 font-mono">CUST-</span>
+                            <Input 
                                 type="text" 
                                 name="id"
                                 placeholder="unique-id" 
                                 value={newCustomer.id} 
                                 onChange={handleInputChange} 
-                                className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-r-xl focus:ring-2 focus:ring-primary outline-none transition-all font-mono dark:text-white" 
+                                className="rounded-l-none font-mono"
                                 autoFocus
                             />
                         </div>
@@ -97,27 +99,26 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
                         </h3>
                         
                         <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Full Name *</label>
-                            <input 
+                            <Input 
+                                label="Full Name *"
                                 type="text" 
                                 name="name"
                                 placeholder="Enter Customer Name" 
                                 value={newCustomer.name} 
                                 onChange={handleInputChange} 
-                                className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
                             />
                         </div>
                         
                         <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Phone Number *</label>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number *</label>
                             <div className="relative">
-                                <input 
+                                <Input 
                                     type="tel" 
                                     name="phone"
                                     placeholder="Enter Phone Number" 
                                     value={newCustomer.phone} 
                                     onChange={handleInputChange} 
-                                    className="w-full p-3 pl-10 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
+                                    className="pl-10"
                                 />
                                 <Phone size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
                             </div>
@@ -132,43 +133,37 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
                         </h3>
                         
                         <div>
-                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Address *</label>
-                            <input 
+                            <Input 
+                                label="Address *"
                                 type="text" 
                                 name="address"
                                 placeholder="House No, Street, Landmark" 
                                 value={newCustomer.address} 
                                 onChange={handleInputChange} 
-                                className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
                             />
                         </div>
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Area / City *</label>
-                                <input 
+                                <Input 
+                                    label="Area / City *"
                                     type="text" 
                                     name="area"
                                     placeholder="e.g. Ameerpet" 
                                     value={newCustomer.area} 
                                     onChange={handleInputChange} 
-                                    className="w-full p-3 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all" 
                                 />
                             </div>
                             <div>
-                                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ml-1">Pricing Tier</label>
-                                <div className="relative">
-                                    <select 
-                                        name="priceTier" 
-                                        value={newCustomer.priceTier} 
-                                        onChange={handleInputChange} 
-                                        className="w-full p-3 pl-10 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-600 rounded-xl focus:ring-2 focus:ring-primary focus:bg-white dark:focus:bg-slate-800 outline-none transition-all appearance-none"
-                                    >
-                                        <option value="RETAIL">Retail</option>
-                                        <option value="WHOLESALE">Wholesale</option>
-                                    </select>
-                                    <Tag size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400"/>
-                                </div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Pricing Tier</label>
+                                <Dropdown 
+                                    options={[
+                                        { value: 'RETAIL', label: 'Retail' },
+                                        { value: 'WHOLESALE', label: 'Wholesale' }
+                                    ]}
+                                    value={newCustomer.priceTier}
+                                    onChange={(val) => setNewCustomer({ ...newCustomer, priceTier: val as 'RETAIL' | 'WHOLESALE' })}
+                                />
                             </div>
                         </div>
                     </div>

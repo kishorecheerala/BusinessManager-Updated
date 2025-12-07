@@ -4,6 +4,7 @@ import Card from './Card';
 import Button from './Button';
 import Dropdown from './Dropdown';
 import DateInput from './DateInput';
+import Input from './Input';
 import { useAppContext } from '../context/AppContext';
 
 interface PaymentModalProps {
@@ -66,13 +67,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                     
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
-                        <input 
+                        <Input 
+                            label="Amount"
                             type="number" 
                             placeholder="Enter amount" 
                             value={paymentDetails.amount} 
                             onChange={e => setPaymentDetails({ ...paymentDetails, amount: e.target.value })} 
-                            className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary" 
                             autoFocus
                         />
                     </div>
@@ -93,13 +93,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     />
                     
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reference (Optional)</label>
-                        <input 
+                        <Input 
+                            label="Reference (Optional)"
                             type="text"
                             placeholder="e.g. UPI ID, Cheque No."
                             value={paymentDetails.reference}
                             onChange={e => setPaymentDetails({ ...paymentDetails, reference: e.target.value })}
-                            className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 outline-none focus:ring-2 focus:ring-primary"
                         />
                     </div>
                     

@@ -4,6 +4,8 @@
 
 
 
+
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Purchase, Supplier, Product, PurchaseItem, Payment } from '../types';
 import { Plus, Info, X, Camera, Image as ImageIcon, IndianRupee, Save, Sparkles, Loader2, ScanLine, Download, Trash2 } from 'lucide-react';
@@ -12,6 +14,7 @@ import Button from './Button';
 import DeleteButton from './DeleteButton';
 import DateInput from './DateInput';
 import Dropdown from './Dropdown';
+import Input from './Input';
 import { compressImage } from '../utils/imageUtils';
 import { getLocalDateString } from '../utils/dateUtils';
 import { calculateTotals } from '../utils/calculations';
@@ -31,6 +34,12 @@ interface PurchaseFormProps {
   dispatch: React.Dispatch<any>;
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
 }
+
+const PAYMENT_METHODS = [
+    { value: 'CASH', label: 'Cash' },
+    { value: 'UPI', label: 'UPI' },
+    { value: 'CHEQUE', label: 'Cheque' }
+];
 
 export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   mode,
@@ -381,12 +390,11 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1.5">Supplier Invoice No.</label>
-                    <input 
+                    <Input 
+                        label="Supplier Invoice No."
                         type="text" 
                         value={supplierInvoiceId} 
                         onChange={e => setSupplierInvoiceId(e.target.value)} 
-                        className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                         placeholder="e.g. INV-9928"
                     />
                 </div>
@@ -474,20 +482,16 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                     
                     <div className="grid grid-cols-2 md:grid-cols-5 gap-2 text-sm p-2 border-t dark:border-slate-600">
                         <div>
-                            <label className="text-[10px] text-gray-500 block">Quantity</label>
-                            <input type="number" value={item.quantity} onChange={e => handleItemUpdate(item.productId, 'quantity', parseFloat(e.target.value))} className="w-full p-1 border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" placeholder="Qty" />
+                            <Input label="Quantity" type="number" value={item.quantity} onChange={e => handleItemUpdate(item.productId, 'quantity', parseFloat(e.target.value))} placeholder="Qty" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-500 block">Buy Price</label>
-                            <input type="number" value={item.price} onChange={e => handleItemUpdate(item.productId, 'price', parseFloat(e.target.value))} className="w-full p-1 border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" placeholder="Buy Price" />
+                            <Input label="Buy Price" type="number" value={item.price} onChange={e => handleItemUpdate(item.productId, 'price', parseFloat(e.target.value))} placeholder="Buy Price" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-500 block">Sale Price</label>
-                            <input type="number" value={item.saleValue} onChange={e => handleItemUpdate(item.productId, 'saleValue', parseFloat(e.target.value))} className="w-full p-1 border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" placeholder="Sale Price" />
+                            <Input label="Sale Price" type="number" value={item.saleValue} onChange={e => handleItemUpdate(item.productId, 'saleValue', parseFloat(e.target.value))} placeholder="Sale Price" />
                         </div>
                         <div>
-                            <label className="text-[10px] text-gray-500 block">GST %</label>
-                            <input type="number" value={item.gstPercent} onChange={e => handleItemUpdate(item.productId, 'gstPercent', parseFloat(e.target.value))} className="w-full p-1 border rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white" placeholder="GST %" />
+                            <Input label="GST %" type="number" value={item.gstPercent} onChange={e => handleItemUpdate(item.productId, 'gstPercent', parseFloat(e.target.value))} placeholder="GST %" />
                         </div>
                         <div className="flex flex-col justify-end">
                             <div className="p-1 text-right font-bold dark:text-white">₹{(item.quantity * item.price).toLocaleString()}</div>
@@ -513,11 +517,12 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                   </div>
                   <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                       <span>Discount:</span>
-                      <input 
+                      <Input 
                           type="number" 
                           value={discount} 
                           onChange={e => setDiscount(e.target.value)} 
-                          className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600 dark:text-white" 
+                          className="text-right" 
+                          containerClassName="w-28"
                       />
                   </div>
                   <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
@@ -543,22 +548,22 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
                               <div className="relative mt-1">
                                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"><IndianRupee size={14}/></span>
-                                  <input 
+                                  <Input 
                                       type="number" 
                                       value={paymentDetails.amount} 
                                       onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} 
                                       placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} 
-                                      className="w-full p-2 pl-8 border-2 border-green-300 rounded-lg shadow-inner focus:ring-green-500 focus:border-green-500 dark:bg-slate-700 dark:border-green-800 dark:text-slate-200" 
+                                      className="pl-8 border-2 border-green-300 focus:ring-green-500 focus:border-green-500 dark:border-green-800" 
                                   />
                               </div>
                           </div>
                           <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                              <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white">
-                                  <option value="CASH">Cash</option>
-                                  <option value="UPI">UPI</option>
-                                  <option value="CHEQUE">Cheque</option>
-                              </select>
+                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Method</label>
+                              <Dropdown 
+                                  options={PAYMENT_METHODS}
+                                  value={paymentDetails.method}
+                                  onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
+                              />
                           </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -568,8 +573,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                               onChange={e => setPaymentDetails({ ...paymentDetails, date: e.target.value })} 
                           />
                           <div>
-                              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Reference (Optional)</label>
-                              <input type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                              <Input label="Reference (Optional)" type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} />
                           </div>
                       </div>
                   </div>

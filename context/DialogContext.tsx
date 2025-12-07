@@ -5,6 +5,7 @@ import GlobalDialog, { DialogOptions, DialogType } from '../components/GlobalDia
 interface DialogContextType {
   showConfirm: (message: string, options?: Partial<DialogOptions>) => Promise<boolean>;
   showAlert: (message: string, options?: Partial<DialogOptions>) => Promise<void>;
+  showPrompt: (message: string, defaultValue?: string, options?: Partial<DialogOptions>) => Promise<string | null>;
 }
 
 const DialogContext = createContext<DialogContextType | undefined>(undefined);
@@ -42,7 +43,19 @@ export const DialogProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   }, []);
 
-  const handleClose = (result: boolean) => {
+  const showPrompt = useCallback((message: string, defaultValue?: string, options?: Partial<DialogOptions>) => {
+    return new Promise<string | null>((resolve) => {
+        setDialog({
+            isOpen: true,
+            type: 'prompt',
+            message,
+            options: { title: 'Input Required', confirmText: 'Submit', cancelText: 'Cancel', defaultValue, ...options },
+            resolve
+        });
+    });
+  }, []);
+
+  const handleClose = (result: any) => {
     if (dialog) {
       dialog.resolve(result);
       setDialog(null);
@@ -50,7 +63,7 @@ export const DialogProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   return (
-    <DialogContext.Provider value={{ showConfirm, showAlert }}>
+    <DialogContext.Provider value={{ showConfirm, showAlert, showPrompt }}>
       {children}
       {dialog && (
         <GlobalDialog

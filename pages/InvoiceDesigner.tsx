@@ -1,10 +1,13 @@
 
+
+
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Save, RotateCcw, RotateCw, Type, Layout, Palette, FileText, Edit3, ChevronDown, Upload, Trash2, Wand2, Grid, QrCode, Printer, Eye, ArrowLeft, CheckSquare, Square, Type as TypeIcon, AlignLeft, AlignCenter, AlignRight, Move, GripVertical, Layers, ArrowUp, ArrowDown, Table, Monitor, Loader2, ZoomIn, ZoomOut, ExternalLink, Columns, Download, FileJson, Image as ImageIcon, Plus, Landmark, Calendar, Coins, Zap, MoveHorizontal, MoveVertical, ArrowRight as ArrowRightIcon, Circle } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { InvoiceTemplateConfig, DocumentType, InvoiceLabels, CustomFont, ProfileData, Page } from '../types';
 import Button from '../components/Button';
 import ColorPickerModal from '../components/ColorPickerModal';
+import Dropdown from '../components/Dropdown';
 import { generateA4InvoicePdf, generateEstimatePDF, generateDebitNotePDF, generateReceiptPDF, generateGenericReportPDF } from '../utils/pdfGenerator';
 import { compressImage } from '../utils/imageUtils';
 import * as pdfjsLib from 'pdfjs-dist';
@@ -1113,16 +1116,17 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                 <label className="text-xs font-bold text-slate-500 uppercase block flex items-center gap-2">
                                     <QrCode size={14} /> QR Code Settings
                                 </label>
-                                <select 
-                                    value={localConfig.layout.qrPosition || 'details-right'} 
-                                    onChange={e => handleConfigChange('layout', 'qrPosition', e.target.value)}
-                                    className="w-full p-2 text-xs border rounded bg-white dark:bg-slate-800 dark:border-slate-700"
-                                >
-                                    <option value="header-right">Header Right (Near Logo)</option>
-                                    <option value="details-right">Details Section (Right)</option>
-                                    <option value="footer-left">Footer Left</option>
-                                    <option value="footer-right">Footer Right</option>
-                                </select>
+                                <Dropdown
+                                    options={[
+                                        { value: 'header-right', label: 'Header Right (Near Logo)' },
+                                        { value: 'details-right', label: 'Details Section (Right)' },
+                                        { value: 'footer-left', label: 'Footer Left' },
+                                        { value: 'footer-right', label: 'Footer Right' }
+                                    ]}
+                                    value={localConfig.layout.qrPosition || 'details-right'}
+                                    onChange={val => handleConfigChange('layout', 'qrPosition', val)}
+                                    placeholder="Select QR Position"
+                                />
                                 
                                 {/* NEW: QR Size Control */}
                                 <div>
@@ -1410,15 +1414,15 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                 <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800 p-3 rounded border dark:border-slate-700">
                                     <div>
                                         <span className="text-[10px] text-slate-500 block mb-1">Date Format</span>
-                                        <select 
-                                            value={localConfig.dateFormat || 'DD/MM/YYYY'} 
-                                            onChange={e => setLocalConfig({...localConfig, dateFormat: e.target.value as any})}
-                                            className="w-full p-2 text-xs border rounded dark:bg-slate-900 dark:border-slate-700 dark:text-white"
-                                        >
-                                            <option value="DD/MM/YYYY">DD/MM/YYYY</option>
-                                            <option value="MM/DD/YYYY">MM/DD/YYYY</option>
-                                            <option value="YYYY-MM-DD">YYYY-MM-DD</option>
-                                        </select>
+                                        <Dropdown
+                                            options={[
+                                                { value: 'DD/MM/YYYY', label: 'DD/MM/YYYY' },
+                                                { value: 'MM/DD/YYYY', label: 'MM/DD/YYYY' },
+                                                { value: 'YYYY-MM-DD', label: 'YYYY-MM-DD' }
+                                            ]}
+                                            value={localConfig.dateFormat || 'DD/MM/YYYY'}
+                                            onChange={val => setLocalConfig({...localConfig, dateFormat: val as any})}
+                                        />
                                     </div>
                                     <div>
                                         <span className="text-[10px] text-slate-500 block mb-1 flex items-center gap-1"><Coins size={10} /> Currency Symbol</span>
@@ -1452,14 +1456,14 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <span className="text-[10px] text-slate-500 block mb-1">QR Code Strategy</span>
-                                            <select 
+                                            <Dropdown
+                                                options={[
+                                                    { value: 'INVOICE_ID', label: 'Invoice Tracking ID' },
+                                                    { value: 'UPI_PAYMENT', label: 'UPI Payment' }
+                                                ]}
                                                 value={localConfig.content.qrType || 'INVOICE_ID'}
-                                                onChange={e => handleConfigChange('content', 'qrType', e.target.value)}
-                                                className="w-full p-2 text-xs border rounded dark:bg-slate-900 dark:border-slate-700 dark:text-white"
-                                            >
-                                                <option value="INVOICE_ID">Invoice Tracking ID</option>
-                                                <option value="UPI_PAYMENT">UPI Payment</option>
-                                            </select>
+                                                onChange={val => handleConfigChange('content', 'qrType', val)}
+                                            />
                                         </div>
                                         {localConfig.content.qrType === 'UPI_PAYMENT' && (
                                             <div>
@@ -1558,29 +1562,29 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                             <div className="space-y-4">
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Header Font</label>
-                                    <select 
-                                        value={localConfig.fonts.titleFont} 
-                                        onChange={e => handleConfigChange('fonts', 'titleFont', e.target.value)}
-                                        className="w-full p-2 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                    >
-                                        <option value="helvetica">Helvetica (Clean)</option>
-                                        <option value="times">Times New Roman (Serif)</option>
-                                        <option value="courier">Courier (Mono)</option>
-                                        {state.customFonts.map(f => <option key={f.id} value={f.name}>{f.name} (Custom)</option>)}
-                                    </select>
+                                    <Dropdown
+                                        options={[
+                                            { value: 'helvetica', label: 'Helvetica (Clean)' },
+                                            { value: 'times', label: 'Times New Roman (Serif)' },
+                                            { value: 'courier', label: 'Courier (Mono)' },
+                                            ...state.customFonts.map(f => ({ value: f.name, label: `${f.name} (Custom)` }))
+                                        ]}
+                                        value={localConfig.fonts.titleFont}
+                                        onChange={val => handleConfigChange('fonts', 'titleFont', val)}
+                                    />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">Body Font</label>
-                                    <select 
-                                        value={localConfig.fonts.bodyFont} 
-                                        onChange={e => handleConfigChange('fonts', 'bodyFont', e.target.value)}
-                                        className="w-full p-2 text-xs border rounded dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                    >
-                                        <option value="helvetica">Helvetica (Clean)</option>
-                                        <option value="times">Times New Roman (Serif)</option>
-                                        <option value="courier">Courier (Mono)</option>
-                                        {state.customFonts.map(f => <option key={f.id} value={f.name}>{f.name} (Custom)</option>)}
-                                    </select>
+                                    <Dropdown
+                                        options={[
+                                            { value: 'helvetica', label: 'Helvetica (Clean)' },
+                                            { value: 'times', label: 'Times New Roman (Serif)' },
+                                            { value: 'courier', label: 'Courier (Mono)' },
+                                            ...state.customFonts.map(f => ({ value: f.name, label: `${f.name} (Custom)` }))
+                                        ]}
+                                        value={localConfig.fonts.bodyFont}
+                                        onChange={val => handleConfigChange('fonts', 'bodyFont', val)}
+                                    />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4">
                                     <div>
@@ -1682,15 +1686,16 @@ const InvoiceDesigner: React.FC<InvoiceDesignerProps> = ({ setIsDirty, setCurren
                         {docType === 'REPORT' && (
                             <div className="flex items-center gap-2">
                                 <span className="text-xs text-gray-500 font-bold uppercase">Scenario:</span>
-                                <select 
-                                    value={reportScenario} 
-                                    onChange={(e) => setReportScenario(e.target.value as ReportScenarioKey)}
-                                    className="p-1 text-xs border rounded bg-white dark:bg-slate-800 dark:border-slate-700 dark:text-white"
-                                >
-                                    <option value="SALES_REPORT">Sales Report</option>
-                                    <option value="CUSTOMER_DUES">Customer Dues</option>
-                                    <option value="LOW_STOCK">Low Stock</option>
-                                </select>
+                                <Dropdown
+                                    options={[
+                                        { value: 'SALES_REPORT', label: 'Sales Report' },
+                                        { value: 'CUSTOMER_DUES', label: 'Customer Dues' },
+                                        { value: 'LOW_STOCK', label: 'Low Stock' }
+                                    ]}
+                                    value={reportScenario}
+                                    onChange={val => setReportScenario(val as ReportScenarioKey)}
+                                    className="min-w-[140px]"
+                                />
                             </div>
                         )}
                     </div>

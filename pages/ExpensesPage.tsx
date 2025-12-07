@@ -8,6 +8,7 @@ import Button from '../components/Button';
 import DeleteButton from '../components/DeleteButton';
 import DateInput from '../components/DateInput';
 import Dropdown from '../components/Dropdown';
+import Input from '../components/Input';
 import { compressImage } from '../utils/imageUtils';
 import { useDialog } from '../context/DialogContext';
 import { getLocalDateString } from '../utils/dateUtils';
@@ -297,11 +298,11 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
                                 <div className="relative">
                                     <DollarSign size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                                    <input 
+                                    <Input 
                                         type="number" 
                                         value={amount} 
                                         onChange={e => setAmount(e.target.value)} 
-                                        className="w-full p-2 pl-9 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white focus:ring-rose-500"
+                                        className="pl-9"
                                         placeholder="0.00"
                                         autoFocus
                                     />
@@ -334,12 +335,11 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Note (Optional)</label>
-                            <input 
+                            <Input 
+                                label="Note (Optional)"
                                 type="text" 
                                 value={note} 
                                 onChange={e => setNote(e.target.value)} 
-                                className="w-full p-2 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"
                                 placeholder="Merchant / Description..."
                             />
                         </div>
@@ -356,31 +356,27 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                     <h2 className="text-lg font-bold text-gray-700 dark:text-gray-300">Expense History</h2>
                     
                     <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
-                        <select 
-                            value={filterCategory} 
-                            onChange={e => setFilterCategory(e.target.value)}
-                            className="p-2 text-sm border rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                        >
-                            <option value="all">All Categories</option>
-                            {EXPENSE_CATEGORIES.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-                        </select>
-                        <select 
-                            value={filterMonth} 
-                            onChange={e => setFilterMonth(e.target.value)}
-                            className="p-2 text-sm border rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                        >
-                            <option value="all">All Months</option>
-                            {Array.from({length: 12}).map((_, i) => (
-                                <option key={i} value={i}>{new Date(0, i).toLocaleString('default', { month: 'short' })}</option>
-                            ))}
-                        </select>
-                        <select 
-                            value={filterYear} 
-                            onChange={e => setFilterYear(e.target.value)}
-                            className="p-2 text-sm border rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
-                        >
-                            {years.map(y => <option key={y} value={y}>{y}</option>)}
-                        </select>
+                        <Dropdown 
+                            options={[{value: 'all', label: 'All Categories'}, ...EXPENSE_CATEGORIES]}
+                            value={filterCategory}
+                            onChange={setFilterCategory}
+                            className="w-40"
+                        />
+                        <Dropdown 
+                             options={[{value: 'all', label: 'All Months'}, ...Array.from({length: 12}).map((_, i) => ({
+                                 value: i.toString(),
+                                 label: new Date(0, i).toLocaleString('default', { month: 'short' })
+                             }))]}
+                             value={filterMonth}
+                             onChange={setFilterMonth}
+                             className="w-32"
+                        />
+                        <Dropdown 
+                            options={years.map(y => ({ value: y, label: y }))}
+                            value={filterYear}
+                            onChange={setFilterYear}
+                            className="w-24"
+                        />
                     </div>
                 </div>
 

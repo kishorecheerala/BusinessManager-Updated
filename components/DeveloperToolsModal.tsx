@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect } from 'react';
 import { X, Database, Terminal, CloudLightning, Zap, Trash2, RefreshCw, HardDrive, Save, AlertTriangle, Bell, Bug, History, RotateCcw, PlusCircle } from 'lucide-react';
 import Card from './Card';
@@ -19,7 +17,7 @@ interface DeveloperToolsModalProps {
 
 const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClose, onOpenCloudDebug }) => {
   const { state, dispatch, showToast } = useAppContext();
-  const { showConfirm } = useDialog();
+  const { showConfirm, showPrompt } = useDialog();
   const [activeTab, setActiveTab] = useState<'general' | 'state' | 'db' | 'danger'>('general');
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number, quota: number } | null>(null);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
@@ -51,7 +49,7 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
   };
 
   const handleCreateSnapshot = async () => {
-      const name = prompt("Enter a name for this checkpoint:", `Checkpoint ${new Date().toLocaleTimeString()}`);
+      const name = await showPrompt("Enter a name for this checkpoint:", `Checkpoint ${new Date().toLocaleTimeString()}`);
       if (name) {
           setIsSnapshotLoading(true);
           try {

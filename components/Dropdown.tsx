@@ -18,6 +18,7 @@ interface DropdownProps {
   searchable?: boolean;
   searchPlaceholder?: string;
   icon?: 'chevron' | 'search';
+  className?: string;
 }
 
 const Dropdown: React.FC<DropdownProps> = ({
@@ -28,7 +29,8 @@ const Dropdown: React.FC<DropdownProps> = ({
   disabled = false,
   searchable = false,
   searchPlaceholder = 'Search...',
-  icon = 'chevron'
+  icon = 'chevron',
+  className = ''
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -56,11 +58,8 @@ const Dropdown: React.FC<DropdownProps> = ({
   }, [options, searchTerm, searchable]);
 
   const handleTriggerClick = (e: React.MouseEvent<HTMLButtonElement>) => {
-    // This is crucial: it stops the click event from immediately
-    // bubbling up to the document and being caught by useOnClickOutside,
-    // which would close the dropdown right after it opens.
     e.stopPropagation();
-    setIsOpen(prev => !prev);
+    if (!disabled) setIsOpen(prev => !prev);
   };
   
   const handleOptionClick = (selectedValue: string) => {
@@ -71,56 +70,56 @@ const Dropdown: React.FC<DropdownProps> = ({
   const TriggerIcon = icon === 'search' ? Search : ChevronDown;
 
   return (
-    <div ref={dropdownRef} className={`relative w-full ${isOpen ? 'z-[1000]' : ''}`}>
+    <div ref={dropdownRef} className={`relative ${className} ${isOpen ? 'z-[1000]' : ''}`}>
       <button
         type="button"
         onClick={handleTriggerClick}
         disabled={disabled}
-        className="w-full p-2 border rounded bg-white text-left flex justify-between items-center dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-800"
+        className="w-full p-2.5 border rounded-lg bg-white text-left flex justify-between items-center dark:bg-slate-800 dark:border-slate-700 dark:text-slate-200 disabled:opacity-50 disabled:bg-gray-100 dark:disabled:bg-slate-800 transition-colors shadow-sm"
         aria-haspopup="listbox"
         aria-expanded={isOpen}
       >
-        <span className={`truncate ${!selectedOption ? 'text-gray-400 dark:text-gray-400' : ''}`}>
+        <span className={`truncate text-sm ${!selectedOption ? 'text-gray-500 dark:text-gray-400' : ''}`}>
             {selectedOption ? selectedOption.label : placeholder}
         </span>
         <TriggerIcon 
-            className={`w-5 h-5 text-gray-400 transition-transform duration-200 ${icon === 'chevron' && isOpen ? 'rotate-180' : ''}`} 
+            className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${icon === 'chevron' && isOpen ? 'rotate-180' : ''}`} 
         />
       </button>
       
       {isOpen && (
         <div 
-          className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-800 rounded-md shadow-lg border dark:border-slate-700 z-[1000] animate-scale-in flex flex-col"
-          style={{ maxHeight: '300px' }}
+          className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-800 rounded-lg shadow-xl border dark:border-slate-700 z-[1000] animate-scale-in flex flex-col overflow-hidden ring-1 ring-black/5"
+          style={{ maxHeight: '250px' }}
         >
           {searchable && (
             <div className="p-2 border-b dark:border-slate-700 sticky top-0 bg-white dark:bg-slate-800">
               <div className="relative">
-                  <Search className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
                   <input
                       type="text"
                       placeholder={searchPlaceholder}
                       value={searchTerm}
                       onChange={e => setSearchTerm(e.target.value)}
-                      className="w-full p-2 pl-8 border rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                      className="w-full p-2 pl-8 text-sm border rounded-md dark:bg-slate-700 dark:border-slate-600 dark:text-white outline-none focus:ring-1 focus:ring-primary"
                       autoFocus
                   />
               </div>
             </div>
           )}
-          <ul className="overflow-y-auto" role="listbox">
+          <ul className="overflow-y-auto custom-scrollbar" role="listbox">
             {filteredOptions.length > 0 ? filteredOptions.map(option => (
               <li
                 key={option.value}
                 onClick={() => handleOptionClick(option.value)}
-                className={`px-4 py-2 hover:bg-primary/5 dark:hover:bg-slate-700 cursor-pointer ${value === option.value ? 'bg-primary/10 font-semibold text-primary dark:bg-primary/20' : ''}`}
+                className={`px-3 py-2 text-sm hover:bg-primary/5 dark:hover:bg-slate-700 cursor-pointer ${value === option.value ? 'bg-primary/10 font-semibold text-primary dark:bg-primary/20' : 'text-gray-700 dark:text-gray-200'}`}
                 role="option"
                 aria-selected={value === option.value}
               >
                 {option.label}
               </li>
             )) : (
-              <li className="px-4 py-2 text-gray-500">No options found.</li>
+              <li className="px-4 py-3 text-sm text-gray-500 text-center">No options found.</li>
             )}
           </ul>
         </div>

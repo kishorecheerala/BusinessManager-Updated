@@ -4,6 +4,8 @@ import { Trash2, RotateCcw, X, Search, Filter } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import Card from '../components/Card';
 import Button from '../components/Button';
+import Input from '../components/Input';
+import Dropdown from '../components/Dropdown';
 import { useDialog } from '../context/DialogContext';
 import { TrashItem, Page } from '../types';
 
@@ -98,6 +100,15 @@ const TrashPage: React.FC<TrashPageProps> = ({ setCurrentPage }) => {
     );
   };
 
+  const filterOptions = [
+      { value: 'all', label: 'All Types' },
+      { value: 'sales', label: 'Sales' },
+      { value: 'purchases', label: 'Purchases' },
+      { value: 'expenses', label: 'Expenses' },
+      { value: 'quotes', label: 'Estimates' },
+      { value: 'customers', label: 'Customers' }
+  ];
+
   return (
     <div className="space-y-6 animate-fade-in-fast pb-20">
       <div className="flex items-center gap-3 mb-6">
@@ -113,28 +124,21 @@ const TrashPage: React.FC<TrashPageProps> = ({ setCurrentPage }) => {
       <div className="bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border dark:border-slate-700 flex flex-col sm:flex-row gap-4">
         <div className="relative flex-grow">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input 
+            <Input 
                 type="text" 
                 placeholder="Search deleted items..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 p-2 border rounded-lg dark:bg-slate-900 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-red-500"
+                className="pl-10 focus:ring-red-500"
             />
         </div>
         <div className="relative min-w-[150px]">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <select 
-                value={filterType} 
-                onChange={(e) => setFilterType(e.target.value)}
-                className="w-full pl-9 p-2 border rounded-lg dark:bg-slate-900 dark:border-slate-700 dark:text-white appearance-none cursor-pointer"
-            >
-                <option value="all">All Types</option>
-                <option value="sales">Sales</option>
-                <option value="purchases">Purchases</option>
-                <option value="expenses">Expenses</option>
-                <option value="quotes">Estimates</option>
-                <option value="customers">Customers</option>
-            </select>
+            <Dropdown 
+                options={filterOptions}
+                value={filterType}
+                onChange={setFilterType}
+                icon="chevron"
+            />
         </div>
       </div>
 
