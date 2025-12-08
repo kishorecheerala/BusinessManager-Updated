@@ -623,8 +623,8 @@ const AppContent: React.FC = () => {
                                 <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
                             </div>
 
-                            {/* Help Button - Hidden on small mobile */}
-                            <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
+                            {/* Help Button - Visible on all screens now */}
+                            <button onClick={() => setIsHelpOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                                 <HelpCircle size={20} />
                             </button>
                         </div>

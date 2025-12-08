@@ -108,8 +108,7 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
             </div>
         </div>
       </Card>
-    </div>,
-    document.body
+    </div>
   );
 };
 

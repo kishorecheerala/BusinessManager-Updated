@@ -623,8 +623,8 @@ const AppContent: React.FC = () => {
                                 <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
                             </div>
 
-                            {/* Help Button - Hidden on small mobile */}
-                            <button onClick={() => setIsHelpOpen(true)} className="hidden sm:block p-2 hover:bg-white/20 rounded-full transition-colors">
+                            {/* Help Button - Visible on all screens now */}
+                            <button onClick={() => setIsHelpOpen(true)} className="p-2 hover:bg-white/20 rounded-full transition-colors">
                                 <HelpCircle size={20} />
                             </button>
                         </div>
@@ -789,7 +789,7 @@ const AppContent: React.FC = () => {
                                         <Edit size={14} />
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-3 gap-2">
                                     {state.quickActions.map((actionId, idx) => {
                                         const action = QUICK_ACTION_REGISTRY[actionId];
                                         if (!action) return null;
@@ -803,12 +803,12 @@ const AppContent: React.FC = () => {
                                                     handleNavigation(action.page);
                                                     setIsMobileQuickAddOpen(false);
                                                 }}
-                                                className="flex flex-col items-center justify-center w-full py-2 px-0.5 rounded-2xl transition-all duration-300 group/item hover:bg-gray-50 dark:hover:bg-slate-700/30"
+                                                className="flex flex-col items-center justify-center p-2 rounded-xl transition-all duration-200 group/item hover:bg-gray-50 dark:hover:bg-slate-700/30"
                                             >
-                                                <div className="p-1 rounded-full transition-all duration-300 group-hover/item:bg-primary/10 group-hover/item:scale-110 text-gray-500 group-hover/item:text-primary dark:text-gray-400 dark:group-hover/item:text-primary">
-                                                    <action.icon className="w-6 h-6 transition-transform duration-300 group-hover/item:scale-105" strokeWidth={2} />
+                                                <div className="p-2 rounded-full transition-all duration-300 group-hover:bg-primary/10 group-hover:scale-110 text-gray-500 group-hover:text-primary dark:text-gray-400 dark:group-hover:text-primary">
+                                                    <action.icon className="w-6 h-6 transition-transform duration-300" strokeWidth={2} />
                                                 </div>
-                                                <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight text-gray-500 group-hover/item:text-primary dark:text-gray-400 dark:group-hover/item:text-primary transition-colors opacity-90 text-center">{action.label}</span>
+                                                <span className="text-[10px] font-semibold mt-1 leading-tight text-gray-500 group-hover:text-primary dark:text-gray-400 dark:group-hover:text-primary transition-colors">{action.label}</span>
                                             </button>
                                         );
                                     })}
