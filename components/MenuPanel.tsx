@@ -1,6 +1,6 @@
 
 import React, { useState, useRef } from 'react';
-import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone, FileSpreadsheet, Type, PaintBucket, Plus, Trash2, Database } from 'lucide-react';
+import { User, BarChart2, Activity, LogIn, LogOut, RefreshCw, CloudLightning, Sun, Moon, Palette, Check, Settings, Monitor, Shield, ChevronRight, RotateCcw, BrainCircuit, Terminal, Receipt, FileText, Lock, PenTool, Gauge, Cloud, Layout, Download, Sparkles, Smartphone, FileSpreadsheet, Type, PaintBucket, Plus, Trash2, Database, HelpCircle } from 'lucide-react';
 import { Page } from '../types';
 import { useAppContext } from '../context/AppContext';
 import AuditLogPanel from './AuditLogPanel';
@@ -23,6 +23,7 @@ interface MenuPanelProps {
   onLockApp?: () => void;
   onOpenChangeLog?: () => void;
   onOpenSignIn?: () => void;
+  onHelpClick?: () => void;
 }
 
 interface ThemeColor {
@@ -115,7 +116,7 @@ const getContrastColor = (hexColor: string) => {
     return (yiq >= 128) ? 'black' : 'white';
 };
 
-const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, onNavigate, onOpenDevTools, onLockApp, onOpenChangeLog, onOpenSignIn }) => {
+const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, onNavigate, onOpenDevTools, onLockApp, onOpenChangeLog, onOpenSignIn, onHelpClick }) => {
     const { state, dispatch, googleSignOut, syncData, showToast } = useAppContext();
     const { isInstallable, install } = usePWAInstall();
     
@@ -413,6 +414,12 @@ const MenuPanel: React.FC<MenuPanelProps> = ({ isOpen, onClose, onProfileClick, 
                     <button onClick={() => { onClose(); onOpenChangeLog?.(); }} className="menu-item">
                         <Sparkles className="w-5 h-5 text-yellow-500" />
                         <span className="flex-grow text-sm font-medium">What's New</span>
+                        <ChevronRight className="w-4 h-4 text-gray-400" />
+                    </button>
+
+                    <button onClick={() => { onClose(); onHelpClick?.(); }} className="menu-item">
+                        <HelpCircle className="w-5 h-5 text-cyan-500" />
+                        <span className="flex-grow text-sm font-medium">Help & Documentation</span>
                         <ChevronRight className="w-4 h-4 text-gray-400" />
                     </button>
                 </div>
