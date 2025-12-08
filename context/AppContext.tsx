@@ -1,4 +1,3 @@
-
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
 import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences, SaleDraft, ParkedSale, TrashItem } from '../types';
 import * as db from '../utils/db';
@@ -1067,7 +1066,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     };
 
     const syncData = async () => {
-        if (!state.googleUser || !state.googleUser.accessToken) {
+        if (!stateRef.current.googleUser || !stateRef.current.googleUser.accessToken) {
             showToast("Please sign in to sync.", 'error');
             return;
         }
@@ -1075,7 +1074,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
         try {
             // 1. Read Cloud Data
-            const cloudData = await DriveService.read(state.googleUser.accessToken);
+            const cloudData = await DriveService.read(stateRef.current.googleUser.accessToken);
             
             // 2. Merge Strategies
             if (cloudData) {
@@ -1087,7 +1086,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const freshData = await db.exportData();
             
             // 4. Write to Cloud
-            await DriveService.write(state.googleUser.accessToken, freshData);
+            await DriveService.write(stateRef.current.googleUser.accessToken, freshData);
             
             // 5. Update State UI
             const time = Date.now();
@@ -1133,9 +1132,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
     // ... restore function implementation ...
     const restoreFromFileId = async (fileId: string) => {
-        if (!state.googleUser?.accessToken) return;
+        if (!stateRef.current.googleUser?.accessToken) return;
         try {
-            const data = await downloadFile(state.googleUser.accessToken, fileId);
+            const data = await downloadFile(stateRef.current.googleUser.accessToken, fileId);
             if (data) {
                 await db.importData(data);
                 window.location.reload();
