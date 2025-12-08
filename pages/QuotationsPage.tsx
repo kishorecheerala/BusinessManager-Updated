@@ -248,14 +248,18 @@ const QuotationsPage: React.FC = () => {
                                             Created: {new Date(quote.date).toLocaleDateString()}
                                             {quote.validUntil && ` | Valid Until: ${new Date(quote.validUntil).toLocaleDateString()}`}
                                         </p>
-                                        <div className="flex gap-2">
+                                        <div className="flex items-center gap-2">
                                             {quote.status === 'PENDING' && (
-                                                <Button onClick={() => handleConvertToSale(quote)} className="h-8 text-xs bg-green-600 hover:bg-green-700">
+                                                <Button onClick={() => handleConvertToSale(quote)} className="h-8 text-xs bg-success hover:bg-emerald-600 text-white">
                                                     <ShoppingCart size={14} className="mr-1"/> Convert
                                                 </Button>
                                             )}
-                                            <Button onClick={() => handleSharePDF(quote)} variant="secondary" className="h-8 w-8 p-0"><Share2 size={16}/></Button>
-                                            <Button onClick={() => { setEditingQuote(quote); setView('edit'); }} variant="secondary" className="h-8 w-8 p-0"><Edit size={16}/></Button>
+                                            <button onClick={() => handleSharePDF(quote)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300 transition-colors" title="Share Estimate">
+                                                <Share2 size={16}/>
+                                            </button>
+                                            <button onClick={() => { setEditingQuote(quote); setView('edit'); }} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-slate-700 dark:hover:bg-slate-600 dark:text-slate-300 transition-colors" title="Edit Estimate">
+                                                <Edit size={16}/>
+                                            </button>
                                             <DeleteButton onClick={() => handleDeleteQuote(quote.id)} />
                                         </div>
                                     </div>
