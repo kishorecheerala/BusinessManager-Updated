@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Check, Cloud, Shield, RefreshCw, Calendar, FileSpreadsheet } from 'lucide-react';
+import { X, Check, Cloud, Shield, RefreshCw, Calendar, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import Card from './Card';
 import { useAppContext } from '../context/AppContext';
 
@@ -10,7 +10,7 @@ interface SignInModalProps {
 }
 
 const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
-  const { googleSignIn } = useAppContext();
+  const { googleSignIn, state, showToast } = useAppContext();
 
   useEffect(() => {
       if (isOpen) document.body.style.overflow = 'hidden';
@@ -20,6 +20,10 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
 
   const handleSignIn = () => {
+    if (!state.isOnline) {
+        showToast("Internet connection required to sign in.", 'error');
+        return;
+    }
     googleSignIn();
     onClose();
   };
@@ -85,13 +89,27 @@ const SignInModal: React.FC<SignInModalProps> = ({ isOpen, onClose }) => {
                 </div>
             </div>
 
+            {/* Sync Warning */}
+            <div className="bg-amber-50 dark:bg-amber-900/20 border-l-4 border-amber-400 dark:border-amber-600 p-4 rounded-r-lg">
+                <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-6 h-6 text-amber-500 shrink-0 mt-0.5" />
+                    <div>
+                        <h4 className="font-bold text-amber-800 dark:text-amber-200 text-sm">Important Note on Syncing</h4>
+                        <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                            For your security, Google sessions expire after one hour. If a sync fails, you may be automatically signed out. Simply return here and sign in again to refresh your connection.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
             <div className="pt-4 space-y-3">
                 <button 
                     onClick={handleSignIn}
-                    className="w-full py-3.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 group"
+                    disabled={!state.isOnline}
+                    className={`w-full py-3.5 ${!state.isOnline ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'} text-white font-bold rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition-all flex items-center justify-center gap-2 group`}
                 >
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5 bg-white rounded-full p-0.5" />
-                    Sign In with Google
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className={`w-5 h-5 bg-white rounded-full p-0.5 ${!state.isOnline ? 'opacity-50' : ''}`} />
+                    {state.isOnline ? 'Sign In with Google' : 'Offline - Connect to Internet'}
                 </button>
                 <button 
                     onClick={onClose} 

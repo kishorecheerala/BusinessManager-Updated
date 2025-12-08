@@ -1104,17 +1104,28 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 const expenses = await db.getAll('expenses');
                 const quotes = await db.getAll('quotes');
                 const trash = await db.getAll('trash');
+                const profileData = await db.getAll('profile');
                 
                 dispatch({ 
                     type: 'SET_STATE', 
-                    payload: { customers, products, sales, purchases, returns, expenses, quotes, trash } 
+                    payload: { customers, products, sales, purchases, returns, expenses, quotes, trash, profile: profileData[0] || null } 
                 });
             }
             
             showToast("Sync complete!", 'success');
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Sync failed", error);
+
+            // Handle Auth Errors (401/403)
+            const errMsg = error?.message || '';
+            if (errMsg.includes('401') || errMsg.includes('403') || errMsg.includes('Token')) {
+                dispatch({ type: 'SET_GOOGLE_USER', payload: null });
+                showToast("Session expired. Please sign in again.", 'error');
+                dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
+                return;
+            }
+
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
             showToast("Sync failed. Check connection.", 'error');
         }
