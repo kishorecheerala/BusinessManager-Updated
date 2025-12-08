@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
@@ -44,6 +45,13 @@ const Calendar: React.FC<CalendarProps> = ({ value, onChange }) => {
 
     return days;
   }, [displayDate]);
+
+  // Group days into rows for styling
+  const dayRows = useMemo(() => {
+      const rows = [];
+      for(let i = 0; i < daysInMonth.length; i += 7) rows.push(daysInMonth.slice(i, i+7));
+      return rows;
+  }, [daysInMonth]);
   
   const handlePrevMonth = () => {
     setDisplayDate(new Date(displayDate.getUTCFullYear(), displayDate.getUTCMonth() - 1, 1));
@@ -82,27 +90,33 @@ const Calendar: React.FC<CalendarProps> = ({ value, onChange }) => {
         <div className="grid grid-cols-7 gap-1 text-center text-xs text-gray-500 font-medium">
             {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(d => <div key={d} className="p-2">{d}</div>)}
         </div>
-        <div className="grid grid-cols-7 gap-1">
-            {daysInMonth.map((d, i) => {
-                const isSelected = d.isCurrentMonth && d.day === selectedDate.getUTCDate() && displayDate.getUTCMonth() === selectedDate.getUTCMonth() && displayDate.getUTCFullYear() === selectedDate.getUTCFullYear();
-                const isToday = d.isCurrentMonth && d.day === today.getDate() && displayDate.getUTCMonth() === today.getMonth() && displayDate.getUTCFullYear() === today.getFullYear();
-                
-                return (
-                    <button 
-                        key={i}
-                        onClick={() => d.isCurrentMonth && handleDateClick(d.day)}
-                        disabled={!d.isCurrentMonth}
-                        className={`w-10 h-10 rounded-full text-sm font-medium transition-all duration-150 flex items-center justify-center
-                            ${!d.isCurrentMonth ? 'text-gray-300 dark:text-slate-600' : ''}
-                            ${d.isCurrentMonth ? 'hover:bg-gray-100 dark:hover:bg-slate-700' : ''}
-                            ${isSelected ? '!bg-primary !text-white' : ''}
-                            ${isToday && !isSelected ? 'ring-1 ring-primary/50 text-primary' : ''}
-                        `}
-                    >
-                        {d.day}
-                    </button>
-                );
-            })}
+        <div className="space-y-1">
+            {dayRows.map((row, rowIndex) => {
+                 const isSelectedWeek = row.some(d => d.isCurrentMonth && d.day === selectedDate.getUTCDate() && displayDate.getUTCMonth() === selectedDate.getUTCMonth());
+                 return (
+                    <div key={rowIndex} className={`grid grid-cols-7 gap-1 ${isSelectedWeek ? 'bg-primary/10 rounded' : ''}`}>
+                        {row.map((d, i) => {
+                            const isSelected = d.isCurrentMonth && d.day === selectedDate.getUTCDate() && displayDate.getUTCMonth() === selectedDate.getUTCMonth() && displayDate.getUTCFullYear() === selectedDate.getUTCFullYear();
+                            const isToday = d.isCurrentMonth && d.day === today.getDate() && displayDate.getUTCMonth() === today.getMonth() && displayDate.getUTCFullYear() === today.getFullYear();
+                            
+                            return (
+                                <button 
+                                    key={i}
+                                    onClick={() => d.isCurrentMonth && handleDateClick(d.day)}
+                                    disabled={!d.isCurrentMonth}
+                                    className={`w-10 h-10 rounded-full text-sm font-medium transition-all duration-150 flex items-center justify-center
+                                        ${!d.isCurrentMonth ? 'text-gray-300 dark:text-slate-600' : ''}
+                                        ${d.isCurrentMonth ? 'hover:bg-gray-100 dark:hover:bg-slate-700' : ''}
+                                        ${isSelected ? '!bg-primary !text-white' : ''}
+                                        ${isToday && !isSelected ? 'ring-1 ring-primary/50 text-primary' : ''}
+                                    `}
+                                >
+                                    {d.day}
+                                </button>
+                            );
+                        })}
+                    </div>
+                 )})}
         </div>
     </div>
   );

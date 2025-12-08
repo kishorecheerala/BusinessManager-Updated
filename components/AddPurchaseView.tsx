@@ -1,11 +1,10 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Purchase, Supplier, Product, PurchaseItem, Payment } from '../types';
 import { Plus, Info, X, Camera, Image as ImageIcon, IndianRupee, Save, Sparkles, Loader2, ScanLine, Download, Trash2 } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import DeleteButton from './DeleteButton';
-// fix: Fix import path for DateInput component
-import DateInput from './DateInput';
+import ModernDateInput from './ModernDateInput';
 import Dropdown from './Dropdown';
 import Input from './Input';
 import { compressImage } from '../utils/imageUtils';
@@ -15,6 +14,7 @@ import { useHotkeys } from '../hooks/useHotkeys';
 import AddSupplierModal from './AddSupplierModal';
 import { GoogleGenAI } from "@google/genai";
 import { generateImagesToPDF } from '../utils/pdfGenerator';
+import { useDialog } from '../context/DialogContext';
 
 interface PurchaseFormProps {
   mode: 'add' | 'edit';
@@ -51,22 +51,92 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   const [supplierInvoiceId, setSupplierInvoiceId] = useState(initialData?.supplierInvoiceId || '');
   const [discount, setDiscount] = useState(initialData?.discount?.toString() || '0');
   const [paymentDueDates, setPaymentDueDates] = useState<string[]>(initialData?.paymentDueDates || []);
-  
+  const [openCalendarId, setOpenCalendarId] = useState<string | null>(null);
+
+  // FIX: Moved state declarations before they are used in `isDirty` useMemo hook.
   // Initialize images from either new array or legacy single url field
   const [invoiceImages, setInvoiceImages] = useState<string[]>(
       initialData?.invoiceImages || (initialData?.invoiceUrl ? [initialData.invoiceUrl] : [])
   );
   
-  const [isAddingSupplier, setIsAddingSupplier] = useState(false);
-  const [isScanning, setIsScanning] = useState(false);
-  
   // Payment Details for New Purchase
   const [paymentDetails, setPaymentDetails] = useState({
+      amount: initialData?.payments?.[0]?.amount.toString() || '',
+      method: initialData?.payments?.[0]?.method || ('CASH' as 'CASH' | 'UPI' | 'CHEQUE'),
+      date: initialData?.payments?.[0]?.date ? getLocalDateString(new Date(initialData.payments[0].date)) : getLocalDateString(),
+      reference: initialData?.payments?.[0]?.reference || '',
+  });
+
+  const { showConfirm } = useDialog();
+
+  const [isAddingSupplier, setIsAddingSupplier] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+
+  const resetForm = useCallback(() => {
+    setSupplierId('');
+    setItems([]);
+    setPurchaseDate(getLocalDateString());
+    setSupplierInvoiceId('');
+    setDiscount('0');
+    setPaymentDueDates([]);
+    setOpenCalendarId(null);
+    setInvoiceImages([]);
+    setPaymentDetails({
       amount: '',
-      method: 'CASH' as 'CASH' | 'UPI' | 'CHEQUE',
+      method: 'CASH',
       date: getLocalDateString(),
       reference: '',
-  });
+    });
+  }, []);
+
+  const isDirty = useMemo(() => {
+    if (mode !== 'add') return false; // Dirty check only for new forms
+    return (
+      supplierId !== '' ||
+      items.length > 0 ||
+      purchaseDate !== getLocalDateString() ||
+      supplierInvoiceId !== '' ||
+      discount !== '0' ||
+      paymentDueDates.length > 0 ||
+      invoiceImages.length > 0 ||
+      paymentDetails.amount !== '' ||
+      paymentDetails.reference !== ''
+    );
+  }, [
+    mode,
+    supplierId,
+    items,
+    purchaseDate,
+    supplierInvoiceId,
+    discount,
+    paymentDueDates,
+    invoiceImages,
+    paymentDetails
+  ]);
+
+  useEffect(() => {
+    setIsDirty(isDirty);
+  }, [isDirty, setIsDirty]);
+
+  const handleClear = async () => {
+    if (await showConfirm("Are you sure you want to clear this form? All unsaved data will be lost.", { confirmText: "Clear Form" })) {
+      resetForm();
+    }
+  };
+
+  const handleBack = async () => {
+    if (isDirty) {
+      if (await showConfirm("You have unsaved changes. Are you sure you want to go back?")) {
+        onBack();
+      }
+    } else {
+      onBack();
+    }
+  };
+
+  const toggleCalendar = (id: string) => {
+    setOpenCalendarId(prev => (prev === id ? null : id));
+  };
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
@@ -314,6 +384,15 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
 
   return (
     <div className="space-y-4">
+      <div className="flex justify-between items-center">
+        <Button onClick={handleBack}>&larr; Back</Button>
+        {mode === 'add' && (
+          <Button onClick={handleClear} variant="secondary" className="bg-orange-100 text-orange-700 hover:bg-orange-200 dark:bg-orange-900/20 dark:text-orange-300 dark:border-orange-800">
+            Clear Form
+          </Button>
+        )}
+      </div>
+
       <AddSupplierModal 
         isOpen={isAddingSupplier} 
         onClose={() => setIsAddingSupplier(false)} 
@@ -330,9 +409,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
           onChange={handleScanFileChange} 
       />
 
-      <Button onClick={onBack}>&larr; Back</Button>
-      
-      <Card title={mode === 'add' ? 'Create New Purchase' : `Edit Purchase`}>
+      <Card title={mode === 'add' ? 'Create New Purchase' : `Edit Purchase`} className={`relative ${openCalendarId === 'purchaseDate' ? 'z-40' : 'z-30'}`}>
          {/* AI Auto-Fill Button - Prominent */}
          <div className="mb-6">
             <button
@@ -392,11 +469,17 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                     />
                 </div>
             </div>
-            <DateInput label="Purchase Date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)} />
+            <ModernDateInput 
+                label="Purchase Date"
+                value={purchaseDate}
+                onChange={e => setPurchaseDate(e.target.value)}
+                isOpen={openCalendarId === 'purchaseDate'}
+                onToggle={() => toggleCalendar('purchaseDate')}
+            />
          </div>
       </Card>
 
-      <Card title="Items">
+      <Card title="Items" className={`relative ${openCalendarId === 'purchaseDate' ? 'z-20' : openCalendarId === 'paymentDate' || openCalendarId?.startsWith('due-') ? 'z-20' : 'z-10'}`}>
         <div className="space-y-4">
             {/* Offline Attachment Bar */}
             <div className="bg-gray-50 dark:bg-slate-800 p-3 rounded-lg border border-gray-200 dark:border-slate-700">
@@ -415,7 +498,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                         )}
                         <button 
                             onClick={() => fileInputRef.current?.click()} 
-                            className="flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 text-xs font-bold rounded shadow-sm transition-colors dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                            className="text-xs bg-white dark:bg-slate-700 border hover:bg-gray-50 text-gray-700 dark:text-white px-3 py-1.5 rounded-md flex items-center gap-1 transition-colors shadow-sm font-bold"
                         >
                             <Camera size={14} />
                             Add Photo
@@ -500,7 +583,7 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
         </div>
       </Card>
       
-      <Card title="Transaction Details">
+      <Card title="Transaction Details" className={`relative ${openCalendarId === 'purchaseDate' ? 'z-0' : openCalendarId === 'paymentDate' || openCalendarId?.startsWith('due-') ? 'z-30' : 'z-0'}`}>
           <div className="space-y-6">
               {/* Section 1: Breakdown */}
               <div className="space-y-3">
@@ -560,10 +643,13 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                           </div>
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <DateInput 
+                          <ModernDateInput 
                               label="Payment Date"
                               value={paymentDetails.date} 
                               onChange={e => setPaymentDetails({ ...paymentDetails, date: e.target.value })} 
+                              isOpen={openCalendarId === 'paymentDate'}
+                              onToggle={() => toggleCalendar('paymentDate')}
+                              popupPosition="top"
                           />
                           <div>
                               <Input label="Reference (Optional)" type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} />
@@ -586,12 +672,15 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                   </div>
                   {paymentDueDates.map((date, index) => (
                       <div key={index} className="flex gap-2 mb-2 animate-fade-in-fast">
-                          <DateInput 
+                          <ModernDateInput 
                               value={date} 
                               onChange={(e) => handleDueDateChange(index, e.target.value)} 
                               containerClassName="flex-grow"
+                              isOpen={openCalendarId === `due-${index}`}
+                              onToggle={() => toggleCalendar(`due-${index}`)}
+                              popupPosition="top"
                           />
-                          <DeleteButton variant="remove" onClick={() => handleRemoveDueDate(index)} className="mt-1" />
+                          <DeleteButton variant="remove" onClick={() => handleRemoveDueDate(index)} className="mt-6" />
                       </div>
                   ))}
                   {paymentDueDates.length === 0 && (

@@ -12,8 +12,7 @@ import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
 import { generateDebitNotePDF, generateImagesToPDF } from '../utils/pdfGenerator';
-// fix: Fix import path for DateInput component
-import DateInput from '../components/DateInput';
+import ModernDateInput from '../components/ModernDateInput';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PurchaseForm } from '../components/AddPurchaseView';
 import { getLocalDateString } from '../utils/dateUtils';
@@ -38,6 +37,11 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
     const [editingScheduleId, setEditingScheduleId] = useState<string | null>(null);
     const [tempDueDates, setTempDueDates] = useState<string[]>([]);
     const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+    const [openDetailCalendars, setOpenDetailCalendars] = useState<Record<string, boolean>>({});
+
+    const toggleDetailCalendar = (id: string) => {
+        setOpenDetailCalendars(prev => ({ [id]: !prev[id] })); // only one at a time
+    };
     
     const [isBatchBarcodeModalOpen, setIsBatchBarcodeModalOpen] = useState(false);
     const [lastPurchase, setLastPurchase] = useState<Purchase | null>(null);
@@ -418,6 +422,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                         type="purchase"
                     />
 
+                    {ImageViewer}
+
                     <div className="space-y-6 animate-fade-in-fast">
                         <div className="flex items-center gap-2">
                             <Button onClick={() => setSelectedSupplier(null)} variant="secondary">&larr; Back to List</Button>
@@ -450,9 +456,10 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                         const isPaid = dueAmount <= 0.01;
                                         const isEditingSchedule = editingScheduleId === purchase.id;
                                         const hasImages = (purchase.invoiceImages && purchase.invoiceImages.length > 0) || !!purchase.invoiceUrl;
+                                        const areAnyCalendarsInThisItemOpen = tempDueDates.some((_, idx) => openDetailCalendars[`${purchase.id}-due-${idx}`]);
 
                                         return (
-                                            <div key={purchase.id} className="border dark:border-slate-700 rounded-lg p-4 bg-gray-50 dark:bg-slate-700/30">
+                                            <div key={purchase.id} className={`border dark:border-slate-700 rounded-lg p-4 bg-gray-50 dark:bg-slate-700/30 ${areAnyCalendarsInThisItemOpen ? 'relative z-10' : ''}`}>
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div>
                                                         <p className="font-bold text-lg dark:text-white">#{purchase.id}</p>
@@ -482,11 +489,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                     <div className="mb-3">
                                                         <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
                                                             {(purchase.invoiceImages || [purchase.invoiceUrl]).filter(Boolean).map((img, idx) => (
-                                                                <div 
-                                                                    key={idx} 
-                                                                    className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity shadow-sm" 
-                                                                    onClick={(e) => { e.stopPropagation(); setViewImageModal(img!); }}
-                                                                >
+                                                                <div key={idx} className="relative h-12 w-12 flex-shrink-0 cursor-pointer border dark:border-slate-600 rounded overflow-hidden hover:opacity-80 transition-opacity shadow-sm" onClick={() => setViewImageModal(img!)}>
                                                                     <img src={img} alt="Invoice" className="h-full w-full object-cover" />
                                                                 </div>
                                                             ))}
@@ -507,8 +510,13 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                         {isEditingSchedule ? (
                                                             <div className="space-y-2 bg-white dark:bg-slate-800 p-2 rounded border border-blue-200 dark:border-slate-600">
                                                                 {tempDueDates.map((date, idx) => (
-                                                                    <div key={idx} className="flex gap-2">
-                                                                        <DateInput value={date} onChange={(e) => handleTempDateChange(idx, e.target.value)} />
+                                                                    <div key={idx} className="flex gap-2 items-center">
+                                                                        <ModernDateInput 
+                                                                            value={date} 
+                                                                            onChange={(e) => handleTempDateChange(idx, e.target.value)}
+                                                                            isOpen={!!openDetailCalendars[`${purchase.id}-due-${idx}`]}
+                                                                            onToggle={() => toggleDetailCalendar(`${purchase.id}-due-${idx}`)}
+                                                                        />
                                                                         <DeleteButton variant="remove" onClick={() => removeTempDate(idx)} />
                                                                     </div>
                                                                 ))}
@@ -552,8 +560,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                     )}
                                                     {/* Solid Green Send Order Button */}
                                                     <button 
-                                                        type="button"
-                                                        onClick={(e) => { e.stopPropagation(); sendPurchaseOrder(purchase); }}
+                                                        onClick={() => sendPurchaseOrder(purchase)} 
                                                         className="flex-grow sm:flex-grow-0 h-8 px-4 text-xs font-bold bg-green-600 hover:bg-green-700 text-white rounded-md shadow-sm transition-colors flex items-center justify-center"
                                                     >
                                                         <MessageCircle size={14} className="mr-1.5" /> Send Order
@@ -562,8 +569,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                     {/* View Image Button */}
                                                     {hasImages && (
                                                         <button 
-                                                            type="button"
-                                                            onClick={(e) => { e.stopPropagation(); setViewImageModal((purchase.invoiceImages && purchase.invoiceImages[0]) || purchase.invoiceUrl || ''); }}
+                                                            onClick={() => setViewImageModal((purchase.invoiceImages && purchase.invoiceImages[0]) || purchase.invoiceUrl || '')}
                                                             className="flex-grow sm:flex-grow-0 h-8 px-3 text-xs font-bold bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-700 dark:text-gray-200 rounded-md shadow-sm transition-colors flex items-center justify-center border border-gray-300 dark:border-slate-600"
                                                             title="View Invoice Image"
                                                         >
@@ -574,8 +580,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                     {/* New Share Docs Button */}
                                                     {hasImages && (
                                                         <button 
-                                                            type="button"
-                                                            onClick={(e) => { e.stopPropagation(); handleSharePurchaseDocs(purchase); }}
+                                                            onClick={() => handleSharePurchaseDocs(purchase)}
                                                             className="flex-grow sm:flex-grow-0 h-8 px-3 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-md shadow-sm transition-colors flex items-center justify-center"
                                                             title="Share PDF for GST"
                                                         >
@@ -583,10 +588,10 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
                                                         </button>
                                                     )}
 
-                                                    <Button onClick={(e) => { e.stopPropagation(); setPurchaseToEdit(purchase); setView('edit_purchase'); }} variant="secondary" className="text-xs h-8 px-2 flex-grow sm:flex-grow-0">
+                                                    <Button onClick={() => { setPurchaseToEdit(purchase); setView('edit_purchase'); }} variant="secondary" className="text-xs h-8 px-2 flex-grow sm:flex-grow-0">
                                                         <Edit size={14} />
                                                     </Button>
-                                                    <DeleteButton variant="delete" onClick={(e) => { e.stopPropagation(); handleDeletePurchase(purchase.id); }} />
+                                                    <DeleteButton variant="delete" onClick={() => handleDeletePurchase(purchase.id)} />
                                                 </div>
                                             </div>
                                         );
@@ -630,6 +635,8 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
 
         return (
             <>
+                {ImageViewer}
+
                 {isBatchBarcodeModalOpen && lastPurchase && (
                     <BatchBarcodeModal 
                         isOpen={isBatchBarcodeModalOpen} 
@@ -703,49 +710,7 @@ const PurchasesPage: React.FC<PurchasesPageProps> = ({ setIsDirty, setCurrentPag
         );
     };
 
-    return (
-        <>
-            {viewImageModal && createPortal(
-                <div 
-                    className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/95 backdrop-blur-sm animate-fade-in-fast"
-                    onClick={() => setViewImageModal(null)}
-                >
-                     <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center z-50 bg-gradient-to-b from-black/50 to-transparent pointer-events-none">
-                         <h3 className="text-white font-medium text-lg drop-shadow-md pl-2 pointer-events-auto">Invoice Viewer</h3>
-                         <div className="flex gap-4 pointer-events-auto">
-                             <a 
-                                href={viewImageModal} 
-                                download={`Invoice_${Date.now()}.jpg`}
-                                className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md transition-colors flex items-center gap-2 px-4 shadow-lg border border-white/10"
-                                title="Download Original"
-                                onClick={(e) => e.stopPropagation()}
-                             >
-                                <Download size={20} /> <span className="hidden sm:inline font-bold text-sm">Download</span>
-                             </a>
-                             <button 
-                                onClick={() => setViewImageModal(null)} 
-                                className="p-2 bg-white/20 hover:bg-white/30 text-white rounded-full backdrop-blur-md transition-colors shadow-lg border border-white/10"
-                             >
-                                <X size={24}/>
-                             </button>
-                         </div>
-                     </div>
-                     
-                     <div className="w-full h-full flex items-center justify-center p-4">
-                         <img 
-                            src={viewImageModal} 
-                            alt="Invoice" 
-                            className="max-w-full max-h-full object-contain rounded-lg shadow-2xl animate-scale-in" 
-                            onClick={(e) => e.stopPropagation()}
-                         />
-                     </div>
-                </div>,
-                document.body
-            )}
-            
-            {renderContent()}
-        </>
-    );
+    return renderContent();
 };
 
 export default PurchasesPage;

@@ -7,8 +7,7 @@ import Button from '../components/Button';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Dropdown from '../components/Dropdown';
-// fix: Fix import path for DateInput component
-import DateInput from '../components/DateInput';
+import ModernDateInput from '../components/ModernDateInput';
 import { generateDebitNotePDF } from '../utils/pdfGenerator';
 import { getLocalDateString } from '../utils/dateUtils';
 
@@ -28,6 +27,7 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
     const [returnDate, setReturnDate] = useState(getLocalDateString());
     const [reason, setReason] = useState('');
     const [notes, setNotes] = useState('');
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
     const [mode, setMode] = useState<'add' | 'edit'>('add');
     const [returnToEditId, setReturnToEditId] = useState<string | null>(null);
@@ -212,7 +212,7 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
                 </div>
             </div>
 
-            <Card title="Process a New Return">
+            <Card title="Process a New Return" className={isCalendarOpen ? 'relative z-20' : ''}>
                 <div className="border-b mb-4 dark:border-slate-700">
                     <nav className="-mb-px flex space-x-6">
                         <button onClick={() => { resetForm(); setReturnType('CUSTOMER'); }} className={`py-2 px-1 border-b-2 font-semibold ${returnType === 'CUSTOMER' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:border-slate-500'}`}>
@@ -288,10 +288,12 @@ const ReturnsPage: React.FC<ReturnsPageProps> = ({ setIsDirty }) => {
                                     <label className="block text-sm font-medium dark:text-gray-300">{returnType === 'CUSTOMER' ? 'Amount Refunded' : 'Credit Note Value'}</label>
                                     <input type="number" value={returnAmount} onChange={e => setReturnAmount(e.target.value)} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" placeholder={`${calculatedReturnValue.toFixed(2)}`} />
                                 </div>
-                                <DateInput
+                                <ModernDateInput
                                     label="Return Date"
                                     value={returnDate}
                                     onChange={e => setReturnDate(e.target.value)}
+                                    isOpen={isCalendarOpen}
+                                    onToggle={setIsCalendarOpen}
                                 />
                            </div>
                            <input type="text" placeholder="Reason (Optional)" value={reason} onChange={e => setReason(e.target.value)} className="w-full p-2 border rounded dark:bg-slate-700 dark:border-slate-600 dark:text-slate-200" />

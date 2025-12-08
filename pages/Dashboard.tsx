@@ -350,6 +350,7 @@ const SmartAnalystCard: React.FC<{
 
             {/* Details Modal */}
             {detailType && (
+                // DEV-NOTE: z-[300] to appear on top of dashboard content. Do not change without specific request.
                 <div 
                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-fade-in-fast" 
                     onClick={() => setDetailType(null)}

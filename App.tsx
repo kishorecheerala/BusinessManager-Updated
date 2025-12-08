@@ -469,6 +469,7 @@ const AppContent: React.FC = () => {
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             {/* Lock Screen Overlay */}
             {isLocked && (
+                // DEV-NOTE: z-[1000] is high to ensure it covers the app when locked. Do not change z-index without specific request.
                 <div className="fixed inset-0 z-[1000] bg-background dark:bg-slate-950 flex items-center justify-center">
                     <PinModal 
                         mode="enter" 
@@ -481,6 +482,7 @@ const AppContent: React.FC = () => {
 
             {/* Park Sale Modal */}
             {parkModalState.isOpen && (
+                // DEV-NOTE: z-[2000] is high to ensure it's on top of all other UI. Do not change z-index without specific request.
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[2000] p-4 animate-fade-in-fast backdrop-blur-sm">
                     <Card className="w-full max-w-sm animate-scale-in border-l-4 border-amber-500">
                         <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-2">Sale in Progress</h2>
@@ -508,6 +510,7 @@ const AppContent: React.FC = () => {
             
             {/* Header - Hidden on Invoice Designer to maximize space */}
             {currentPage !== 'INVOICE_DESIGNER' && (
+                // DEV-NOTE: z-40 positions header above content, but below nav and modals. Do not change z-index without specific request.
                 <header className="fixed top-0 left-0 right-0 z-40 bg-theme shadow-lg transition-all duration-300">
                     
                     {/* Top Row: Navigation & Actions (h-16) */}
@@ -621,6 +624,7 @@ const AppContent: React.FC = () => {
                                         <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-white dark:border-slate-800"></span>
                                     )}
                                 </button>
+                                {/* The panel inside has its own z-index, see NotificationsPanel.tsx */}
                                 <NotificationsPanel isOpen={isNotificationsOpen} onClose={() => setIsNotificationsOpen(false)} onNavigate={handleNavigation} />
                             </div>
 
@@ -689,6 +693,7 @@ const AppContent: React.FC = () => {
             
             {/* Bottom Navigation */}
             {currentPage !== 'INVOICE_DESIGNER' && (
+            // DEV-NOTE: z-50 keeps nav on top of page content. Do not change z-index without specific request.
             <nav className={`fixed pb-[env(safe-area-inset-bottom)] z-50 transition-all duration-300 ${navContainerClass}`}>
                 {/* Desktop View - Scrollable */}
                 <div className="hidden md:flex w-full overflow-x-auto custom-scrollbar">
@@ -738,6 +743,7 @@ const AppContent: React.FC = () => {
                         </button>
 
                         {isMoreMenuOpen && (
+                            // DEV-NOTE: z-50 matches parent nav. Do not change z-index without specific request.
                             <div className="absolute bottom-[calc(100%+16px)] right-0 w-52 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-100 dark:border-slate-700 z-50 animate-scale-in origin-bottom-right overflow-hidden ring-1 ring-black/5">
                                 <div className="p-1.5 grid gap-1 max-h-[60vh] overflow-y-auto">
                                     {mobileMoreItems.map(item => (
@@ -786,6 +792,7 @@ const AppContent: React.FC = () => {
                             <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">Add</span>
                         </button>
                         {isMobileQuickAddOpen && (
+                            // DEV-NOTE: z-50 matches parent nav. Do not change z-index without specific request.
                             <div className="absolute bottom-[calc(100%+16px)] right-0 w-[85vw] max-w-[340px] bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-700 p-5 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
                                 <div className="flex justify-between items-center mb-4 px-1">
                                     <div className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Quick Actions</div>

@@ -17,8 +17,8 @@ const daysFromNow = (days: number): string => {
 
 export const testProfile: ProfileData = {
   id: 'userProfile',
-  name: 'My Business',
-  ownerName: 'Owner Name',
+  name: 'Business Manager',
+  ownerName: 'Owner',
   phone: '9876543210',
   address: '123 Market Street, City, 500001',
   gstNumber: '36ABCDE1234F1Z5',
@@ -127,7 +127,7 @@ export const testData: Omit<AppState, 'toast' | 'selection' | 'pin' | 'googleUse
   navOrder: [
     'DASHBOARD', 'CUSTOMERS', 'SALES', 'PURCHASES', 
     'INSIGHTS', 'REPORTS', 'PRODUCTS', 'EXPENSES', 
-    'RETURNS', 'QUOTATIONS', 'INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER'
+    'RETURNS', 'QUOTATIONS', 'INVOICE_DESIGNER', 'SYSTEM_OPTIMIZER', 'SQL_ASSISTANT', 'TRASH'
   ],
   quickActions: [
     'add_sale', 'add_customer', 'add_expense', 'add_purchase', 'add_quote', 'add_return'

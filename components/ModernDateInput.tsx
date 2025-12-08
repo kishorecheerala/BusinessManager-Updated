@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Calendar as CalendarIcon } from 'lucide-react';
 import Calendar from './Calendar';
@@ -7,18 +8,28 @@ interface ModernDateInputProps extends Omit<React.InputHTMLAttributes<HTMLInputE
   label?: string;
   value: string; // YYYY-MM-DD
   onChange: (event: { target: { value: string } }) => void;
+  isOpen?: boolean;
+  onToggle?: (isOpen: boolean) => void;
   containerClassName?: string;
+  popupPosition?: 'top' | 'bottom';
 }
 
-const ModernDateInput: React.FC<ModernDateInputProps> = ({ label, value, onChange, disabled, containerClassName = '', ...props }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const ModernDateInput: React.FC<ModernDateInputProps> = ({ label, value, onChange, disabled, isOpen, onToggle, containerClassName = '', popupPosition = 'bottom', ...props }) => {
+  const [internalIsOpen, setInternalIsOpen] = useState(false);
+  const isComponentOpen = isOpen !== undefined ? isOpen : internalIsOpen;
+  const setComponentOpen = onToggle || setInternalIsOpen;
+
   const ref = useRef<HTMLDivElement>(null);
-  useOnClickOutside(ref, () => setIsOpen(false));
+  useOnClickOutside(ref, () => {
+      if (isComponentOpen) {
+          setComponentOpen(false);
+      }
+  });
 
   const handleDateSelect = (dateString: string) => {
     // Mimic input event object for compatibility
     onChange({ target: { value: dateString } });
-    setIsOpen(false);
+    setComponentOpen(false);
   };
   
   const formattedDate = useMemo(() => {
@@ -44,7 +55,7 @@ const ModernDateInput: React.FC<ModernDateInputProps> = ({ label, value, onChang
       )}
       <button
         type="button"
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => !disabled && setComponentOpen(!isComponentOpen)}
         disabled={disabled}
         className={`w-full p-2.5 border bg-gray-50 dark:bg-slate-800 border-gray-200 dark:border-slate-700 rounded-lg text-left flex justify-between items-center text-gray-800 dark:text-white outline-none focus:ring-2 focus:ring-primary transition-colors disabled:opacity-60 disabled:cursor-not-allowed`}
         {...props}
@@ -55,8 +66,8 @@ const ModernDateInput: React.FC<ModernDateInputProps> = ({ label, value, onChang
         </span>
       </button>
 
-      {isOpen && (
-          <div className="absolute top-full mt-2 z-[1000] animate-scale-in origin-top-left">
+      {isComponentOpen && (
+          <div className={`absolute z-50 animate-scale-in w-full ${popupPosition === 'top' ? 'bottom-full mb-2 origin-bottom' : 'top-full mt-2 origin-top'}`}>
               <Calendar value={value} onChange={handleDateSelect} />
           </div>
       )}
