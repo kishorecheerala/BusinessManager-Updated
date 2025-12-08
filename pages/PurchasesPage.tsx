@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Edit, Save, X, Search, Download, Printer, FileSpreadsheet, Upload, CheckCircle, XCircle, Info, QrCode, Calendar as CalendarIcon, Image as ImageIcon, Share2, MessageCircle, Eye, FileText } from 'lucide-react';
@@ -13,6 +12,7 @@ import BatchBarcodeModal from '../components/BatchBarcodeModal';
 import Dropdown from '../components/Dropdown';
 import PaymentModal from '../components/PaymentModal';
 import { generateDebitNotePDF, generateImagesToPDF } from '../utils/pdfGenerator';
+// fix: Fix import path for DateInput component
 import DateInput from '../components/DateInput';
 import { Html5Qrcode } from 'html5-qrcode';
 import { PurchaseForm } from '../components/AddPurchaseView';

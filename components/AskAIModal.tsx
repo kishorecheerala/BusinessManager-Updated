@@ -6,6 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import Card from './Card';
 import Button from './Button';
 import { Page } from '../types';
+import Textarea from './Textarea';
 
 interface AskAIModalProps {
   isOpen: boolean;
@@ -528,12 +529,12 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose, onNavigate }) 
         {!isLiveMode && (
             <div className="p-3 bg-white dark:bg-slate-800 border-t dark:border-slate-700 shrink-0">
                 <div className={`flex gap-2 items-end bg-gray-100 dark:bg-slate-900 p-2 rounded-xl border border-gray-200 dark:border-slate-700 focus-within:border-primary focus-within:ring-1 focus-within:ring-primary transition-all ${!state.isOnline ? 'opacity-50' : ''}`}>
-                    <textarea 
+                    <Textarea 
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
                         onKeyDown={handleKeyPress}
                         placeholder={state.isOnline ? "Ask about sales, stock, or profit..." : "Offline mode enabled"}
-                        className="flex-grow bg-transparent border-none focus:ring-0 resize-none text-sm max-h-24 py-2 px-2 dark:text-white disabled:cursor-not-allowed placeholder-gray-400"
+                        className="flex-grow bg-transparent border-none focus:ring-0 resize-none text-sm max-h-24 py-2 px-2 disabled:cursor-not-allowed placeholder-gray-400 !p-2"
                         rows={1}
                         disabled={isLoading || !state.isOnline}
                     />

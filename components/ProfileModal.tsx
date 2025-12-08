@@ -6,6 +6,8 @@ import { ProfileData } from '../types';
 import Card from './Card';
 import Button from './Button';
 import { compressImage } from '../utils/imageUtils';
+import Input from './Input';
+import Textarea from './Textarea';
 
 interface ProfileModalProps {
   isOpen: boolean;
@@ -119,24 +121,19 @@ const ProfileModal: React.FC<ProfileModalProps> = ({ isOpen, onClose }) => {
 
             <div className="space-y-4">
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Business Name</label>
-                <input type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g. My Saree Shop" className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                <Input label="Business Name" type="text" name="name" value={formData.name} onChange={handleInputChange} placeholder="e.g. My Saree Shop" />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Owner Name</label>
-                <input type="text" name="ownerName" value={formData.ownerName} onChange={handleInputChange} placeholder="Your Name (for greetings)" className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                <Input label="Owner Name" type="text" name="ownerName" value={formData.ownerName} onChange={handleInputChange} placeholder="Your Name (for greetings)" />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Phone Number</label>
-                <input type="text" name="phone" value={formData.phone} onChange={handleInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                <Input label="Phone Number" type="text" name="phone" value={formData.phone} onChange={handleInputChange} />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Address</label>
-                <textarea name="address" value={formData.address} onChange={handleInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" rows={3}></textarea>
+                <Textarea label="Address" name="address" value={formData.address} onChange={handleInputChange} rows={3} />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">GST Number</label>
-                <input type="text" name="gstNumber" value={formData.gstNumber} onChange={handleInputChange} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600 dark:text-white" />
+                <Input label="GST Number" type="text" name="gstNumber" value={formData.gstNumber} onChange={handleInputChange} />
             </div>
             </div>
         </div>

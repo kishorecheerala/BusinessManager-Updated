@@ -1,9 +1,8 @@
-import React, { useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React from 'react';
 import Card from './Card';
 import Button from './Button';
 import Dropdown from './Dropdown';
-import DateInput from './DateInput';
+import ModernDateInput from './ModernDateInput';
 import Input from './Input';
 import { useAppContext } from '../context/AppContext';
 
@@ -35,11 +34,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
     const { showToast } = useAppContext();
 
-    useEffect(() => {
-        if (isOpen) document.body.style.overflow = 'hidden';
-        return () => { document.body.style.overflow = ''; };
-    }, [isOpen]);
-
     if (!isOpen) return null;
 
     const paymentMethodOptions = [
@@ -56,9 +50,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         onSubmit();
     }
 
-    return createPortal(
+    return (
         <div 
-            className="fixed inset-0 z-[99999] flex items-center justify-center p-4"
+            style={{ 
+                position: 'fixed', 
+                top: 0, 
+                left: 0, 
+                right: 0, 
+                bottom: 0, 
+                zIndex: 99999,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+            }}
+            className="p-4"
         >
             <div className="absolute inset-0 bg-black/50 animate-fade-in-fast" onClick={onClose} />
             <Card title="Add Payment" className="relative z-10 w-full max-w-sm animate-scale-in">
@@ -94,7 +99,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                         />
                     </div>
                     
-                    <DateInput
+                    <ModernDateInput
                         label="Payment Date"
                         value={paymentDetails.date} 
                         onChange={e => setPaymentDetails({ ...paymentDetails, date: e.target.value })} 
@@ -116,8 +121,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                     </div>
                 </div>
             </Card>
-        </div>,
-        document.body
+        </div>
     );
 };
 

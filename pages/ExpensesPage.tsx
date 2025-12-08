@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Plus, Trash2, Filter, Receipt, DollarSign, X, Camera, Image as ImageIcon, ScanLine, Loader2 } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -6,7 +5,7 @@ import { Expense, ExpenseCategory } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import DeleteButton from '../components/DeleteButton';
-import DateInput from '../components/DateInput';
+import ModernDateInput from '../components/ModernDateInput';
 import Dropdown from '../components/Dropdown';
 import Input from '../components/Input';
 import { compressImage } from '../utils/imageUtils';
@@ -319,7 +318,7 @@ const ExpensesPage: React.FC<ExpensesPageProps> = ({ setIsDirty }) => {
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <DateInput 
+                            <ModernDateInput 
                                 label="Date"
                                 value={date}
                                 onChange={e => setDate(e.target.value)}

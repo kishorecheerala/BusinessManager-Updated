@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect } from 'react';
-import { X, Save, Key, Globe, Info, RefreshCw } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, Save, Key, Globe, Info, RefreshCw, Settings } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
 import { getClientId } from '../utils/googleDrive';
+import Input from './Input';
 
 interface APIConfigModalProps {
   isOpen: boolean;
@@ -57,7 +58,7 @@ const APIConfigModal: React.FC<APIConfigModalProps> = ({ isOpen, onClose }) => {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-[150] p-4 animate-fade-in-fast backdrop-blur-sm">
       <Card className="w-full max-w-lg h-[85vh] flex flex-col p-0 overflow-hidden animate-scale-in border-none shadow-2xl">
         <div className="bg-slate-800 text-white p-4 flex justify-between items-center shrink-0">
@@ -91,12 +92,12 @@ const APIConfigModal: React.FC<APIConfigModalProps> = ({ isOpen, onClose }) => {
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Required for Drive Sync, Sheets Export, and Calendar.
             </p>
-            <input 
+            <Input 
               type="text" 
               value={clientId}
               onChange={(e) => setClientId(e.target.value)}
               placeholder="e.g., 7320...apps.googleusercontent.com"
-              className="w-full p-3 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-blue-500 outline-none font-mono"
+              className="text-sm font-mono"
             />
             <div className="text-[10px] text-gray-400 bg-gray-100 dark:bg-slate-800 p-2 rounded border dark:border-slate-700">
               <strong>Setup:</strong> Google Cloud Console &gt; Credentials &gt; OAuth 2.0 Client ID (Web Application).<br/>
@@ -115,12 +116,12 @@ const APIConfigModal: React.FC<APIConfigModalProps> = ({ isOpen, onClose }) => {
             <p className="text-xs text-gray-500 dark:text-gray-400">
               Required for Business Insights and Smart Analyst.
             </p>
-            <input 
+            <Input 
               type="password" 
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="AIza..."
-              className="w-full p-3 text-sm border rounded-lg dark:bg-slate-800 dark:border-slate-700 dark:text-white focus:ring-2 focus:ring-purple-500 outline-none font-mono"
+              className="text-sm font-mono"
             />
             <div className="text-[10px] text-gray-400 bg-gray-100 dark:bg-slate-800 p-2 rounded border dark:border-slate-700">
               <strong>Get Key:</strong> Visit <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="text-blue-500 hover:underline">Google AI Studio</a>.

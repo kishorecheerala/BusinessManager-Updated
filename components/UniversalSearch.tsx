@@ -1,10 +1,10 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Search, User, Package, Boxes, ShoppingCart, QrCode, Mic } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Page } from '../types';
 import { Customer, Supplier, Product, Sale, Purchase } from '../types';
 import QRScannerModal from './QRScannerModal';
+import Input from './Input';
 
 interface SearchResults {
     customers: Customer[];
@@ -166,12 +166,12 @@ const UniversalSearch: React.FC<UniversalSearchProps> = ({ isOpen, onClose, onNa
             <div className="flex items-center gap-2 mb-4">
                 <div className="relative flex-grow">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                     <input
+                     <Input
                         type="text"
                         placeholder={isListening ? "Listening..." : "Search..."}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className={`w-full p-3 pl-10 border rounded-full dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-all ${isListening ? 'ring-2 ring-red-500 border-red-500' : ''}`}
+                        className={`pl-10 rounded-full ${isListening ? 'ring-2 ring-red-500 !border-red-500' : ''}`}
                         autoFocus
                     />
                 </div>

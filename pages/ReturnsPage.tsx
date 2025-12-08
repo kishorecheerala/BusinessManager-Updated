@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Undo2, Users, Package, Plus, Trash2, Share2, Edit, Download } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -8,6 +7,7 @@ import Button from '../components/Button';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Dropdown from '../components/Dropdown';
+// fix: Fix import path for DateInput component
 import DateInput from '../components/DateInput';
 import { generateDebitNotePDF } from '../utils/pdfGenerator';
 import { getLocalDateString } from '../utils/dateUtils';

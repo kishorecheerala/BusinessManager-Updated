@@ -1,17 +1,10 @@
-
-
-
-
-
-
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Purchase, Supplier, Product, PurchaseItem, Payment } from '../types';
 import { Plus, Info, X, Camera, Image as ImageIcon, IndianRupee, Save, Sparkles, Loader2, ScanLine, Download, Trash2 } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import DeleteButton from './DeleteButton';
+// fix: Fix import path for DateInput component
 import DateInput from './DateInput';
 import Dropdown from './Dropdown';
 import Input from './Input';
@@ -466,11 +459,11 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
                 <div key={item.productId} className="bg-gray-50 dark:bg-slate-700/50 rounded border dark:border-slate-700 overflow-hidden animate-slide-up-fade">
                     <div className="p-2 flex justify-between items-start">
                         <div className="flex-grow">
-                            <input 
+                            <Input 
                                 type="text" 
                                 value={item.productName} 
                                 onChange={e => handleItemUpdate(item.productId, 'productName', e.target.value)}
-                                className="font-semibold bg-transparent border-none p-0 focus:ring-0 w-full dark:text-white placeholder-gray-400"
+                                className="font-semibold bg-transparent border-none p-0 focus:ring-0 w-full placeholder-gray-400"
                                 placeholder="Product Name"
                             />
                             <p className="text-[10px] text-gray-500 dark:text-gray-400 font-mono">{item.productId}</p>

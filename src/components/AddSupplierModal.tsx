@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Supplier } from '../types';
 import Button from './Button';
 import Card from './Card';
@@ -209,20 +209,9 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
         );
     }
 
-    return (
+    return createPortal(
          <div 
-             style={{ 
-                position: 'fixed', 
-                top: 0, 
-                left: 0, 
-                right: 0, 
-                bottom: 0, 
-                zIndex: 99999,
-                display: 'flex',
-                alignItems: 'end',
-                justifyContent: 'center'
-             }}
-             className="sm:items-center sm:p-4"
+             className="fixed inset-0 z-[99999] flex items-end sm:items-center justify-center sm:p-4"
          >
              <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in-fast" onClick={onClose} />
             {/* Modal Container */}
@@ -234,7 +223,7 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
                     <div className="absolute top-2 left-1/2 -translate-x-1/2 w-12 h-1.5 bg-gray-300 dark:bg-slate-600 rounded-full sm:hidden"></div>
                     
                     <h2 className="text-lg font-bold text-gray-800 dark:text-white mt-2 sm:mt-0">{isEditMode ? 'Edit Supplier' : 'Add New Supplier'}</h2>
-                    <button onClick={onClose} className="p-2 rounded-full text-gray-500 hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors mt-2 sm:mt-0">
+                    <button onClick={onClose} className="p-2 rounded-full text-gray-500 hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors mt-2 sm:mt-0">
                         <X size={20}/>
                     </button>
                  </div>
@@ -247,7 +236,8 @@ const AddSupplierModal: React.FC<AddSupplierModalProps> = ({ isOpen, onClose, on
                  {/* Footer */}
                  {footerButtons}
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 

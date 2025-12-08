@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, History, ArrowRight, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
@@ -16,8 +15,10 @@ import { useHotkeys } from '../hooks/useHotkeys';
 import AddCustomerModal from '../components/AddCustomerModal';
 import ProductSearchModal from '../components/ProductSearchModal';
 import QRScannerModal from '../components/QRScannerModal';
-import DateInput from '../components/DateInput';
+import ModernDateInput from '../components/ModernDateInput';
 import { generateA4InvoicePdf, generateReceiptPDF } from '../utils/pdfGenerator';
+import Input from '../components/Input';
+import Dropdown from '../components/Dropdown';
 
 const fetchImageAsBase64 = (url: string): Promise<string> =>
   fetch(url)
@@ -628,12 +629,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                         {isCustomerDropdownOpen && (
                                             <div className="absolute top-full left-0 w-full mt-1 bg-white dark:bg-slate-900 rounded-md shadow-lg border dark:border-slate-700 z-40 animate-fade-in-fast">
                                                 <div className="p-2 border-b dark:border-slate-700">
-                                                    <input
+                                                    <Input
                                                         type="text"
                                                         placeholder="Search by name or area..."
                                                         value={customerSearchTerm}
                                                         onChange={e => setCustomerSearchTerm(e.target.value)}
-                                                        className="w-full p-2 border border-gray-300 rounded dark:bg-slate-800 dark:border-slate-600 dark:text-white"
                                                         autoFocus
                                                     />
                                                 </div>
@@ -679,7 +679,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                 </div>
                             </div>
                             
-                            <DateInput 
+                            <ModernDateInput 
                                 label="Sale Date"
                                 value={saleDate} 
                                 onChange={e => setSaleDate(e.target.value)}
@@ -724,9 +724,9 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                         <DeleteButton variant="remove" onClick={() => handleRemoveItem(item.productId)} />
                                     </div>
                                     <div className="flex items-center gap-2 text-sm mt-1">
-                                        <input type="number" value={item.quantity} onChange={e => handleItemChange(item.productId, 'quantity', e.target.value)} className="w-20 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Qty"/>
+                                        <Input type="number" value={item.quantity} onChange={e => handleItemChange(item.productId, 'quantity', e.target.value)} className="w-20 !p-1 text-center" placeholder="Qty"/>
                                         <span>x</span>
-                                        <input type="number" value={item.price} onChange={e => handleItemChange(item.productId, 'price', e.target.value)} className="w-24 p-1 border rounded dark:bg-slate-700 dark:border-slate-600" placeholder="Price"/>
+                                        <Input type="number" value={item.price} onChange={e => handleItemChange(item.productId, 'price', e.target.value)} className="w-24 !p-1 text-center" placeholder="Price"/>
                                         <span>= ₹{(Number(item.quantity) * Number(item.price)).toLocaleString('en-IN')}</span>
                                     </div>
                                 </div>
@@ -744,7 +744,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                 </div>
                                 <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                                     <span>Discount:</span>
-                                    <input type="number" value={discount} onChange={e => setDiscount(e.target.value)} className="w-28 p-1 border rounded text-right dark:bg-slate-700 dark:border-slate-600" />
+                                    <Input type="number" value={discount} onChange={e => setDiscount(e.target.value)} className="w-28 !p-1 text-right" />
                                 </div>
                                 <div className="flex justify-between items-center text-gray-700 dark:text-gray-300">
                                     <span>GST Included:</span>
@@ -763,22 +763,33 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             {/* Section 3: Payment Details */}
                             {mode === 'add' ? (
                                 <div className="space-y-4">
+                                    <Input
+                                        label="Amount Paid Now"
+                                        type="number"
+                                        value={paymentDetails.amount}
+                                        onChange={e => setPaymentDetails({ ...paymentDetails, amount: e.target.value })}
+                                        placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`}
+                                        className="border-2 border-red-300 focus:ring-red-500 focus:border-red-500 dark:border-red-400"
+                                    />
                                     <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid Now</label>
-                                        <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={`Total is ₹${calculations.totalAmount.toLocaleString('en-IN')}`} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 mt-1 dark:bg-slate-700 dark:border-red-400 dark:text-slate-200" />
+                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Method</label>
+                                        <Dropdown
+                                            options={[
+                                                { value: 'CASH', label: 'Cash' },
+                                                { value: 'UPI', label: 'UPI' },
+                                                { value: 'CHEQUE', label: 'Cheque' }
+                                            ]}
+                                            value={paymentDetails.method}
+                                            onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
+                                        />
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                        <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select mt-1 dark:bg-slate-700 dark:border-slate-600">
-                                            <option value="CASH">Cash</option>
-                                            <option value="UPI">UPI</option>
-                                            <option value="CHEQUE">Cheque</option>
-                                        </select>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Reference (Optional)</label>
-                                        <input type="text" placeholder="e.g. UPI ID, Cheque No." value={paymentDetails.reference} onChange={e => setPaymentDetails({...paymentDetails, reference: e.target.value })} className="w-full p-2 border rounded mt-1 dark:bg-slate-700 dark:border-slate-600" />
-                                    </div>
+                                    <Input
+                                        label="Payment Reference (Optional)"
+                                        type="text"
+                                        placeholder="e.g. UPI ID, Cheque No."
+                                        value={paymentDetails.reference}
+                                        onChange={e => setPaymentDetails({ ...paymentDetails, reference: e.target.value })}
+                                    />
                                 </div>
                             ) : (
                                 <div className="pt-4 border-t dark:border-slate-700 text-center">
@@ -791,17 +802,25 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     {mode === 'add' && items.length === 0 && customerId && customerTotalDue != null && customerTotalDue > 0.01 && (
                         <Card title="Record Payment for Dues">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <Input
+                                    label="Amount Paid"
+                                    type="number"
+                                    value={paymentDetails.amount}
+                                    onChange={e => setPaymentDetails({ ...paymentDetails, amount: e.target.value })}
+                                    placeholder={'Enter amount to pay dues'}
+                                    className="border-2 border-red-300 focus:ring-red-500 focus:border-red-500 dark:border-red-400"
+                                />
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Amount Paid</label>
-                                    <input type="number" value={paymentDetails.amount} onChange={e => setPaymentDetails({...paymentDetails, amount: e.target.value })} placeholder={'Enter amount to pay dues'} className="w-full p-2 border-2 border-red-300 rounded-lg shadow-inner focus:ring-red-500 focus:border-red-500 dark:bg-slate-700 dark:border-red-400" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">Payment Method</label>
-                                    <select value={paymentDetails.method} onChange={e => setPaymentDetails({ ...paymentDetails, method: e.target.value as any})} className="w-full p-2 border rounded custom-select dark:bg-slate-700 dark:border-slate-600">
-                                        <option value="CASH">Cash</option>
-                                        <option value="UPI">UPI</option>
-                                        <option value="CHEQUE">Cheque</option>
-                                    </select>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Method</label>
+                                    <Dropdown
+                                        options={[
+                                            { value: 'CASH', label: 'Cash' },
+                                            { value: 'UPI', label: 'UPI' },
+                                            { value: 'CHEQUE', label: 'Cheque' }
+                                        ]}
+                                        value={paymentDetails.method}
+                                        onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
+                                    />
                                 </div>
                             </div>
                         </Card>
@@ -887,12 +906,12 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 <Card className="animate-fade-in-fast h-full flex flex-col">
                     <div className="relative mb-4">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input
+                        <Input
                             type="text"
                             placeholder="Search history by customer or invoice..."
                             value={historySearch}
                             onChange={e => setHistorySearch(e.target.value)}
-                            className="w-full p-2 pl-10 border rounded-lg dark:bg-slate-700 dark:border-slate-600 dark:text-white"
+                            className="pl-10"
                         />
                     </div>
                     

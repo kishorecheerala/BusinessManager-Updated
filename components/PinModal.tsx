@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import Card from './Card';
 import Button from './Button';
 import { Lock } from 'lucide-react';
+import Input from './Input';
 
 interface PinModalProps {
     mode: 'setup' | 'enter';
@@ -112,7 +113,7 @@ const PinModal: React.FC<PinModalProps> = ({ mode, onSetPin, onCorrectPin, corre
 
                     <div className="space-y-4">
                         <div className="flex justify-center">
-                            <input
+                            <Input
                                 ref={pinInputRef}
                                 type="password"
                                 inputMode="numeric"
@@ -120,16 +121,16 @@ const PinModal: React.FC<PinModalProps> = ({ mode, onSetPin, onCorrectPin, corre
                                 value={pin}
                                 onChange={handlePinChange}
                                 onKeyDown={handleKeyPress}
-                                placeholder="Enter PIN"
+                                placeholder="----"
                                 maxLength={4}
-                                className="w-48 text-center text-3xl tracking-[0.5em] font-mono p-2 border-b-2 border-slate-300 focus:border-indigo-500 bg-transparent outline-none transition-colors dark:text-white dark:border-slate-600"
+                                className="w-48 text-center text-3xl tracking-[0.5em] font-mono !p-2 !border-0 !border-b-2 !border-slate-300 focus:!border-indigo-500 !bg-transparent !rounded-none"
                                 autoFocus
                             />
                         </div>
 
                         {mode === 'setup' && (
                             <div className="flex justify-center animate-fade-in-up">
-                                <input
+                                <Input
                                     ref={confirmInputRef}
                                     type="password"
                                     inputMode="numeric"
@@ -137,9 +138,9 @@ const PinModal: React.FC<PinModalProps> = ({ mode, onSetPin, onCorrectPin, corre
                                     value={confirmPin}
                                     onChange={handleConfirmPinChange}
                                     onKeyDown={handleKeyPress}
-                                    placeholder="Confirm PIN"
+                                    placeholder="----"
                                     maxLength={4}
-                                    className="w-48 text-center text-3xl tracking-[0.5em] font-mono p-2 border-b-2 border-slate-300 focus:border-indigo-500 bg-transparent outline-none transition-colors dark:text-white dark:border-slate-600"
+                                    className="w-48 text-center text-3xl tracking-[0.5em] font-mono !p-2 !border-0 !border-b-2 !border-slate-300 focus:!border-indigo-500 !bg-transparent !rounded-none"
                                 />
                             </div>
                         )}
