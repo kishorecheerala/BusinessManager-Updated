@@ -4,7 +4,8 @@ import {
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
   Receipt, Undo2, FileText, BarChart2, Settings, PenTool, Gauge, Search, 
   Sparkles, Bell, HelpCircle, Cloud, CloudOff, RefreshCw, Layout, Edit,
-  X, Download, Sun, Moon, CalendarClock, WifiOff, Database, PauseCircle, Trash2
+  X, Download, Sun, Moon, CalendarClock, WifiOff, Database, PauseCircle, Trash2,
+  ScanLine, QrCode
 } from 'lucide-react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { DialogProvider } from './context/DialogContext';
@@ -31,7 +32,6 @@ import { useOnClickOutside } from './hooks/useOnClickOutside';
 import { useHotkeys } from './hooks/useHotkeys';
 import { logPageView } from './utils/analyticsLogger';
 import { APP_VERSION } from './utils/changelogData';
-import { usePWAInstall } from './hooks/usePWAInstall';
 
 // Pages (Lazy Load for Performance)
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
@@ -85,15 +85,15 @@ const LABEL_MAP: Record<string, string> = {
 };
 
 const QUICK_ACTION_REGISTRY: Record<string, { icon: React.ElementType, label: string, page: Page, action?: string }> = {
-    'add_sale': { icon: ShoppingCart, label: 'Sale', page: 'SALES', action: 'new' },
-    'add_customer': { icon: UserPlus, label: 'Customer', page: 'CUSTOMERS', action: 'new' },
-    'add_expense': { icon: Receipt, label: 'Expense', page: 'EXPENSES', action: 'new' },
-    'add_purchase': { icon: PackagePlus, label: 'Purchase', page: 'PURCHASES', action: 'new' },
-    'add_quote': { icon: FileText, label: 'Estimate', page: 'QUOTATIONS', action: 'new' },
+    'add_sale': { icon: ShoppingCart, label: 'New Sale', page: 'SALES', action: 'new' },
+    'magic_order': { icon: Sparkles, label: 'Magic Order', page: 'SALES', action: 'magic' },
+    'add_purchase': { icon: PackagePlus, label: 'New Purchase', page: 'PURCHASES', action: 'new' },
+    'scan_invoice': { icon: ScanLine, label: 'Scan Bill', page: 'PURCHASES', action: 'scan' },
+    'add_customer': { icon: UserPlus, label: 'Add Customer', page: 'CUSTOMERS', action: 'new' },
+    'scan_barcode': { icon: QrCode, label: 'Scan Item', page: 'PRODUCTS', action: 'scan' },
+    'add_expense': { icon: Receipt, label: 'Add Expense', page: 'EXPENSES', action: 'new' },
+    'add_quote': { icon: FileText, label: 'New Estimate', page: 'QUOTATIONS', action: 'new' },
     'add_return': { icon: Undo2, label: 'Return', page: 'RETURNS', action: 'new' },
-    'view_products': { icon: Package, label: 'Products', page: 'PRODUCTS' },
-    'view_reports': { icon: FileText, label: 'Reports', page: 'REPORTS' },
-    'view_insights': { icon: BarChart2, label: 'Insights', page: 'INSIGHTS' },
 };
 
 interface NavItemProps {
@@ -769,28 +769,35 @@ const AppContent: React.FC = () => {
                         )}
                     </div>
 
-                    {/* Quick Add FAB - Moved to End */}
-                    <div className="relative -top-4 ml-1 flex flex-col items-center justify-center w-auto shrink-0" ref={mobileQuickAddRef}>
+                    {/* Quick Add - Inline Style */}
+                    <div className="relative flex flex-col items-center justify-center w-full" ref={mobileQuickAddRef}>
                         <button 
                             onClick={() => { setIsMobileQuickAddOpen(!isMobileQuickAddOpen); setIsMoreMenuOpen(false); }}
-                            className={`w-14 h-14 rounded-full bg-theme text-white shadow-xl shadow-primary/40 flex items-center justify-center transition-transform duration-300 ${isMobileQuickAddOpen ? 'rotate-45 scale-110' : 'active:scale-95'}`}
+                            className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
+                                isMobileQuickAddOpen 
+                                ? 'text-primary transform -translate-y-1' 
+                                : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50/50 dark:hover:bg-slate-700/30'
+                            }`}
                             aria-label="Quick Add"
                         >
-                            <Plus size={32} strokeWidth={2.5} />
+                            <div className={`p-1 rounded-full transition-all duration-300 ${isMobileQuickAddOpen ? 'bg-primary/10 scale-110' : ''}`}>
+                                <Plus className={`w-6 h-6 transition-transform duration-300 ${isMobileQuickAddOpen ? 'rotate-45' : 'group-hover:scale-105'}`} strokeWidth={isMobileQuickAddOpen ? 2.5 : 2} />
+                            </div>
+                            <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">Add</span>
                         </button>
                         {isMobileQuickAddOpen && (
-                            <div className="absolute bottom-[calc(100%+12px)] right-0 w-72 bg-white/95 dark:bg-slate-800/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-gray-200 dark:border-slate-700 p-4 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
-                                <div className="flex justify-between items-center mb-3 px-1">
-                                    <div className="text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">Quick Actions</div>
+                            <div className="absolute bottom-[calc(100%+16px)] right-0 w-[85vw] max-w-[340px] bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-700 p-5 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">
+                                <div className="flex justify-between items-center mb-4 px-1">
+                                    <div className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Quick Actions</div>
                                     <button 
                                         onClick={() => { setIsNavCustomizerOpen(true); setIsMobileQuickAddOpen(false); }}
-                                        className="text-primary hover:text-primary/80 transition-colors p-1.5 rounded-full hover:bg-primary/5"
+                                        className="text-primary hover:text-primary/80 transition-colors p-2 rounded-full hover:bg-primary/10"
                                         title="Edit Quick Actions"
                                     >
-                                        <Edit size={14} />
+                                        <Edit size={16} />
                                     </button>
                                 </div>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-3 gap-3">
                                     {state.quickActions.map((actionId, idx) => {
                                         const action = QUICK_ACTION_REGISTRY[actionId];
                                         if (!action) return null;
@@ -804,12 +811,12 @@ const AppContent: React.FC = () => {
                                                     handleNavigation(action.page);
                                                     setIsMobileQuickAddOpen(false);
                                                 }}
-                                                className="flex flex-col items-center justify-center w-full py-2 px-0.5 rounded-2xl transition-all duration-300 group/item hover:bg-gray-50 dark:hover:bg-slate-700/30"
+                                                className="flex flex-col items-center justify-center w-full py-3 rounded-2xl transition-all duration-200 bg-gray-50/50 dark:bg-slate-700/30 hover:bg-white dark:hover:bg-slate-700 border border-transparent hover:border-gray-200 dark:hover:border-slate-600 shadow-sm hover:shadow-md active:scale-95 group"
                                             >
-                                                <div className="p-1 rounded-full transition-all duration-300 group-hover/item:bg-primary/10 group-hover/item:scale-110 text-gray-500 group-hover/item:text-primary dark:text-gray-400 dark:group-hover/item:text-primary">
-                                                    <action.icon className="w-6 h-6 transition-transform duration-300 group-hover/item:scale-105" strokeWidth={2} />
+                                                <div className="p-3 rounded-2xl bg-primary/10 text-primary mb-2 shadow-sm ring-1 ring-primary/20 group-hover:scale-110 transition-transform duration-300">
+                                                    <action.icon className="w-6 h-6" strokeWidth={2.5} />
                                                 </div>
-                                                <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight text-gray-500 group-hover/item:text-primary dark:text-gray-400 dark:group-hover/item:text-primary transition-colors opacity-90 text-center">{action.label}</span>
+                                                <span className="text-xs font-bold text-gray-700 dark:text-gray-200 text-center leading-tight">{action.label}</span>
                                             </button>
                                         );
                                     })}
