@@ -1,11 +1,4 @@
 
-
-
-
-
-
-
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Purchase, Supplier, Product, PurchaseItem, Payment } from '../types';
 import { Plus, Info, X, Camera, Image as ImageIcon, IndianRupee, Save, Sparkles, Loader2, ScanLine, Download, Trash2 } from 'lucide-react';
@@ -33,6 +26,7 @@ interface PurchaseFormProps {
   setIsDirty: (isDirty: boolean) => void;
   dispatch: React.Dispatch<any>;
   showToast: (message: string, type?: 'success' | 'info' | 'error') => void;
+  startWithScan?: boolean;
 }
 
 const PAYMENT_METHODS = [
@@ -50,7 +44,8 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   onBack,
   setIsDirty,
   dispatch,
-  showToast
+  showToast,
+  startWithScan = false
 }) => {
   const [supplierId, setSupplierId] = useState(initialData?.supplierId || '');
   const [items, setItems] = useState<PurchaseItem[]>(initialData?.items || []);
@@ -77,6 +72,16 @@ export const PurchaseForm: React.FC<PurchaseFormProps> = ({
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+
+  // Trigger scan on mount if requested
+  useEffect(() => {
+    if (startWithScan && mode === 'add') {
+        // Small delay to ensure render complete
+        setTimeout(() => {
+            handleScanClick();
+        }, 100);
+    }
+  }, []);
 
   // Use consolidated calculations.
   const calculations = useMemo(() => {

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, History, ArrowRight, FileText } from 'lucide-react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, History, ArrowRight, FileText, Wand2, Sparkles } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -16,6 +16,7 @@ import { useHotkeys } from '../hooks/useHotkeys';
 import AddCustomerModal from '../components/AddCustomerModal';
 import ProductSearchModal from '../components/ProductSearchModal';
 import QRScannerModal from '../components/QRScannerModal';
+import MagicOrderModal from '../components/MagicOrderModal';
 import DateInput from '../components/DateInput';
 import { generateA4InvoicePdf, generateReceiptPDF } from '../utils/pdfGenerator';
 
@@ -62,6 +63,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const [isSelectingProduct, setIsSelectingProduct] = useState(false);
     const [isScanning, setIsScanning] = useState(false);
+    const [isMagicOrderOpen, setIsMagicOrderOpen] = useState(false);
     
     const [isAddingCustomer, setIsAddingCustomer] = useState(false);
     const isDirtyRef = useRef(false);
@@ -110,14 +112,18 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    // Effect to handle switching to edit mode from another page
+    // Effect to handle switching to edit mode from another page or triggering magic order
     useEffect(() => {
-        if (state.selection?.page === 'SALES' && state.selection.action === 'edit') {
-            const sale = state.sales.find(s => s.id === state.selection.id);
-            if (sale) {
-                loadSaleForEditing(sale);
-                dispatch({ type: 'CLEAR_SELECTION' });
+        if (state.selection?.page === 'SALES') {
+            if (state.selection.action === 'edit') {
+                const sale = state.sales.find(s => s.id === state.selection.id);
+                if (sale) {
+                    loadSaleForEditing(sale);
+                }
+            } else if (state.selection.id === 'magic') {
+                setIsMagicOrderOpen(true);
             }
+            dispatch({ type: 'CLEAR_SELECTION' });
         }
     }, [state.selection, state.sales, dispatch]);
 
@@ -235,6 +241,39 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         } else {
             showToast("Product not found in inventory.", 'error');
         }
+    };
+    
+    const handleMagicItemsParsed = (parsedItems: SaleItem[]) => {
+        // Merge with existing items if needed, or replace? Usually replacing or appending is better.
+        // Let's append, but check stock.
+        const newItems = [...items];
+        
+        parsedItems.forEach(newItem => {
+            const product = state.products.find(p => p.id === newItem.productId);
+            const originalQtyInSale = mode === 'edit' ? saleToEdit?.items.find(i => i.productId === newItem.productId)?.quantity || 0 : 0;
+            const availableStock = (Number(product?.quantity) || 0) + originalQtyInSale;
+
+            const existingItemIndex = newItems.findIndex(i => i.productId === newItem.productId);
+            
+            if (existingItemIndex >= 0) {
+                const totalQty = newItems[existingItemIndex].quantity + newItem.quantity;
+                if (totalQty > availableStock) {
+                    showToast(`Limited stock for ${newItem.productName}. Set to max available.`, 'info');
+                    newItems[existingItemIndex].quantity = availableStock;
+                } else {
+                    newItems[existingItemIndex].quantity = totalQty;
+                }
+            } else {
+                if (newItem.quantity > availableStock) {
+                    showToast(`Limited stock for ${newItem.productName}. Set to max available.`, 'info');
+                    newItem.quantity = availableStock;
+                }
+                if (newItem.quantity > 0) newItems.push(newItem);
+            }
+        });
+        
+        setItems(newItems);
+        showToast(`Added ${parsedItems.length} items from Magic Order.`, 'success');
     };
 
     const handleItemChange = (productId: string, field: 'quantity' | 'price', value: string) => {
@@ -523,6 +562,14 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
+            {isMagicOrderOpen && (
+                <MagicOrderModal 
+                    isOpen={isMagicOrderOpen}
+                    onClose={() => setIsMagicOrderOpen(false)}
+                    products={state.products}
+                    onItemsParsed={handleMagicItemsParsed}
+                />
+            )}
             
             {/* Drafts Modal */}
             {isDraftsOpen && (
@@ -568,6 +615,17 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     
                     {/* Drafts Controls */}
                     <div className="flex gap-2">
+                         {/* Magic Order Trigger in Header */}
+                        {mode === 'add' && (
+                            <button 
+                                onClick={() => setIsMagicOrderOpen(true)}
+                                className="p-2 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 dark:bg-indigo-900/20 dark:text-indigo-400 dark:hover:bg-indigo-900/40 transition-colors border border-indigo-200 dark:border-indigo-800"
+                                title="Magic Order Paste"
+                            >
+                                <Sparkles size={20} />
+                            </button>
+                        )}
+
                         {mode === 'add' && (items.length > 0 || customerId) && (
                             <Button onClick={handleParkSale} variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-800">
                                 <PauseCircle size={16} className="mr-1 sm:mr-2" /> <span className="hidden sm:inline">Park</span>
@@ -837,43 +895,25 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     {/* Recent Transactions Section */}
                     {recentSales.length > 0 && (
                         <div className="mt-8 pt-4 border-t dark:border-slate-700">
-                            <div className="flex items-center justify-between mb-4">
-                                <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
-                                    <History size={20} /> Recent Sales
-                                </h3>
-                                <span className="text-xs text-gray-500 italic">Tap to edit if you made a mistake</span>
-                            </div>
+                            <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-4 flex items-center gap-2">
+                                <History size={20} /> Recent Transactions
+                            </h3>
                             <div className="space-y-3">
                                 {recentSales.map(sale => {
                                     const customer = state.customers.find(c => c.id === sale.customerId);
-                                    const itemSummary = sale.items.map(i => `${i.productName} (x${i.quantity})`).join(', ');
-                                    
                                     return (
                                         <div 
                                             key={sale.id}
                                             onClick={() => handleEditFromHistory(sale)}
-                                            className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col gap-2 cursor-pointer hover:border-primary hover:shadow-md transition-all group"
+                                            className="bg-white dark:bg-slate-800 p-3 rounded-lg border border-slate-200 dark:border-slate-700 shadow-sm flex justify-between items-center cursor-pointer hover:border-primary transition-colors"
                                         >
-                                            <div className="flex justify-between items-start">
-                                                <div>
-                                                    <p className="font-bold text-sm text-gray-800 dark:text-white flex items-center gap-1">
-                                                        {customer?.name || 'Unknown'}
-                                                        <span className="text-[10px] font-normal text-gray-500 bg-gray-100 dark:bg-slate-700 px-1.5 rounded-full">{sale.id.split('-').pop()}</span>
-                                                    </p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <p className="font-bold text-sm text-primary">₹{sale.totalAmount.toLocaleString('en-IN')}</p>
-                                                    <p className="text-[10px] text-gray-400">{new Date(sale.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
-                                                </div>
+                                            <div>
+                                                <p className="font-bold text-sm text-gray-800 dark:text-white">{customer?.name || 'Unknown'}</p>
+                                                <p className="text-xs text-gray-500 font-mono">{sale.id}</p>
                                             </div>
-                                            
-                                            <div className="flex justify-between items-center pt-2 border-t dark:border-slate-700/50 border-dashed">
-                                                <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-1 flex-1 pr-2">
-                                                    {itemSummary}
-                                                </p>
-                                                <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-medium opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                                    <Edit size={12} /> Edit
-                                                </div>
+                                            <div className="text-right">
+                                                <p className="font-bold text-sm text-primary">₹{sale.totalAmount.toLocaleString('en-IN')}</p>
+                                                <p className="text-xs text-gray-500">{new Date(sale.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
                                             </div>
                                         </div>
                                     );

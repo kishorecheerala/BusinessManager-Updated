@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X, GripVertical, Check, Info, Plus, Trash2 } from 'lucide-react';
@@ -5,7 +6,7 @@ import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
 import { Page } from '../types';
-import { Home, Users, ShoppingCart, Package, Receipt, Undo2, FileText, BarChart2, PenTool, Gauge, UserPlus, PackagePlus } from 'lucide-react';
+import { Home, Users, ShoppingCart, Package, Receipt, Undo2, FileText, BarChart2, PenTool, Gauge, UserPlus, PackagePlus, ScanLine, QrCode, Sparkles } from 'lucide-react';
 
 interface NavCustomizerModalProps {
     isOpen: boolean;
@@ -43,15 +44,15 @@ const PAGE_LABELS: Record<string, string> = {
 };
 
 const QUICK_ACTION_META: Record<string, { icon: React.ElementType, label: string }> = {
-    'add_sale': { icon: ShoppingCart, label: 'Sale' },
-    'add_customer': { icon: UserPlus, label: 'Customer' },
-    'add_expense': { icon: Receipt, label: 'Expense' },
-    'add_purchase': { icon: PackagePlus, label: 'Purchase' },
-    'add_quote': { icon: FileText, label: 'Estimate' },
+    'add_sale': { icon: ShoppingCart, label: 'New Sale' },
+    'magic_order': { icon: Sparkles, label: 'Magic Order' },
+    'add_purchase': { icon: PackagePlus, label: 'New Purchase' },
+    'scan_invoice': { icon: ScanLine, label: 'Scan Bill' },
+    'add_customer': { icon: UserPlus, label: 'Add Customer' },
+    'scan_barcode': { icon: QrCode, label: 'Scan Item' },
+    'add_expense': { icon: Receipt, label: 'Add Expense' },
+    'add_quote': { icon: FileText, label: 'New Estimate' },
     'add_return': { icon: Undo2, label: 'Return' },
-    'view_products': { icon: Package, label: 'Products' },
-    'view_reports': { icon: FileText, label: 'Reports' },
-    'view_insights': { icon: BarChart2, label: 'Insights' },
 };
 
 const NavCustomizerModal: React.FC<NavCustomizerModalProps> = ({ isOpen, onClose }) => {

@@ -127,10 +127,14 @@ const ProductsPage: React.FC<ProductsPageProps> = ({ setIsDirty }) => {
     // Initial load from navigation
     useEffect(() => {
         if (state.selection && state.selection.page === 'PRODUCTS') {
-            const prod = state.products.find(p => p.id === state.selection.id);
-            if (prod) {
-                setSelectedProduct(prod);
-                setEditedProduct(prod);
+            if (state.selection.id === 'scan') {
+                setIsScannerOpen(true);
+            } else {
+                const prod = state.products.find(p => p.id === state.selection.id);
+                if (prod) {
+                    setSelectedProduct(prod);
+                    setEditedProduct(prod);
+                }
             }
             dispatch({ type: 'CLEAR_SELECTION' });
         }
