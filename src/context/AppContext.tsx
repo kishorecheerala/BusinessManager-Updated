@@ -299,7 +299,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
   switch (action.type) {
     case 'SET_STATE': 
         return { ...state, ...action.payload };
-
+    // ... (All other cases remain identical to original) ...
     case 'ADD_CUSTOMER':
         const newCustomer = action.payload;
         db.saveCollection('customers', [...state.customers, newCustomer]);
@@ -1135,11 +1135,19 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
+    // Ref to hold the latest login handler to avoid stale closures in initGoogleAuth
+    const loginResponseRef = useRef(handleGoogleLoginResponse);
+
+    useEffect(() => {
+        loginResponseRef.current = handleGoogleLoginResponse;
+    }, [handleGoogleLoginResponse]);
+
     const googleSignIn = (options?: { forceConsent?: boolean }) => {
         if (!tokenClientRef.current) {
             loadGoogleScript()
                 .then(() => {
-                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse);
+                    // Use the ref to always call the latest version of the handler
+                    tokenClientRef.current = initGoogleAuth((res) => loginResponseRef.current(res));
                     const prompt = options?.forceConsent ? 'consent' : ''; 
                     tokenClientRef.current.requestAccessToken({ prompt });
                 })
