@@ -1,13 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Database, Terminal, CloudLightning, Zap, Trash2, RefreshCw, HardDrive, Save, AlertTriangle, Bell, Bug, History, RotateCcw, PlusCircle } from 'lucide-react';
+import { X, Database, Terminal, CloudLightning, Zap, Trash2, RefreshCw, HardDrive, Save, AlertTriangle, Bell, Bug, History, RotateCcw, PlusCircle, Server, Activity } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import { testData, testProfile } from '../utils/testData';
 import { useDialog } from '../context/DialogContext';
-import { Snapshot } from '../types';
+import { Snapshot, Customer, Product, Sale, SaleItem } from '../types';
 
 interface DeveloperToolsModalProps {
   isOpen: boolean;
@@ -18,10 +19,20 @@ interface DeveloperToolsModalProps {
 const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClose, onOpenCloudDebug }) => {
   const { state, dispatch, showToast } = useAppContext();
   const { showConfirm, showPrompt } = useDialog();
-  const [activeTab, setActiveTab] = useState<'general' | 'state' | 'db' | 'danger'>('general');
+  const [activeTab, setActiveTab] = useState<'general' | 'state' | 'db' | 'stress' | 'danger'>('general');
   const [storageEstimate, setStorageEstimate] = useState<{ usage: number, quota: number } | null>(null);
   const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
   const [isSnapshotLoading, setIsSnapshotLoading] = useState(false);
+
+  // Stress Test Config
+  const [stressConfig, setStressConfig] = useState({
+      customers: 500,
+      products: 1000,
+      sales: 2000,
+      monthsHistory: 12
+  });
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [genProgress, setGenProgress] = useState('');
 
   useEffect(() => {
     if (isOpen) {
@@ -160,6 +171,116 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
       document.body.removeChild(link);
   };
 
+  // --- Stress Generator Logic ---
+  const generateStressData = async () => {
+      const confirmed = await showConfirm(
+          `This will generate ${stressConfig.customers + stressConfig.products + stressConfig.sales} records. EXISTING DATA WILL BE REPLACED.`, 
+          { title: "Start Stress Test", confirmText: "Generate & Replace", variant: "danger" }
+      );
+      if(!confirmed) return;
+
+      setIsGenerating(true);
+      
+      // Delay to allow UI to update
+      setTimeout(async () => {
+          try {
+            // 1. Generate Customers
+            setGenProgress('Generating Customers...');
+            const customers: Customer[] = [];
+            for (let i = 0; i < stressConfig.customers; i++) {
+                customers.push({
+                    id: `CUST-GEN-${i}`,
+                    name: `Customer ${i} ${Math.random().toString(36).substring(7)}`,
+                    phone: `9${Math.floor(Math.random() * 1000000000)}`,
+                    address: `Address Block ${Math.floor(Math.random() * 100)}, Street ${Math.floor(Math.random() * 10)}`,
+                    area: ['North', 'South', 'East', 'West', 'Central'][Math.floor(Math.random() * 5)],
+                    priceTier: Math.random() > 0.8 ? 'WHOLESALE' : 'RETAIL'
+                });
+            }
+
+            // 2. Generate Products
+            setGenProgress('Generating Products...');
+            const products: Product[] = [];
+            for (let i = 0; i < stressConfig.products; i++) {
+                const price = Math.floor(Math.random() * 5000) + 100;
+                products.push({
+                    id: `PROD-GEN-${i}`,
+                    name: `Product Item ${i}-${Math.random().toString(36).substring(7)}`,
+                    category: ['Electronics', 'Clothing', 'Groceries', 'Hardware', 'Services'][Math.floor(Math.random() * 5)],
+                    quantity: Math.floor(Math.random() * 100),
+                    purchasePrice: price,
+                    salePrice: Math.floor(price * 1.3),
+                    gstPercent: [0, 5, 12, 18, 28][Math.floor(Math.random() * 5)]
+                });
+            }
+
+            // 3. Generate Sales
+            setGenProgress('Generating Sales History...');
+            const sales: Sale[] = [];
+            const today = new Date();
+            for (let i = 0; i < stressConfig.sales; i++) {
+                const numItems = Math.floor(Math.random() * 5) + 1;
+                const saleItems: SaleItem[] = [];
+                let total = 0;
+                let gst = 0;
+
+                for (let k = 0; k < numItems; k++) {
+                    const prod = products[Math.floor(Math.random() * products.length)];
+                    const qty = Math.floor(Math.random() * 5) + 1;
+                    const lineTotal = prod.salePrice * qty;
+                    
+                    saleItems.push({
+                        productId: prod.id,
+                        productName: prod.name,
+                        quantity: qty,
+                        price: prod.salePrice
+                    });
+
+                    total += lineTotal;
+                    gst += lineTotal - (lineTotal / (1 + prod.gstPercent / 100));
+                }
+
+                // Random date within configured months
+                const date = new Date();
+                date.setDate(today.getDate() - Math.floor(Math.random() * (stressConfig.monthsHistory * 30)));
+
+                sales.push({
+                    id: `INV-GEN-${i}`,
+                    customerId: customers[Math.floor(Math.random() * customers.length)].id,
+                    items: saleItems,
+                    totalAmount: Math.floor(total),
+                    gstAmount: Math.floor(gst),
+                    discount: 0,
+                    date: date.toISOString(),
+                    payments: Math.random() > 0.2 ? [{
+                        id: `PAY-GEN-${i}`,
+                        amount: Math.floor(total),
+                        method: 'CASH',
+                        date: date.toISOString()
+                    }] : [] // 20% unpaid
+                });
+            }
+
+            setGenProgress('Saving to Database...');
+            await db.saveCollection('customers', customers);
+            await db.saveCollection('products', products);
+            await db.saveCollection('sales', sales);
+            // Clear other tables to avoid conflicts
+            await db.saveCollection('purchases', []);
+            await db.saveCollection('returns', []);
+            await db.saveCollection('expenses', []);
+            
+            showToast(`Generated ${sales.length} transactions! Reloading...`, 'success');
+            setTimeout(() => window.location.reload(), 1000);
+
+          } catch (e) {
+              console.error(e);
+              showToast("Generation failed", 'error');
+              setIsGenerating(false);
+          }
+      }, 100);
+  };
+
   if (!isOpen) return null;
 
   const formatBytes = (bytes: number) => {
@@ -200,6 +321,9 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
                 </button>
                 <button onClick={() => setActiveTab('db')} className={`p-4 text-left text-sm font-semibold flex items-center gap-2 hover:bg-white dark:hover:bg-slate-700 ${activeTab === 'db' ? 'bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 border-r-2 border-indigo-600' : 'text-slate-600 dark:text-slate-400'}`}>
                     <HardDrive size={16} /> Storage & Snaps
+                </button>
+                <button onClick={() => setActiveTab('stress')} className={`p-4 text-left text-sm font-semibold flex items-center gap-2 hover:bg-white dark:hover:bg-slate-700 ${activeTab === 'stress' ? 'bg-white dark:bg-slate-700 text-amber-600 dark:text-amber-400 border-r-2 border-amber-600' : 'text-slate-600 dark:text-slate-400'}`}>
+                    <Activity size={16} /> Stress Test
                 </button>
                 <button onClick={() => setActiveTab('danger')} className={`p-4 text-left text-sm font-semibold flex items-center gap-2 hover:bg-red-50 dark:hover:bg-red-900/20 ${activeTab === 'danger' ? 'bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 border-r-2 border-red-600' : 'text-slate-600 dark:text-slate-400'}`}>
                     <AlertTriangle size={16} /> Danger Zone
@@ -334,6 +458,83 @@ const DeveloperToolsModal: React.FC<DeveloperToolsModalProps> = ({ isOpen, onClo
                                     <RefreshCw size={14} className="mr-2"/> Force Reload App
                                 </Button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'stress' && (
+                    <div className="space-y-6">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg border border-amber-200 dark:border-amber-800">
+                            <h3 className="font-bold text-amber-800 dark:text-amber-200 text-sm flex items-center gap-2 mb-2">
+                                <Activity size={16} /> Load Testing
+                            </h3>
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                                This tool generates massive amounts of random data to test the app's performance and stability. 
+                                <strong> Warning: Existing data will be wiped.</strong>
+                            </p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Number of Customers</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="range" min="100" max="10000" step="100" 
+                                        value={stressConfig.customers}
+                                        onChange={(e) => setStressConfig({...stressConfig, customers: parseInt(e.target.value)})}
+                                        className="flex-grow h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                    <span className="text-sm font-mono w-16 text-right">{stressConfig.customers}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Number of Products</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="range" min="100" max="5000" step="100" 
+                                        value={stressConfig.products}
+                                        onChange={(e) => setStressConfig({...stressConfig, products: parseInt(e.target.value)})}
+                                        className="flex-grow h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                    <span className="text-sm font-mono w-16 text-right">{stressConfig.products}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Sales Volume</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="range" min="500" max="20000" step="500" 
+                                        value={stressConfig.sales}
+                                        onChange={(e) => setStressConfig({...stressConfig, sales: parseInt(e.target.value)})}
+                                        className="flex-grow h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                    <span className="text-sm font-mono w-16 text-right">{stressConfig.sales}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">History Range (Months)</label>
+                                <div className="flex items-center gap-2">
+                                    <input 
+                                        type="range" min="1" max="24" step="1" 
+                                        value={stressConfig.monthsHistory}
+                                        onChange={(e) => setStressConfig({...stressConfig, monthsHistory: parseInt(e.target.value)})}
+                                        className="flex-grow h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600"
+                                    />
+                                    <span className="text-sm font-mono w-16 text-right">{stressConfig.monthsHistory}mo</span>
+                                </div>
+                            </div>
+
+                            <Button 
+                                onClick={generateStressData}
+                                disabled={isGenerating}
+                                className="w-full bg-red-600 hover:bg-red-700 text-white shadow-lg"
+                            >
+                                {isGenerating ? (
+                                    <>Generating... {genProgress}</>
+                                ) : (
+                                    <><Server size={16} className="mr-2" /> Generate Large Dataset</>
+                                )}
+                            </Button>
                         </div>
                     </div>
                 )}
