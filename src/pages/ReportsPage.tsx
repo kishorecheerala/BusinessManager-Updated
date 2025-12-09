@@ -422,7 +422,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
     const SheetButton: React.FC<{ onClick: () => void }> = ({ onClick }) => (
         <Button 
             onClick={onClick} 
-            className="bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm border-transparent"
+            className="bg-[#10B981] text-white hover:bg-[#059669] shadow-sm border-transparent"
         >
             {isExporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <FileSpreadsheet className="w-4 h-4 mr-2" />}
             Sheets
@@ -498,7 +498,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                             </div>
                         </div>
                         <div className="text-right mt-4">
-                            <Button onClick={() => { setAreaFilter('all'); setDuesAgeFilter('all'); setCustomDuesAge(''); }} variant="secondary" className="bg-gray-200 text-gray-700 hover:bg-gray-300 dark:bg-slate-700 dark:text-slate-200 dark:hover:bg-slate-600">
+                            <Button onClick={() => { setAreaFilter('all'); setDuesAgeFilter('all'); setCustomDuesAge(''); }} variant="secondary">
                                 <XCircle className="w-4 h-4 mr-2" />
                                 Clear Filters
                             </Button>
@@ -507,7 +507,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
 
                     <Card title="Customer Dues Report">
                         <div className="flex gap-2 mb-4">
-                            <Button onClick={generateDuesPDF}><Download className="w-4 h-4 mr-2" /> PDF</Button>
+                            <Button onClick={generateDuesPDF} className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white border-transparent shadow-sm"><Download className="w-4 h-4 mr-2" /> PDF</Button>
                             <Button onClick={generateDuesCSV} variant="secondary"><Download className="w-4 h-4 mr-2" /> CSV</Button>
                             <SheetButton onClick={exportDuesToSheets} />
                         </div>
@@ -538,7 +538,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
 
                     <Card title="Customer Account Summary">
                         <div className="flex gap-2 mb-4">
-                            <Button onClick={generateCustomerSummaryPDF}><Download className="w-4 h-4 mr-2" /> PDF</Button>
+                            <Button onClick={generateCustomerSummaryPDF} className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white border-transparent shadow-sm"><Download className="w-4 h-4 mr-2" /> PDF</Button>
                             <Button onClick={generateCustomerSummaryCSV} variant="secondary"><Download className="w-4 h-4 mr-2" /> CSV</Button>
                             <SheetButton onClick={exportCustomerSummaryToSheets} />
                         </div>
@@ -586,7 +586,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
 
                     <Card title="Supplier Payables (Dues)">
                         <div className="flex gap-2 mb-4">
-                            <Button onClick={generateSupplierDuesPDF}><Download className="w-4 h-4 mr-2" /> PDF</Button>
+                            <Button onClick={generateSupplierDuesPDF} className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white border-transparent shadow-sm"><Download className="w-4 h-4 mr-2" /> PDF</Button>
                             <Button onClick={generateSupplierDuesCSV} variant="secondary"><Download className="w-4 h-4 mr-2" /> CSV</Button>
                             <SheetButton onClick={exportSupplierDuesToSheets} />
                         </div>
@@ -618,7 +618,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
 
                     <Card title="Supplier Account Summary">
                         <div className="flex gap-2 mb-4">
-                            <Button onClick={generateSupplierSummaryPDF}><Download className="w-4 h-4 mr-2" /> PDF</Button>
+                            <Button onClick={generateSupplierSummaryPDF} className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white border-transparent shadow-sm"><Download className="w-4 h-4 mr-2" /> PDF</Button>
                             <Button onClick={generateSupplierSummaryCSV} variant="secondary"><Download className="w-4 h-4 mr-2" /> CSV</Button>
                             <SheetButton onClick={exportSupplierSummaryToSheets} />
                         </div>
@@ -652,7 +652,7 @@ const ReportsPage: React.FC<ReportsPageProps> = ({ setCurrentPage }) => {
                 <div className="animate-fade-in-fast space-y-6">
                     <Card title="Low Stock Report (Reorder)">
                         <div className="flex gap-2 mb-4">
-                            <Button onClick={generateLowStockPDF}><Download className="w-4 h-4 mr-2" /> PDF</Button>
+                            <Button onClick={generateLowStockPDF} className="bg-[#8B5CF6] hover:bg-[#7C3AED] text-white border-transparent shadow-sm"><Download className="w-4 h-4 mr-2" /> PDF</Button>
                             <SheetButton onClick={exportLowStockToSheets} />
                         </div>
                         <div className="overflow-x-auto">

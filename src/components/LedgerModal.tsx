@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState } from 'react';
-import { X, FileText, Download, ArrowUpRight, ArrowDownLeft, FileSpreadsheet } from 'lucide-react';
+import { X, FileText, Download, FileSpreadsheet } from 'lucide-react';
 import Card from './Card';
 import Button from './Button';
 import { useAppContext } from '../context/AppContext';
@@ -254,7 +254,11 @@ const LedgerModal: React.FC<LedgerModalProps> = ({ isOpen, onClose, partyId, par
                         </div>
                     </div>
                     <div className="flex gap-2">
-                        <Button onClick={handleExportSheets} variant="secondary" className="h-8 text-xs bg-green-50 text-green-700 border-green-200 hover:bg-green-100" disabled={isExporting}>
+                        <Button 
+                            onClick={handleExportSheets} 
+                            className="h-8 text-xs bg-[#10B981] text-white hover:bg-[#059669] shadow-sm border-transparent" 
+                            disabled={isExporting}
+                        >
                             <FileSpreadsheet size={14} className="mr-2" /> {isExporting ? 'Exporting...' : 'Sheets'}
                         </Button>
                         <Button onClick={handleDownloadPDF} variant="secondary" className="h-8 text-xs">
