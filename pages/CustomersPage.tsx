@@ -1,9 +1,7 @@
-
-
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, Crown, ShieldAlert, BadgeCheck, Users, MessageCircle, FileText, Star, Tag } from 'lucide-react';
+import { Plus, User, Phone, MapPin, Search, Edit, Save, X, IndianRupee, ShoppingCart, Share2, Crown, ShieldAlert, BadgeCheck, Users, MessageCircle, FileText, Star, Tag, Wallet } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
-import { Customer, Payment, Sale, Page } from '../types';
+import { Customer, Payment, Sale, Page, SaleItem } from '../types';
 import Card from '../components/Card';
 import Button from '../components/Button';
 import ConfirmationModal from '../components/ConfirmationModal';
@@ -15,6 +13,22 @@ import PaymentModal from '../components/PaymentModal';
 import AddCustomerModal from '../components/AddCustomerModal';
 import { getLocalDateString } from '../utils/dateUtils';
 import LedgerModal from '../components/LedgerModal';
+import Input from '../components/Input';
+import ModernDateInput from '../components/ModernDateInput';
+
+// Custom WhatsApp Icon Component
+const WhatsAppIcon = ({ size = 24, className = "" }: { size?: number, className?: string }) => (
+    <svg 
+        width={size} 
+        height={size} 
+        viewBox="0 0 24 24" 
+        fill="currentColor" 
+        className={className}
+        xmlns="http://www.w3.org/2000/svg"
+    >
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.008-.57-.008-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+    </svg>
+);
 
 // --- Customer Segmentation Helper ---
 type CustomerSegment = 'VIP' | 'Regular' | 'New' | 'At-Risk';
@@ -77,6 +91,11 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         date: getLocalDateString(),
         reference: '',
     });
+    
+    // Opening Balance Modal State
+    const [isOpeningBalanceModalOpen, setIsOpeningBalanceModalOpen] = useState(false);
+    const [openingBalance, setOpeningBalance] = useState('');
+    const [openingDate, setOpeningDate] = useState(getLocalDateString());
     
     const [confirmModalState, setConfirmModalState] = useState<{ isOpen: boolean, saleIdToDelete: string | null }>({ isOpen: false, saleIdToDelete: null });
     const [isLedgerOpen, setIsLedgerOpen] = useState(false);
@@ -205,6 +224,44 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         
         setPaymentModalState({ isOpen: false, saleId: null });
         setPaymentDetails({ amount: '', method: 'CASH', date: getLocalDateString(), reference: '' });
+    };
+
+    const handleAddOpeningBalance = () => {
+        const amount = parseFloat(openingBalance);
+        if (isNaN(amount) || amount <= 0) {
+            showToast("Please enter a valid amount.", 'error');
+            return;
+        }
+        if (!selectedCustomer) return;
+
+        // Create a special sale for opening balance
+        const saleId = `OPBAL-${Date.now()}`;
+        const saleDateWithTime = new Date(`${openingDate}T00:00:00`).toISOString();
+        
+        const item: SaleItem = {
+            productId: 'OPENING-BAL',
+            productName: 'Opening Balance / Previous Dues',
+            quantity: 1,
+            price: amount
+        };
+
+        const openingSale: Sale = {
+            id: saleId,
+            customerId: selectedCustomer.id,
+            items: [item],
+            discount: 0,
+            gstAmount: 0,
+            totalAmount: amount,
+            date: saleDateWithTime,
+            payments: [] // Start as fully unpaid
+        };
+
+        dispatch({ type: 'ADD_SALE', payload: openingSale });
+        showToast("Opening balance added successfully.", 'success');
+        
+        setIsOpeningBalanceModalOpen(false);
+        setOpeningBalance('');
+        setOpeningDate(getLocalDateString());
     };
 
     const handleDownloadThermalReceipt = async (sale: Sale) => {
@@ -348,6 +405,35 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
             <>
                 {isLedgerOpen && <LedgerModal isOpen={isLedgerOpen} onClose={() => setIsLedgerOpen(false)} partyId={selectedCustomer.id} partyType="CUSTOMER" />}
                 
+                {/* Opening Balance Modal */}
+                {isOpeningBalanceModalOpen && (
+                    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+                        <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-fade-in-fast" onClick={() => setIsOpeningBalanceModalOpen(false)} />
+                        <Card className="relative z-10 w-full max-w-sm animate-scale-in">
+                            <h2 className="text-lg font-bold text-gray-800 dark:text-white mb-4">Add Previous Dues</h2>
+                            <div className="space-y-4">
+                                <Input 
+                                    label="Opening Balance Amount" 
+                                    type="number" 
+                                    value={openingBalance} 
+                                    onChange={(e) => setOpeningBalance(e.target.value)} 
+                                    placeholder="Enter total due amount"
+                                    autoFocus
+                                />
+                                <ModernDateInput 
+                                    label="Date of Balance"
+                                    value={openingDate}
+                                    onChange={(e) => setOpeningDate(e.target.value)}
+                                />
+                                <div className="flex gap-2">
+                                    <Button onClick={handleAddOpeningBalance} className="w-full">Save Balance</Button>
+                                    <Button onClick={() => setIsOpeningBalanceModalOpen(false)} variant="secondary" className="w-full">Cancel</Button>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                )}
+
                 <ConfirmationModal
                     isOpen={confirmModalState.isOpen}
                     onClose={() => setConfirmModalState({ isOpen: false, saleIdToDelete: null })}
@@ -425,7 +511,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                             target="_blank"
                                             className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-100 transition-colors text-sm font-medium dark:bg-emerald-900/30 dark:border-emerald-800 dark:text-emerald-300"
                                         >
-                                            <MessageCircle size={14} /> WhatsApp
+                                            <WhatsAppIcon size={14} /> WhatsApp
                                         </a>
                                         <a 
                                             href={`truecaller://search_number?phoneNumber=${selectedCustomer.phone.replace(/\D/g, '')}`} 
@@ -461,7 +547,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                 {selectedCustomer.reference && <p><strong>Reference:</strong> {selectedCustomer.reference}</p>}
                             </div>
                         )}
-                        <div className="mt-4 pt-4 border-t flex gap-2">
+                        <div className="mt-4 pt-4 border-t flex flex-wrap gap-2">
                             <Button onClick={(e) => { e.stopPropagation(); setIsLedgerOpen(true); }} variant="secondary" className="flex-1">
                                 <FileText size={16} className="mr-2" />
                                 Statement / Ledger
@@ -469,6 +555,9 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                             <Button onClick={handleShareDuesSummary} className="flex-1">
                                 <Share2 size={16} className="mr-2" />
                                 Share Dues Summary
+                            </Button>
+                            <Button onClick={() => setIsOpeningBalanceModalOpen(true)} variant="secondary" className="w-full sm:w-auto bg-teal-50 text-teal-700 border-teal-200 hover:bg-teal-100">
+                                <Wallet size={16} className="mr-2" /> Add Opening Balance
                             </Button>
                         </div>
                     </Card>
@@ -654,7 +743,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                                 onClick={() => setSelectedCustomer(customer)}
                             >
                                 <div className="flex justify-between items-start">
-                                    <div>
+                                    <div className="flex-1 min-w-0">
                                         <p className="font-bold text-lg text-primary flex items-center gap-2">
                                             <User size={16}/> {customer.name}
                                             <SegmentBadge segment={getCustomerSegment(customerSales)} />

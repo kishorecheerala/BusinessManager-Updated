@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, History, ArrowRight, FileText, Calendar } from 'lucide-react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { Plus, Trash2, Share2, Search, X, IndianRupee, QrCode, Save, Edit, ScanLine, PauseCircle, PlayCircle, Clock, History, ArrowRight, FileText } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { Sale, SaleItem, Customer, Product, Payment } from '../types';
 import Card from '../components/Card';
@@ -17,6 +17,7 @@ import ModernDateInput from '../components/ModernDateInput';
 import { generateA4InvoicePdf, generateReceiptPDF } from '../utils/pdfGenerator';
 import Input from '../components/Input';
 import Dropdown from '../components/Dropdown';
+import PaymentModal from '../components/PaymentModal';
 
 // Interface for Draft/Parked Sales
 interface ParkedSale {
@@ -41,6 +42,15 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const [discount, setDiscount] = useState('0');
     const [saleDate, setSaleDate] = useState(getLocalDateString());
     
+    // Add Payment Modal State for Editing
+    const [editPaymentModal, setEditPaymentModal] = useState<{ isOpen: boolean, saleId: string | null, payment: Payment | null }>({ isOpen: false, saleId: null, payment: null });
+    const [tempPaymentDetails, setTempPaymentDetails] = useState({
+        amount: '',
+        method: 'CASH' as 'CASH' | 'UPI' | 'CHEQUE',
+        date: getLocalDateString(),
+        reference: '',
+    });
+
     const [paymentDetails, setPaymentDetails] = useState({
         amount: '',
         method: 'CASH' as 'CASH' | 'UPI' | 'CHEQUE',
@@ -375,8 +385,11 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                 return;
             }
 
+            const saleCreationDate = new Date();
+            const saleDateWithTime = new Date(`${saleDate}T${saleCreationDate.toTimeString().split(' ')[0]}`);
+            
             const updatedSale: Sale = {
-                ...saleToEdit, items, discount: discountAmount, gstAmount, totalAmount,
+                ...saleToEdit, items, discount: discountAmount, gstAmount, totalAmount, date: saleDateWithTime.toISOString()
             };
             dispatch({ type: 'UPDATE_SALE', payload: { oldSale: saleToEdit, updatedSale } });
             showToast('Sale updated successfully!');
@@ -435,6 +448,43 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
         resetForm();
     };
 
+    // Update Payment Logic
+    const handleEditPaymentClick = (saleId: string, payment: Payment) => {
+        setTempPaymentDetails({
+            amount: payment.amount.toString(),
+            method: payment.method,
+            date: getLocalDateString(new Date(payment.date)),
+            reference: payment.reference || ''
+        });
+        setEditPaymentModal({ isOpen: true, saleId, payment });
+    };
+
+    const handleUpdatePayment = () => {
+        if (!editPaymentModal.saleId || !editPaymentModal.payment) return;
+        
+        const updatedPayment: Payment = {
+            ...editPaymentModal.payment,
+            amount: parseFloat(tempPaymentDetails.amount) || 0,
+            method: tempPaymentDetails.method,
+            date: new Date(tempPaymentDetails.date).toISOString(),
+            reference: tempPaymentDetails.reference
+        };
+
+        dispatch({ 
+            type: 'UPDATE_PAYMENT_IN_SALE', 
+            payload: { saleId: editPaymentModal.saleId, payment: updatedPayment } 
+        });
+        
+        // Update local saleToEdit if currently editing it
+        if (saleToEdit && saleToEdit.id === editPaymentModal.saleId) {
+             const updatedPayments = saleToEdit.payments.map(p => p.id === updatedPayment.id ? updatedPayment : p);
+             setSaleToEdit({...saleToEdit, payments: updatedPayments});
+        }
+
+        setEditPaymentModal({ isOpen: false, saleId: null, payment: null });
+        showToast("Payment updated successfully.", 'success');
+    };
+
     const canCreateSale = customerId && items.length > 0 && mode === 'add';
     const canUpdateSale = customerId && items.length > 0 && mode === 'edit';
     const canRecordPayment = customerId && items.length === 0 && parseFloat(paymentDetails.amount || '0') > 0 && customerTotalDue != null && customerTotalDue > 0.01 && mode === 'add';
@@ -463,6 +513,17 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                     onScanned={handleProductScanned}
                 />
             }
+
+            {/* Edit Payment Modal */}
+            <PaymentModal
+                isOpen={editPaymentModal.isOpen}
+                onClose={() => setEditPaymentModal({ isOpen: false, saleId: null, payment: null })}
+                onSubmit={handleUpdatePayment}
+                totalAmount={0} // Not relevant for editing existing
+                dueAmount={0} // Not relevant
+                paymentDetails={tempPaymentDetails}
+                setPaymentDetails={setTempPaymentDetails}
+            />
             
             {/* Drafts Modal */}
             {isDraftsOpen && (
@@ -577,7 +638,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             label="Sale Date"
                             value={saleDate} 
                             onChange={e => setSaleDate(e.target.value)}
-                            disabled={mode === 'edit'}
                             isOpen={isCalendarOpen}
                             onToggle={setIsCalendarOpen}
                         />
@@ -670,8 +730,29 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             />
                         </div>
                     ) : (
-                        <div className="pt-4 border-t dark:border-slate-700 text-center">
-                            <p className="text-sm text-gray-600 dark:text-gray-400">Payments for this invoice must be managed from the customer's details page.</p>
+                        <div className="pt-4 border-t dark:border-slate-700">
+                            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">Recorded Payments</h4>
+                             {saleToEdit?.payments && saleToEdit.payments.length > 0 ? (
+                                <div className="space-y-2">
+                                    {saleToEdit.payments.map((p, idx) => (
+                                        <div key={idx} className="flex justify-between items-center p-2 bg-gray-50 dark:bg-slate-800 rounded border dark:border-slate-700">
+                                            <div>
+                                                <p className="text-sm font-bold">₹{p.amount.toLocaleString()}</p>
+                                                <p className="text-xs text-gray-500">{new Date(p.date).toLocaleDateString()} • {p.method}</p>
+                                            </div>
+                                            {/* Edit Payment Button */}
+                                            <button 
+                                                onClick={() => handleEditPaymentClick(saleToEdit.id, p)}
+                                                className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded"
+                                            >
+                                                <Edit size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                             ) : (
+                                 <p className="text-sm text-gray-500 italic">No payments recorded.</p>
+                             )}
                         </div>
                     )}
                 </div>

@@ -1,3 +1,4 @@
+
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
 import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences, SaleDraft, ParkedSale, TrashItem } from '../types';
 import * as db from '../utils/db';
@@ -76,6 +77,7 @@ type Action =
   | { type: 'UPDATE_SALE'; payload: { oldSale: Sale; updatedSale: Sale } }
   | { type: 'DELETE_SALE'; payload: string }
   | { type: 'ADD_PAYMENT_TO_SALE'; payload: { saleId: string; payment: any } }
+  | { type: 'UPDATE_PAYMENT_IN_SALE'; payload: { saleId: string; payment: any } }
   | { type: 'ADD_PURCHASE'; payload: Purchase }
   | { type: 'UPDATE_PURCHASE'; payload: { oldPurchase: Purchase; updatedPurchase: Purchase } }
   | { type: 'DELETE_PURCHASE'; payload: string }
@@ -451,6 +453,19 @@ const appReducer = (state: AppState, action: Action): AppState => {
         );
         db.saveCollection('sales', salesWithPayment);
         return { ...state, sales: salesWithPayment, ...touch };
+
+    case 'UPDATE_PAYMENT_IN_SALE': {
+        const { saleId, payment } = action.payload;
+        const salesWithUpdatedPayment = state.sales.map(s => {
+            if (s.id === saleId) {
+                const updatedPayments = s.payments.map(p => p.id === payment.id ? payment : p);
+                return { ...s, payments: updatedPayments };
+            }
+            return s;
+        });
+        db.saveCollection('sales', salesWithUpdatedPayment);
+        return { ...state, sales: salesWithUpdatedPayment, ...touch };
+    }
 
     case 'ADD_PURCHASE':
         const newPurchase = action.payload;

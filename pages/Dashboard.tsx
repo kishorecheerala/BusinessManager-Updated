@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award, Wallet, ArrowRight, Phone, UserX, Zap, Activity } from 'lucide-react';
+import { IndianRupee, User, AlertTriangle, Download, Upload, ShoppingCart, Package, ShieldCheck, ShieldX, Archive, PackageCheck, TestTube2, Sparkles, TrendingUp, TrendingDown, CalendarClock, Volume2, StopCircle, X, RotateCw, BrainCircuit, Loader2, MessageCircle, Share, Award, Wallet, ArrowRight, Phone, UserX, Zap, Activity, Receipt, CalendarRange, CreditCard, Banknote } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import * as db from '../utils/db';
 import Card from '../components/Card';
@@ -13,6 +13,8 @@ import PinModal from '../components/PinModal';
 import CheckpointsModal from '../components/CheckpointsModal';
 import { GoogleGenAI, Modality } from "@google/genai";
 import { usePWAInstall } from '../hooks/usePWAInstall';
+import ModernDateInput from '../components/ModernDateInput';
+import { getLocalDateString } from '../utils/dateUtils';
 
 interface DashboardProps {
     setCurrentPage: (page: Page) => void;
@@ -32,7 +34,7 @@ const MetricCard: React.FC<{
 }> = ({ icon: Icon, title, value, color, iconBgColor, textColor, unit = '₹', subValue, onClick, delay }) => (
     <div
         onClick={onClick}
-        className={`rounded-lg shadow-md p-3 sm:p-5 flex items-center transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer' : ''} animate-slide-up-fade group`}
+        className={`rounded-lg shadow-md p-3 sm:p-5 flex items-center transition-all duration-300 hover:shadow-xl hover:scale-[1.01] ${color} ${onClick ? 'cursor-pointer hover:ring-2 hover:ring-offset-1 hover:ring-primary/50' : ''} animate-slide-up-fade group`}
         style={{ animationDelay: `${delay || 0}ms` }}
         role={onClick ? 'button' : undefined}
         tabIndex={onClick ? 0 : undefined}
@@ -286,23 +288,7 @@ const SmartAnalystCard: React.FC<{
                 </div>
                 
                 {/* Metrics Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    {/* Today's Collection */}
-                    <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-lg shadow-sm text-white group/card">
-                            <div className="absolute right-[-10px] top-[-10px] opacity-10 group-hover/card:opacity-20 transition-opacity transform rotate-12">
-                            <IndianRupee size={80} />
-                            </div>
-                            <div className="relative z-10">
-                            <p className="text-emerald-100 flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide mb-0.5">
-                                <Wallet size={12}/> Today
-                            </p>
-                            <p className="font-bold text-2xl tracking-tight">₹{analysis.todaysCollection.toLocaleString()}</p>
-                            </div>
-                            <div className="absolute bottom-3 right-3 bg-white/20 p-1.5 rounded-full backdrop-blur-sm">
-                            <TrendingUp size={16} className="text-white" />
-                            </div>
-                    </div>
-
+                <div className="grid grid-cols-2 gap-3">
                     <button 
                         onClick={() => setDetailType('deadStock')}
                         className="p-3 rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-800 hover:bg-amber-100 dark:hover:bg-amber-900/20 transition-all text-left group relative"
@@ -350,7 +336,6 @@ const SmartAnalystCard: React.FC<{
 
             {/* Details Modal */}
             {detailType && (
-                // DEV-NOTE: z-[300] to appear on top of dashboard content. Do not change without specific request.
                 <div 
                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-fade-in-fast" 
                     onClick={() => setDetailType(null)}
@@ -766,7 +751,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
     const [bannerDismissed, setBannerDismissed] = useState(false);
     
     useEffect(() => {
-        // Check session storage for dismissed state
         const dismissed = sessionStorage.getItem('pwa_banner_dismissed');
         if (dismissed === 'true') {
             setBannerDismissed(true);
@@ -778,9 +762,18 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         sessionStorage.setItem('pwa_banner_dismissed', 'true');
     };
     
+    // --- Filters State ---
+    const [duration, setDuration] = useState('this_month');
     const [selectedYear, setSelectedYear] = useState<string>(new Date().getFullYear().toString());
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth().toString());
-    
+    const [customStart, setCustomStart] = useState(getLocalDateString());
+    const [customEnd, setCustomEnd] = useState(getLocalDateString());
+    const [isStartCalendarOpen, setIsStartCalendarOpen] = useState(false);
+    const [isEndCalendarOpen, setIsEndCalendarOpen] = useState(false);
+
+    // Collection Modal State
+    const [collectionDetailModalOpen, setCollectionDetailModalOpen] = useState(false);
+
     const [isPinModalOpen, setIsPinModalOpen] = useState(false);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
 
@@ -796,57 +789,151 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
         return Array.from(years).sort().reverse();
     }, [sales]);
 
-    const monthOptions = [
-        { value: 'all', label: 'Full Year' },
-        { value: '0', label: 'January' }, { value: '1', label: 'February' }, { value: '2', label: 'March' },
-        { value: '3', label: 'April' }, { value: '4', label: 'May' }, { value: '5', label: 'June' },
-        { value: '6', label: 'July' }, { value: '7', label: 'August' }, { value: '8', label: 'September' },
-        { value: '9', label: 'October' }, { value: '10', label: 'November' }, { value: '11', label: 'December' },
+    const durationOptions = [
+        { value: 'today', label: 'Today' },
+        { value: 'yesterday', label: 'Yesterday' },
+        { value: 'this_week', label: 'This Week' },
+        { value: 'last_7', label: 'Last 7 Days' },
+        { value: 'this_month', label: 'This Month' },
+        { value: 'last_month', label: 'Last Month' },
+        { value: 'this_year', label: 'This Year' },
+        { value: 'custom', label: 'Custom Period' },
     ];
 
-    const stats = useMemo(() => {
-        const yearInt = parseInt(selectedYear);
-        
-        // 1. Yearly
-        const filteredYearSales = sales.filter(s => new Date(s.date).getFullYear() === yearInt);
-        const filteredYearPurchases = purchases.filter(p => new Date(p.date).getFullYear() === yearInt);
-        
-        // 2. Monthly
-        let filteredMonthSales = [];
-        let filteredMonthPurchases = [];
+    // Compute generic date range based on duration filter
+    const dateRange = useMemo(() => {
+        const now = new Date();
+        let start = new Date();
+        let end = new Date();
 
-        if (selectedMonth === 'all') {
-             filteredMonthSales = filteredYearSales;
-             filteredMonthPurchases = filteredYearPurchases;
-        } else {
-             const monthIndex = parseInt(selectedMonth);
-             filteredMonthSales = filteredYearSales.filter(s => new Date(s.date).getMonth() === monthIndex);
-             filteredMonthPurchases = filteredYearPurchases.filter(p => new Date(p.date).getMonth() === monthIndex);
+        // Default to end of today
+        end.setHours(23,59,59,999);
+        start.setHours(0,0,0,0);
+
+        switch(duration) {
+            case 'today':
+                // start/end are already set to today 00:00 and 23:59
+                break;
+            case 'yesterday':
+                start.setDate(now.getDate() - 1);
+                end.setDate(now.getDate() - 1);
+                end.setHours(23,59,59,999);
+                start.setHours(0,0,0,0);
+                break;
+            case 'this_week':
+                // Assuming week starts on Monday
+                const day = now.getDay() || 7; 
+                start.setDate(now.getDate() - day + 1);
+                break;
+            case 'last_7':
+                start.setDate(now.getDate() - 7);
+                break;
+            case 'this_month':
+                start = new Date(now.getFullYear(), now.getMonth(), 1);
+                end = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+                break;
+            case 'last_month':
+                 start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+                 end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+                 break;
+            case 'this_year':
+                 start = new Date(now.getFullYear(), 0, 1);
+                 end = new Date(now.getFullYear(), 11, 31, 23, 59, 59);
+                 break;
+            case 'custom':
+                 // Parse custom dates
+                 const [sy, sm, sd] = customStart.split('-').map(Number);
+                 start = new Date(sy, sm - 1, sd, 0, 0, 0, 0);
+                 
+                 const [ey, em, ed] = customEnd.split('-').map(Number);
+                 end = new Date(ey, em - 1, ed, 23, 59, 59, 999);
+                 break;
         }
+        return { start, end };
+    }, [duration, customStart, customEnd]);
+
+    // Calculate metrics based on filtered range
+    const stats = useMemo(() => {
+        const filteredSales = sales.filter(s => {
+            const d = new Date(s.date);
+            return d >= dateRange.start && d <= dateRange.end;
+        });
         
-        const monthSalesTotal = filteredMonthSales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
-        const monthPurchasesTotal = filteredMonthPurchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
+        const filteredPurchases = purchases.filter(p => {
+             const d = new Date(p.date);
+             return d >= dateRange.start && d <= dateRange.end;
+        });
         
-        // Customer Dues (All time)
+        const filteredExpenses = expenses.filter(e => {
+            const d = new Date(e.date);
+            return d >= dateRange.start && d <= dateRange.end;
+        });
+
+        // Collection: Payments received in period
+        const periodCollection = sales.reduce((acc, sale) => {
+            const salePayments = sale.payments || [];
+            const paymentsInPeriod = salePayments.filter(p => {
+                const pd = new Date(p.date);
+                return pd >= dateRange.start && pd <= dateRange.end;
+            });
+            return acc + paymentsInPeriod.reduce((sum, p) => sum + Number(p.amount), 0);
+        }, 0);
+
+        const periodSalesTotal = filteredSales.reduce((sum, s) => sum + Number(s.totalAmount), 0);
+        const periodPurchasesTotal = filteredPurchases.reduce((sum, p) => sum + Number(p.totalAmount), 0);
+        const periodExpensesTotal = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0);
+        
+        // Customer Dues (All time snapshot)
         const totalCustomerDues = sales.reduce((sum, s) => {
             const paid = (s.payments || []).reduce((pSum, p) => pSum + Number(p.amount), 0);
             return sum + (Number(s.totalAmount) - paid);
         }, 0);
 
-        // Supplier Dues (All time)
+        // Supplier Dues (All time snapshot)
         const totalSupplierDues = purchases.reduce((sum, p) => {
             const paid = (p.payments || []).reduce((pSum, p) => pSum + Number(p.amount), 0);
             return sum + (Number(p.totalAmount) - paid);
         }, 0);
 
         return { 
-            monthSalesTotal,
-            monthPurchasesTotal,
+            periodSalesTotal,
+            periodPurchasesTotal,
+            periodExpensesTotal,
+            periodCollection,
             totalCustomerDues, 
             totalSupplierDues, 
-            salesCount: filteredMonthSales.length 
+            salesCount: filteredSales.length 
         };
-    }, [sales, purchases, selectedMonth, selectedYear]);
+    }, [sales, purchases, expenses, dateRange]);
+
+    const collectionDetails = useMemo(() => {
+        const paymentMap: Record<string, number> = {};
+        const paymentsList: { date: string, customer: string, amount: number, method: string }[] = [];
+
+        sales.forEach(sale => {
+            const salePayments = sale.payments || [];
+            salePayments.forEach(p => {
+                const pDate = new Date(p.date);
+                if (pDate >= dateRange.start && pDate <= dateRange.end) {
+                    const method = p.method || 'CASH';
+                    paymentMap[method] = (paymentMap[method] || 0) + Number(p.amount);
+                    
+                    const customer = customers.find(c => c.id === sale.customerId);
+                    paymentsList.push({
+                        date: p.date,
+                        customer: customer?.name || 'Unknown',
+                        amount: Number(p.amount),
+                        method: method
+                    });
+                }
+            });
+        });
+
+        return { 
+            byMethod: Object.entries(paymentMap).map(([method, amount]) => ({ method, amount })), 
+            list: paymentsList.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) 
+        };
+    }, [sales, customers, dateRange]);
 
     const runSecureAction = (action: () => void) => {
         if (state.pin) {
@@ -976,10 +1063,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 <h1 className="text-3xl font-bold text-primary">Dashboard</h1>
             </div>
 
-            {/* Install Prompt Banner - Shows if installable AND NOT dismissed this session */}
+            {/* Install Prompt Banner */}
             {(isInstallable || (isIOS && !isInstalled)) && !bannerDismissed && (
                 <div className="bg-gradient-to-r from-indigo-500 to-blue-600 text-white rounded-xl p-4 shadow-lg flex flex-col sm:flex-row items-center justify-between gap-3 animate-slide-down-fade mb-4 relative">
-                    {/* Close Button */}
                     <button 
                         onClick={handleDismissBanner}
                         className="absolute top-2 right-2 p-1 hover:bg-white/20 rounded-full transition-colors"
@@ -987,7 +1073,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     >
                         <X size={16} />
                     </button>
-
                     <div className="flex items-center gap-3 pr-8">
                         <div className="bg-white/20 p-2 rounded-lg backdrop-blur-sm">
                             <Download size={24} />
@@ -1009,41 +1094,111 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                 </div>
             )}
             
-            <SmartAnalystCard 
-                sales={sales} 
-                products={products} 
-                customers={customers} 
-                purchases={purchases} 
-                returns={returns} 
-                expenses={expenses}
-                ownerName={profile?.ownerName || 'Owner'}
-                onNavigate={handleNavigate}
-            />
-            
             {/* Toolbar for Period Selectors */}
-            <div className="flex justify-end items-center mb-1">
-                 <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700">
-                     <Dropdown 
-                        options={monthOptions}
-                        value={selectedMonth}
-                        onChange={setSelectedMonth}
-                        className="w-32"
-                     />
-                    <div className="h-4 w-px bg-gray-300 dark:bg-slate-600"></div>
-                     <Dropdown 
-                        options={getYears.map(y => ({ value: y, label: y }))}
-                        value={selectedYear}
-                        onChange={setSelectedYear}
-                        className="w-24"
-                     />
+            <div className="flex flex-wrap justify-end items-center mb-1 gap-2">
+                 <div className="flex items-center gap-2 bg-white dark:bg-slate-800 p-1 rounded-lg shadow-sm border border-gray-200 dark:border-slate-700 relative z-20">
+                    <div className="flex items-center gap-1.5 px-2">
+                        <CalendarRange size={16} className="text-gray-400"/>
+                        <Dropdown
+                            options={durationOptions}
+                            value={duration}
+                            onChange={setDuration}
+                            className="w-36"
+                        />
+                    </div>
+                    
+                    {duration === 'custom' && (
+                        <>
+                            <div className="h-4 w-px bg-gray-300 dark:bg-slate-600"></div>
+                            <div className="flex items-center gap-2 px-2">
+                                <ModernDateInput 
+                                    value={customStart}
+                                    onChange={(e) => setCustomStart(e.target.value)}
+                                    isOpen={isStartCalendarOpen}
+                                    onToggle={setIsStartCalendarOpen}
+                                    containerClassName="w-32"
+                                />
+                                <span className="text-gray-400">-</span>
+                                <ModernDateInput 
+                                    value={customEnd}
+                                    onChange={(e) => setCustomEnd(e.target.value)}
+                                    isOpen={isEndCalendarOpen}
+                                    onToggle={setIsEndCalendarOpen}
+                                    containerClassName="w-32"
+                                />
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-                <MetricCard icon={IndianRupee} title="Sales" value={stats.monthSalesTotal} subValue={`${stats.salesCount} orders`} color="bg-primary/5 dark:bg-primary/10" iconBgColor="bg-primary/20" textColor="text-primary" onClick={() => setCurrentPage('SALES')} delay={0} />
-                <MetricCard icon={Package} title="Purchases" value={stats.monthPurchasesTotal} subValue="Inventory cost" color="bg-blue-50 dark:bg-blue-900/20" iconBgColor="bg-blue-100 dark:bg-blue-800" textColor="text-blue-700 dark:text-blue-100" onClick={() => setCurrentPage('PURCHASES')} delay={100} />
-                <MetricCard icon={User} title="Cust. Dues" value={stats.totalCustomerDues} subValue="Total Receivable" color="bg-purple-50 dark:bg-purple-900/20" iconBgColor="bg-purple-100 dark:bg-purple-800" textColor="text-purple-700 dark:text-purple-100" onClick={() => setCurrentPage('CUSTOMERS')} delay={200} />
-                <MetricCard icon={ShoppingCart} title="My Payables" value={stats.totalSupplierDues} subValue="Total Payable" color="bg-amber-50 dark:bg-amber-900/20" iconBgColor="bg-amber-100 dark:bg-amber-800" textColor="text-amber-700 dark:text-amber-100" onClick={() => setCurrentPage('PURCHASES')} delay={300} />
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                <MetricCard 
+                    icon={Wallet} 
+                    title={duration === 'today' ? "Today's Coll." : "Collection"} 
+                    value={stats.periodCollection} 
+                    subValue={duration === 'custom' ? 'Selected Range' : duration.replace('_', ' ')} 
+                    color="bg-emerald-50 dark:bg-emerald-900/20" 
+                    iconBgColor="bg-emerald-100 dark:bg-emerald-800" 
+                    textColor="text-emerald-700 dark:text-emerald-100" 
+                    onClick={() => setCollectionDetailModalOpen(true)} 
+                    delay={0} 
+                />
+                <MetricCard 
+                    icon={Receipt} 
+                    title="Expenses" 
+                    value={stats.periodExpensesTotal} 
+                    subValue={duration === 'custom' ? 'Selected Range' : duration.replace('_', ' ')} 
+                    color="bg-rose-50 dark:bg-rose-900/20" 
+                    iconBgColor="bg-rose-100 dark:bg-rose-800" 
+                    textColor="text-rose-700 dark:text-rose-100" 
+                    onClick={() => setCurrentPage('EXPENSES')} 
+                    delay={50} 
+                />
+                <MetricCard 
+                    icon={IndianRupee} 
+                    title="Sales" 
+                    value={stats.periodSalesTotal} 
+                    subValue={`${stats.salesCount} orders`} 
+                    color="bg-primary/5 dark:bg-primary/10" 
+                    iconBgColor="bg-primary/20" 
+                    textColor="text-primary" 
+                    onClick={() => setCurrentPage('SALES')} 
+                    delay={100} 
+                />
+                <MetricCard 
+                    icon={Package} 
+                    title="Purchases" 
+                    value={stats.periodPurchasesTotal} 
+                    subValue="Inventory cost" 
+                    color="bg-blue-50 dark:bg-blue-900/20" 
+                    iconBgColor="bg-blue-100 dark:bg-blue-800" 
+                    textColor="text-blue-700 dark:text-blue-100" 
+                    onClick={() => setCurrentPage('PURCHASES')} 
+                    delay={200} 
+                />
+                <MetricCard 
+                    icon={User} 
+                    title="Cust. Dues" 
+                    value={stats.totalCustomerDues} 
+                    subValue="Total Receivable" 
+                    color="bg-purple-50 dark:bg-purple-900/20" 
+                    iconBgColor="bg-purple-100 dark:bg-purple-800" 
+                    textColor="text-purple-700 dark:text-purple-100" 
+                    onClick={() => setCurrentPage('CUSTOMERS')} 
+                    delay={300} 
+                />
+                <MetricCard 
+                    icon={ShoppingCart} 
+                    title="My Payables" 
+                    value={stats.totalSupplierDues} 
+                    subValue="Total Payable" 
+                    color="bg-amber-50 dark:bg-amber-900/20" 
+                    iconBgColor="bg-amber-100 dark:bg-amber-800" 
+                    textColor="text-amber-700 dark:text-amber-100" 
+                    onClick={() => setCurrentPage('PURCHASES')} 
+                    delay={400} 
+                />
             </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1057,6 +1212,16 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     <LowStockCard products={products} onNavigate={(id) => handleNavigate('PRODUCTS', id)} />
                  </div>
                  <div className="space-y-6">
+                    <SmartAnalystCard 
+                        sales={sales} 
+                        products={products} 
+                        customers={customers} 
+                        purchases={purchases} 
+                        returns={returns} 
+                        expenses={expenses}
+                        ownerName={profile?.ownerName || 'Owner'}
+                        onNavigate={handleNavigate}
+                    />
                     <Card title="Data Management">
                         <BackupStatusAlert lastBackupDate={lastBackupDate} lastSyncTime={state.lastSyncTime} />
                         <div className="space-y-4 mt-4">
@@ -1094,6 +1259,63 @@ const Dashboard: React.FC<DashboardProps> = ({ setCurrentPage }) => {
                     </Card>
                  </div>
             </div>
+
+            {/* Collection Details Modal */}
+            {collectionDetailModalOpen && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[300] flex items-center justify-center p-4 animate-fade-in-fast" onClick={() => setCollectionDetailModalOpen(false)}>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden animate-scale-in border dark:border-slate-700" onClick={e => e.stopPropagation()}>
+                        <div className="p-4 border-b dark:border-slate-700 flex justify-between items-center bg-emerald-50 dark:bg-emerald-900/20">
+                            <div>
+                                <h3 className="font-bold text-lg text-emerald-800 dark:text-emerald-200 flex items-center gap-2">
+                                    <Wallet className="w-5 h-5" /> Collection Breakdown
+                                </h3>
+                                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                    {duration === 'custom' ? `${new Date(dateRange.start).toLocaleDateString()} - ${new Date(dateRange.end).toLocaleDateString()}` : duration.replace('_', ' ')}
+                                </p>
+                            </div>
+                            <button onClick={() => setCollectionDetailModalOpen(false)} className="p-2 rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-colors text-emerald-700 dark:text-emerald-300">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        
+                        <div className="overflow-y-auto p-4 space-y-4 bg-white dark:bg-slate-900 custom-scrollbar">
+                            <div className="grid grid-cols-2 gap-3 mb-2">
+                                {collectionDetails.byMethod.map((item, idx) => (
+                                    <div key={idx} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border dark:border-slate-700 flex flex-col">
+                                        <div className="flex items-center gap-2 mb-1">
+                                            {item.method === 'UPI' ? <Zap size={14} className="text-amber-500"/> : item.method === 'CHEQUE' ? <CreditCard size={14} className="text-blue-500"/> : <Banknote size={14} className="text-green-500"/>}
+                                            <span className="text-xs font-bold text-slate-500 uppercase">{item.method}</span>
+                                        </div>
+                                        <span className="text-lg font-bold text-slate-800 dark:text-white">₹{item.amount.toLocaleString('en-IN')}</span>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div>
+                                <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Recent Transactions</h4>
+                                <div className="space-y-2">
+                                    {collectionDetails.list.length > 0 ? (
+                                        collectionDetails.list.map((tx, idx) => (
+                                            <div key={idx} className="flex justify-between items-center p-2.5 bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                                                <div className="min-w-0">
+                                                    <p className="font-semibold text-sm text-slate-700 dark:text-slate-200 truncate">{tx.customer}</p>
+                                                    <p className="text-[10px] text-slate-500">{new Date(tx.date).toLocaleDateString()} • {new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <p className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">+₹{tx.amount.toLocaleString()}</p>
+                                                    <span className="text-[10px] bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded text-slate-500">{tx.method}</span>
+                                                </div>
+                                            </div>
+                                        ))
+                                    ) : (
+                                        <p className="text-center text-sm text-slate-400 py-4">No collections found in this period.</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
