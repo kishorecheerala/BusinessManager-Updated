@@ -1,24 +1,61 @@
 {
-  "name": "Business Manager",
-  "short_name": "Business Manager",
-  "description": "Sales & inventory management",
+  "name": "Saree Business Manager",
+  "short_name": "Saree Biz",
+  "id": "/?source=pwa",
+  "start_url": "./index.html",
+  "scope": "./",
+  "background_color": "#f8fafc",
   "display": "standalone",
-  "scope": "/",
-  "start_url": "/",
-  "theme_color": "#8b5cf6",
-  "background_color": "#ffffff",
+  "orientation": "portrait",
+  "theme_color": "#db2777",
+  "description": "Offline-first sales, purchase, and inventory management for your saree business.",
+  "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "/vite.svg",
+      "src": "./vite.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/vite.svg",
+      "src": "./vite.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "./vite.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Sale",
+      "short_name": "New Sale",
+      "description": "Record a new sale transaction",
+      "url": "./index.html?action=new_sale",
+      "icons": [
+        {
+          "src": "./vite.svg",
+          "type": "image/svg+xml",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "New Customer",
+      "short_name": "New Customer",
+      "description": "Add a new customer to your records",
+      "url": "./index.html?action=new_customer",
+      "icons": [
+        {
+          "src": "./vite.svg",
+          "type": "image/svg+xml",
+          "sizes": "192x192"
+        }
+      ]
     }
   ]
 }

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Image as ImageIcon } from 'lucide-react';
 import { Product } from '../types';
 import Card from './Card';
 
@@ -47,22 +47,29 @@ const ProductSearchModal: React.FC<ProductSearchModalProps> = ({ products, onClo
                 autoFocus
               />
             </div>
-            <div className="mt-4 max-h-80 overflow-y-auto space-y-2">
+            <div className="mt-4 max-h-80 overflow-y-auto space-y-2 custom-scrollbar">
               {products
                 .filter(p => p.name.toLowerCase().includes(productSearchTerm.toLowerCase()) || p.id.toLowerCase().includes(productSearchTerm.toLowerCase()))
                 .map(p => (
-                <div key={p.id} onClick={() => onSelect(p)} className="p-3 bg-gray-50 dark:bg-slate-700/50 rounded-lg cursor-pointer hover:bg-teal-50 dark:hover:bg-slate-700 flex justify-between items-center">
-                  <div>
-                    <p className="font-semibold">{p.name}</p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">Code: {p.id}</p>
+                <div key={p.id} onClick={() => onSelect(p)} className="p-2 bg-gray-50 dark:bg-slate-700/50 rounded-lg cursor-pointer hover:bg-teal-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors">
+                  <div className="w-10 h-10 rounded bg-white dark:bg-slate-600 flex items-center justify-center overflow-hidden border border-gray-200 dark:border-slate-600 shrink-0">
+                      {p.image ? (
+                          <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                      ) : (
+                          <ImageIcon size={16} className="text-gray-400" />
+                      )}
                   </div>
-                  <div className="text-right">
-                      <p className="font-semibold">₹{Number(p.salePrice).toLocaleString('en-IN')}</p>
-                      <p className="text-sm">Stock: {p.quantity}</p>
+                  <div className="flex-grow min-w-0">
+                    <p className="font-semibold truncate">{p.name}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 font-mono truncate">{p.id}</p>
+                  </div>
+                  <div className="text-right shrink-0">
+                      <p className="font-semibold text-primary">₹{Number(p.salePrice).toLocaleString('en-IN')}</p>
+                      <p className={`text-xs ${p.quantity < 5 ? 'text-red-500 font-bold' : 'text-gray-500'}`}>Stock: {p.quantity}</p>
                   </div>
                 </div>
               ))}
-              {products.length === 0 && <p className="text-center text-gray-500">No products found.</p>}
+              {products.length === 0 && <p className="text-center text-gray-500 py-4">No products found.</p>}
             </div>
           </Card>
         </div>

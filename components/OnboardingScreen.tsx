@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
-import { User, Building2, Lock, ArrowRight, Cloud, ShieldCheck } from 'lucide-react';
+import { User, Building2, Lock, ArrowRight } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { ProfileData } from '../types';
+import Button from './Button';
 
 const OnboardingScreen: React.FC = () => {
     const { dispatch, googleSignIn, showToast } = useAppContext();
@@ -16,7 +16,6 @@ const OnboardingScreen: React.FC = () => {
             return;
         }
 
-        // Save Profile
         const newProfile: ProfileData = {
             id: 'userProfile',
             name: businessName,
@@ -28,7 +27,6 @@ const OnboardingScreen: React.FC = () => {
         };
         dispatch({ type: 'SET_PROFILE', payload: newProfile });
 
-        // Save PIN if provided
         if (pin.length === 4) {
             dispatch({ type: 'SET_PIN', payload: pin });
             showToast("Welcome! Your business is set up.", 'success');
@@ -42,7 +40,7 @@ const OnboardingScreen: React.FC = () => {
     const handleSkip = () => {
         const defaultProfile: ProfileData = {
             id: 'userProfile',
-            name: 'My Business',
+            name: 'My Saree Business',
             ownerName: 'Owner',
             phone: '',
             address: '',
@@ -52,60 +50,48 @@ const OnboardingScreen: React.FC = () => {
         dispatch({ type: 'SET_PROFILE', payload: defaultProfile });
         showToast("Welcome! You can update details later in Settings.", 'info');
     };
-
-    const handleManualImport = () => {
-        // Trigger a hidden file input or explain functionality
-        showToast("To import a file, please skip setup or use the 'Import' button in the Admin menu after entering dummy details.", 'info');
-    };
+    
+    const handleInfoClick = () => {
+      showToast("To restore from a file, use the 'Restore from Backup' button on the Dashboard.", 'info');
+    }
 
     return (
-        <div className="min-h-screen bg-[#FAFAFD] flex items-center justify-center p-6 animate-fade-in-fast font-sans text-[#0D0D26]">
-            <div className="w-full max-w-sm">
+        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4 font-sans text-slate-800 dark:text-slate-200">
+            <div className="w-full max-w-md mx-auto bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-2xl border dark:border-slate-700">
                 
-                {/* Header */}
-                <div className="mb-10 text-center">
-                    <h1 className="text-2xl font-bold text-[#356899] mb-2">Business Manager</h1>
-                    <h2 className="text-3xl font-extrabold mb-3">Welcome 👋</h2>
-                    <p className="text-[#AFB0B6] text-sm">
-                        Let's set up your business profile to track sales and purchases.
+                <div className="text-center mb-8">
+                    <h1 className="text-3xl font-bold text-primary mb-2">Saree Business Manager</h1>
+                    <p className="text-2xl font-semibold text-slate-700 dark:text-slate-300">Welcome 👋</p>
+                    <p className="text-slate-500 dark:text-slate-400 mt-2">
+                        Let's set up your profile to track sales and purchases.
                     </p>
                 </div>
 
-                {/* Form */}
-                <div className="space-y-5 mb-8">
-                    {/* Business Name */}
+                <div className="space-y-6">
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <Building2 className="text-[#AFB0B6] w-5 h-5" />
-                        </div>
+                        <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                         <input
                             type="text"
-                            placeholder="Business Name (e.g. My Shop)"
+                            placeholder="Business Name (e.g. My Saree Shop)"
                             value={businessName}
                             onChange={(e) => setBusinessName(e.target.value)}
-                            className="w-full h-14 pl-12 pr-4 rounded-xl bg-white border border-[#E0E0E0] text-[#0D0D26] placeholder-[#AFB0B6] focus:outline-none focus:border-[#356899] focus:ring-1 focus:ring-[#356899] transition-all shadow-sm"
+                            className="w-full h-12 pl-10 pr-4 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                         />
                     </div>
 
-                    {/* Owner Name */}
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <User className="text-[#AFB0B6] w-5 h-5" />
-                        </div>
+                        <User className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                         <input
                             type="text"
                             placeholder="Owner Name"
                             value={ownerName}
                             onChange={(e) => setOwnerName(e.target.value)}
-                            className="w-full h-14 pl-12 pr-4 rounded-xl bg-white border border-[#E0E0E0] text-[#0D0D26] placeholder-[#AFB0B6] focus:outline-none focus:border-[#356899] focus:ring-1 focus:ring-[#356899] transition-all shadow-sm"
+                            className="w-full h-12 pl-10 pr-4 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                         />
                     </div>
 
-                    {/* PIN */}
                     <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <Lock className="text-[#AFB0B6] w-5 h-5" />
-                        </div>
+                        <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
                         <input
                             type="password"
                             inputMode="numeric"
@@ -113,33 +99,25 @@ const OnboardingScreen: React.FC = () => {
                             placeholder="Set 4-Digit Security PIN (Optional)"
                             value={pin}
                             onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
-                            className="w-full h-14 pl-12 pr-4 rounded-xl bg-white border border-[#E0E0E0] text-[#0D0D26] placeholder-[#AFB0B6] focus:outline-none focus:border-[#356899] focus:ring-1 focus:ring-[#356899] transition-all shadow-sm"
+                            className="w-full h-12 pl-10 pr-4 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all shadow-sm"
                         />
                     </div>
 
-                    <button
-                        onClick={handleStart}
-                        className="w-full h-14 bg-[#356899] hover:bg-[#2B557D] active:scale-[0.98] text-white font-bold rounded-xl shadow-lg shadow-blue-200 transition-all flex items-center justify-center gap-2 mt-4"
-                    >
-                        Start Business <ArrowRight size={20} />
-                    </button>
+                    <Button onClick={handleStart} className="w-full h-12 shadow-lg">
+                        Start Business <ArrowRight size={20} className="ml-2" />
+                    </Button>
                 </div>
 
-                {/* Divider */}
-                <div className="flex items-center gap-4 mb-8">
-                    <div className="h-px bg-[#AFB0B6] opacity-30 flex-1"></div>
-                    <span className="text-xs text-[#AFB0B6] font-medium">Or restore existing data</span>
-                    <div className="h-px bg-[#AFB0B6] opacity-30 flex-1"></div>
+                <div className="text-center my-6 text-sm text-slate-500">
+                    Or restore existing data
                 </div>
-
-                {/* Social / Restore */}
-                <div className="flex justify-center gap-5 mb-8">
-                    <button 
+                
+                <div className="flex justify-center">
+                     <button 
                         onClick={() => googleSignIn()}
-                        className="w-14 h-14 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center hover:scale-110 transition-transform"
+                        className="w-14 h-14 bg-white rounded-full shadow-md border border-gray-100 flex items-center justify-center hover:scale-105 transition-transform"
                         title="Restore from Google Drive"
                     >
-                        {/* Inline SVG for Google Logo to speed up load */}
                         <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
                             <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                             <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
@@ -150,12 +128,12 @@ const OnboardingScreen: React.FC = () => {
                     </button>
                 </div>
 
-                {/* Footer */}
-                <div className="text-center space-y-4">
-                    <p className="text-[#AFB0B6] text-sm">
-                        Already have a backup file? <button onClick={handleManualImport} className="text-[#356899] font-medium hover:underline">Info</button>
+                <div className="text-center mt-8 space-y-3">
+                    <p className="text-slate-500 text-xs">
+                        Already have a backup file?{' '}
+                        <button onClick={handleInfoClick} className="text-primary font-medium hover:underline">Info</button>
                     </p>
-                    <button onClick={handleSkip} className="text-gray-400 text-sm hover:text-[#356899] transition-colors underline decoration-dotted underline-offset-4">
+                    <button onClick={handleSkip} className="text-slate-400 text-xs hover:text-primary transition-colors underline decoration-dotted underline-offset-4">
                         Skip setup & try app
                     </button>
                 </div>

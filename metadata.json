@@ -1,6 +1,6 @@
 {
-  "name": "Business Manager Prod",
-  "description": "Comprehensive offline-first business management with AI insights, advanced diagnostics, and robust data protection.",
+  "name": "Saree Business Manager",
+  "description": "Offline-first sales, purchase, and inventory management for your saree business.",
   "requestFramePermissions": [
     "camera",
     "microphone"

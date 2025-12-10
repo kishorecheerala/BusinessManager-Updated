@@ -279,6 +279,23 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
 
     const selectedCustomer = useMemo(() => customerId ? state.customers.find(c => c.id === customerId) : null, [customerId, state.customers]);
 
+    // --- Last Purchase Information for Selected Customer ---
+    const lastPurchaseInfo = useMemo(() => {
+        if (!customerId) return null;
+        const customerSales = state.sales.filter(s => s.customerId === customerId);
+        if (customerSales.length === 0) return null;
+        
+        // Sort by date desc
+        const lastSale = customerSales.reduce((latest, current) => {
+            return new Date(current.date) > new Date(latest.date) ? current : latest;
+        });
+        
+        return {
+            date: new Date(lastSale.date).toLocaleDateString(),
+            amount: lastSale.totalAmount
+        };
+    }, [customerId, state.sales]);
+
     const filteredCustomers = useMemo(() => 
         state.customers.filter(c => 
             c.name.toLowerCase().includes(customerSearchTerm.toLowerCase()) || 
@@ -498,7 +515,6 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
     const canCreateSale = customerId && items.length > 0 && mode === 'add';
     const canUpdateSale = customerId && items.length > 0 && mode === 'edit';
     const canRecordPayment = customerId && items.length === 0 && parseFloat(paymentDetails.amount || '0') > 0 && customerTotalDue != null && customerTotalDue > 0.01 && mode === 'add';
-    const pageTitle = mode === 'edit' ? `Edit Sale: ${saleToEdit?.id}` : 'New Sale / Payment';
 
     return (
         <div className="space-y-4 animate-fade-in-fast relative pb-10">
@@ -599,7 +615,7 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                                             autoFocus
                                         />
                                     </div>
-                                    <ul className="max-h-60 overflow-y-auto" role="listbox">
+                                    <ul className="max-h-60 overflow-y-auto custom-scrollbar" role="listbox">
                                         <li
                                             key="select-customer-placeholder"
                                             onClick={() => {
@@ -652,6 +668,13 @@ const SalesPage: React.FC<SalesPageProps> = ({ setIsDirty }) => {
                             onToggle={setIsCalendarOpen}
                         />
                     </div>
+                    {/* Last Purchase Info Hint */}
+                    {lastPurchaseInfo && mode === 'add' && (
+                        <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-md border border-blue-100 dark:border-blue-800 flex items-center justify-between animate-fade-in-fast mt-2">
+                            <span>Last Purchase: <strong>{lastPurchaseInfo.date}</strong></span>
+                            <span>Amount: <strong>₹{lastPurchaseInfo.amount.toLocaleString('en-IN')}</strong></span>
+                        </div>
+                    )}
                 </div>
             </Card>
 

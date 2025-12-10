@@ -1,11 +1,11 @@
 
 // Robust Offline Service Worker
-const CACHE_NAME = 'business-manager-v-2.0.0';
+const CACHE_NAME = 'saree-business-manager-v-1.0.0';
 
 // Critical external assets to pre-cache for offline functionality
 const EXTERNAL_ASSETS = [
   'https://cdn.tailwindcss.com',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@400;700&family=Poppins:wght@300;400;500;600&family=Roboto:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&family=Playfair+Display:wght@400;700&family=Poppins:wght@400;600&family=Roboto:wght@400;500&family=Space+Mono:wght@400;700&display=swap',
   'https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js',
   'https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/default.css',
   'https://cdn.jsdelivr.net/npm/mobile-drag-drop@2.3.0-rc.2/index.min.js',

@@ -1,8 +1,9 @@
+
 {
   "id": "business-manager-pro-v1",
-  "name": "Business Manager Prod",
-  "short_name": "Business Manager",
-  "description": "Comprehensive offline-first business management with AI insights, advanced diagnostics, and robust data protection.",
+  "name": "Saree Business Manager",
+  "short_name": "Saree Biz",
+  "description": "Comprehensive offline-first saree sales and inventory management.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
