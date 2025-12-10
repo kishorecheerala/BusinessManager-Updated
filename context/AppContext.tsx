@@ -177,12 +177,12 @@ const getLocalStorageState = () => {
     if (typeof window === 'undefined') return {};
     
     const theme = (localStorage.getItem('theme') as Theme) || 'light';
-    const themeColor = localStorage.getItem('themeColor') || '#db2777';
+    const themeColor = localStorage.getItem('themeColor') || '#8b5cf6';
     const font = localStorage.getItem('font') || 'Inter';
     
     let themeGradient = localStorage.getItem('themeGradient');
     if (themeGradient === null) {
-        themeGradient = 'linear-gradient(135deg, #db2777 0%, #c2410c 100%)';
+        themeGradient = 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)';
     } else if (themeGradient === 'none') {
         themeGradient = '';
     }
@@ -235,9 +235,9 @@ const initialState: AppState = {
     pin: null,
     
     theme: localDefaults.theme || 'light',
-    themeColor: localDefaults.themeColor || '#db2777',
+    themeColor: localDefaults.themeColor || '#8b5cf6',
     headerColor: '',
-    themeGradient: localDefaults.themeGradient ?? 'linear-gradient(135deg, #db2777 0%, #c2410c 100%)', 
+    themeGradient: localDefaults.themeGradient ?? 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)', 
     font: localDefaults.font || 'Inter',
     googleUser: localDefaults.googleUser || null,
     lastSyncTime: localDefaults.lastSyncTime || null,

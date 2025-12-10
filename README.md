@@ -1,6 +1,6 @@
-# Business Manager
+# Saree Business Manager
 
-A comprehensive, offline-first Progressive Web App (PWA) designed to streamline sales, purchase, and customer management for a small business. This application empowers users to track dues, manage stock, and generate reports directly from their device, without needing a constant internet connection.
+A comprehensive, offline-first Progressive Web App (PWA) designed to streamline sales, purchase, and customer management for a small saree business. This application empowers users to track dues, manage stock, and generate reports directly from their device, without needing a constant internet connection.
 
 ## ✨ Key Features
 
@@ -21,7 +21,7 @@ A comprehensive, offline-first Progressive Web App (PWA) designed to streamline 
 - **👥 Customer Management:** Maintain a detailed directory of customers, view their complete sales history, risk status (High/Medium/Safe), and manage their due payments.
 - **🛒 Sales Management:** Create new sales invoices, add products by searching or scanning QR codes, apply discounts, and record payments.
 - **📦 Purchase & Supplier Management:** Track purchases from suppliers, manage supplier information, and record payments made to them.
-- **👔 Product & Inventory Control:** Manage a complete product catalog. Stock is automatically updated with every sale, purchase, and return. Includes bulk barcode printing.
+- **👔 Product & Inventory Control:** Manage a complete product catalog of sarees. Stock is automatically updated with every sale, purchase, and return. Includes bulk barcode printing.
 - **🔄 Returns Processing:** Handle both customer returns (crediting their account and adding stock back) and returns to suppliers (reducing stock and creating a credit).
 - **📈 Comprehensive Reports:** Generate and export reports for Dues, Sales, and Low Stock. Export options include PDF, CSV, and **Google Sheets**.
 - **🔒 Data Backup & Restore:** Since all data is stored locally on the device, a robust backup (download JSON) and restore (upload JSON) system ensures data safety. Also supports **Google Drive Sync** for cloud backups.
@@ -45,22 +45,15 @@ The project is organized into a modular and scalable structure:
 
 ```
 /
-├── public/
-│   ├── manifest.json       # PWA manifest
-│   ├── sw.js               # Service Worker for offline caching
-│   └── vite.svg            # App icon
-│
-├── src/
-│   ├── components/         # Reusable UI components (Card, Button, Charts)
-│   ├── context/            # Global state management (AppContext.tsx)
-│   ├── pages/              # Main feature pages (Dashboard, Sales, Invoice Designer, etc.)
-│   ├── utils/              # Helper functions (PDF generation, Drive Sync, Analytics)
-│   ├── App.tsx             # Main app component with navigation logic
-│   ├── index.tsx           # Application entry point
-│   ├── types.ts            # Centralized TypeScript type definitions
-│   └── ...
-│
-└── index.html              # Main HTML entry file
+├── components/         # Reusable UI components (Card, Button, Charts)
+├── context/            # Global state management (AppContext.tsx)
+├── pages/              # Main feature pages (Dashboard, Sales, Invoice Designer, etc.)
+├── utils/              # Helper functions (PDF generation, Drive Sync, Analytics)
+├── App.tsx             # Main app component with navigation logic
+├── index.tsx           # Application entry point
+├── types.ts            # Centralized TypeScript type definitions
+├── index.html          # Main HTML entry file
+└── manifest.json       # PWA manifest
 ```
 
 ## 🚀 Core Functionality Deep Dive

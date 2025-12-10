@@ -13,7 +13,7 @@ import { Page } from './types';
 // Components (Eager Load - Critical for App Skeleton)
 import Card from './components/Card';
 import Button from './components/Button';
-import OnboardingScreen from './components/OnboardingScreen'; // Imported Eagerly for fast First Paint
+import OnboardingScreen from './components/OnboardingScreen';
 import DevineLoader from './components/DevineLoader';
 import Toast from './components/Toast';
 
@@ -122,14 +122,14 @@ const NavItem: React.FC<NavItemProps> = ({ page, label, icon: Icon, onClick, isA
         onClick={onClick}
         className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
             isActive 
-            ? 'text-primary transform -translate-y-1' 
-            : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50/50 dark:hover:bg-slate-700/30'
+            ? 'text-white transform -translate-y-1' 
+            : 'text-white/70 hover:text-white hover:bg-white/10'
         }`}
     >
-        <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-primary/10 scale-110' : ''}`}>
+        <div className={`p-1 rounded-full transition-all duration-300 ${isActive ? 'bg-white/20 scale-110' : ''}`}>
             <Icon className={`w-6 h-6 transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-105'}`} strokeWidth={isActive ? 2.5 : 2} />
         </div>
-        <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight ${isActive ? 'opacity-100' : 'opacity-80'}`}>{label}</span>
+        <span className={`text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight`}>{label}</span>
     </button>
 );
 
@@ -202,6 +202,7 @@ const AppContent: React.FC = () => {
     const [isChangeLogOpen, setIsChangeLogOpen] = useState(false);
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
+    const [showOnboarding, setShowOnboarding] = useState(false);
     
     const [parkModalState, setParkModalState] = useState<{ isOpen: boolean, targetPage: Page | null }>({ isOpen: false, targetPage: null });
 
@@ -228,6 +229,15 @@ const AppContent: React.FC = () => {
             setTimeout(() => setIsChangeLogOpen(true), 1500);
         }
     }, []);
+
+    useEffect(() => {
+        // Show onboarding if no profile is set after DB has loaded
+        if (isDbLoaded && (!state.profile || !state.profile.name)) {
+            // Delay slightly to ensure app skeleton is visible
+            const timer = setTimeout(() => setShowOnboarding(true), 500);
+            return () => clearTimeout(timer);
+        }
+    }, [isDbLoaded, state.profile]);
 
     const handleCloseChangeLog = () => {
         setIsChangeLogOpen(false);
@@ -441,32 +451,22 @@ const AppContent: React.FC = () => {
 
     if (!isDbLoaded) return <DevineLoader />;
 
-    // Render Onboarding Screen if profile is missing (Fresh Install)
-    if (!state.profile || !state.profile.name) {
-        return (
-            <div className={`min-h-screen bg-background text-text font-sans ${state.theme}`}>
-                <Toast />
-                <OnboardingScreen />
-            </div>
-        );
-    }
-
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
         : `min-h-screen pt-[7rem]`;
     
-    let navContainerClass = state.uiPreferences?.cardStyle === 'glass' 
-        ? 'glass border-white/20 dark:border-slate-700/50' 
-        : 'bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700';
+    let navContainerClass = 'bg-theme';
 
     if (state.uiPreferences?.navStyle === 'floating') {
-        navContainerClass += ' bottom-4 left-4 right-4 rounded-2xl shadow-xl border';
+        navContainerClass += ' bottom-4 left-4 right-4 rounded-2xl shadow-xl';
     } else {
-        navContainerClass += ' bottom-0 left-0 right-0 border-t';
+        navContainerClass += ' bottom-0 left-0 right-0 border-t border-white/20';
     }
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
+            <OnboardingScreen isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
+            
             {/* Lazy Load Suspense Wrapper for Modals */}
             <Suspense fallback={null}>
                 {isLocked && (
@@ -547,7 +547,7 @@ const AppContent: React.FC = () => {
                                 className="pointer-events-auto flex flex-col items-center justify-center hover:opacity-90 transition-opacity"
                             >
                                 <h1 className="text-lg sm:text-xl font-bold tracking-tight truncate max-w-[200px] sm:max-w-[300px] leading-tight drop-shadow-sm">
-                                    {state.profile?.name || 'Business Manager'}
+                                    {state.profile?.name || 'Saree Business Manager'}
                                 </h1>
                                 <div className="flex items-center gap-1.5 mt-0.5 animate-fade-in-fast">
                                     {state.googleUser ? (
@@ -711,13 +711,13 @@ const AppContent: React.FC = () => {
                         <button
                             onClick={() => { setIsMoreMenuOpen(prev => !prev); setIsMobileQuickAddOpen(false); }}
                             className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
-                                isMoreBtnActive 
-                                ? 'text-primary transform -translate-y-1' 
-                                : 'text-gray-400 dark:text-gray-500'
+                                isMoreBtnActive || isMoreMenuOpen
+                                ? 'text-white transform -translate-y-1' 
+                                : 'text-white/70 hover:text-white hover:bg-white/10'
                             }`}
                             >
-                            <div className={`p-1 rounded-full transition-all duration-300 ${isMoreBtnActive ? 'bg-primary/10 scale-110' : ''}`}>
-                                <Menu className={`w-6 h-6 transition-transform duration-300 ${isMoreBtnActive ? 'rotate-90' : ''}`} strokeWidth={isMoreBtnActive ? 2.5 : 2} />
+                            <div className={`p-1 rounded-full transition-all duration-300 ${(isMoreBtnActive || isMoreMenuOpen) ? 'bg-white/20 scale-110' : ''}`}>
+                                <Menu className={`w-6 h-6 transition-transform duration-300 ${(isMoreBtnActive || isMoreMenuOpen) ? 'rotate-90' : ''}`} strokeWidth={(isMoreBtnActive || isMoreMenuOpen) ? 2.5 : 2} />
                             </div>
                             <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">More</span>
                         </button>
@@ -758,15 +758,15 @@ const AppContent: React.FC = () => {
                             onClick={() => { setIsMobileQuickAddOpen(!isMobileQuickAddOpen); setIsMoreMenuOpen(false); }}
                             className={`flex flex-col items-center justify-center w-full pt-3 pb-2 px-0.5 rounded-2xl transition-all duration-300 group ${
                                 isMobileQuickAddOpen 
-                                ? 'text-primary transform -translate-y-1' 
-                                : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50/50 dark:hover:bg-slate-700/30'
+                                ? 'text-white transform -translate-y-1' 
+                                : 'text-white/70 hover:text-white hover:bg-white/10'
                             }`}
                             aria-label="Quick Add"
                         >
-                            <div className={`p-1 rounded-full transition-all duration-300 ${isMobileQuickAddOpen ? 'bg-primary/10 scale-110' : ''}`}>
+                            <div className={`p-1 rounded-full transition-all duration-300 ${isMobileQuickAddOpen ? 'bg-white/20 scale-110' : ''}`}>
                                 <Plus className={`w-6 h-6 transition-transform duration-300 ${isMobileQuickAddOpen ? 'rotate-45' : 'group-hover:scale-105'}`} strokeWidth={isMobileQuickAddOpen ? 2.5 : 2} />
                             </div>
-                            <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">Quick Add</span>
+                            <span className="text-[9px] sm:text-[10px] font-semibold mt-1 leading-tight">Add</span>
                         </button>
                         {isMobileQuickAddOpen && (
                             <div className="absolute bottom-[calc(100%+16px)] right-0 w-[85vw] max-w-[340px] bg-white/95 dark:bg-slate-800/95 backdrop-blur-2xl rounded-3xl shadow-2xl border border-gray-100 dark:border-slate-700 p-5 animate-slide-up-fade origin-bottom-right z-50 ring-1 ring-black/5">

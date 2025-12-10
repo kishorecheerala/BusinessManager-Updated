@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { Calendar as CalendarIcon } from 'lucide-react';
@@ -115,7 +114,7 @@ const ModernDateInput: React.FC<ModernDateInputProps> = ({ label, value, onChang
               
               {/* Floating Popup */}
               <div 
-                  className="fixed z-[100000] animate-scale-in"
+                  className="fixed z-[100002] animate-scale-in"
                   style={{ 
                       top: coords.top, 
                       left: coords.left,

@@ -17,10 +17,10 @@ const daysFromNow = (days: number): string => {
 
 export const testProfile: ProfileData = {
   id: 'userProfile',
-  name: 'Business Manager',
-  ownerName: 'Owner',
+  name: 'My Saree Boutique',
+  ownerName: 'Priya',
   phone: '9876543210',
-  address: '123 Market Street, City, 500001',
+  address: '123 Silk Road, Weaver Colony, Hyderabad 500081',
   gstNumber: '36ABCDE1234F1Z5',
 };
 

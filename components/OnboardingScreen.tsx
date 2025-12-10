@@ -1,15 +1,25 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { User, Building2, Lock, ArrowRight } from 'lucide-react';
 import { useAppContext } from '../context/AppContext';
 import { ProfileData } from '../types';
 import Button from './Button';
 
-const OnboardingScreen: React.FC = () => {
+interface OnboardingScreenProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ isOpen, onClose }) => {
     const { dispatch, googleSignIn, showToast } = useAppContext();
     const [businessName, setBusinessName] = useState('');
     const [ownerName, setOwnerName] = useState('');
     const [pin, setPin] = useState('');
+    
+    useEffect(() => {
+        if (isOpen) document.body.style.overflow = 'hidden';
+        return () => { document.body.style.overflow = ''; };
+    }, [isOpen]);
 
     const handleStart = () => {
         if (!businessName.trim() || !ownerName.trim()) {
@@ -36,6 +46,7 @@ const OnboardingScreen: React.FC = () => {
         } else {
             showToast("Welcome! Your business is set up.", 'success');
         }
+        onClose();
     };
 
     const handleSkip = () => {
@@ -50,15 +61,24 @@ const OnboardingScreen: React.FC = () => {
         };
         dispatch({ type: 'SET_PROFILE', payload: defaultProfile });
         showToast("Welcome! You can update details later in Settings.", 'info');
+        onClose();
     };
     
     const handleInfoClick = () => {
       showToast("To restore from a file, use the 'Restore from Backup' button on the Dashboard.", 'info');
     }
 
-    return (
-        <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center p-4 font-sans text-slate-800 dark:text-slate-200">
-            <div className="w-full max-w-md mx-auto bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-lg dark:border dark:border-slate-700">
+    const handleSignInAndRestore = () => {
+      // The AppContext handles restore logic on sign-in if profile is missing
+      googleSignIn();
+      onClose();
+    }
+
+    if (!isOpen) return null;
+
+    return createPortal(
+        <div className="fixed inset-0 z-[5000] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 font-sans text-slate-800 dark:text-slate-200 animate-fade-in-fast">
+            <div className="w-full max-w-md mx-auto bg-white dark:bg-slate-800 p-8 rounded-2xl shadow-lg dark:border dark:border-slate-700 animate-scale-in">
                 
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold text-primary mb-2">Saree Business Manager</h1>
@@ -115,7 +135,7 @@ const OnboardingScreen: React.FC = () => {
                 
                 <div className="flex justify-center">
                      <button 
-                        onClick={() => googleSignIn()}
+                        onClick={handleSignInAndRestore}
                         className="w-16 h-16 bg-white rounded-full shadow-md border border-gray-200 dark:border-slate-700 flex items-center justify-center hover:scale-105 transition-transform"
                         title="Restore from Google Drive"
                     >
@@ -139,7 +159,8 @@ const OnboardingScreen: React.FC = () => {
                     </button>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
