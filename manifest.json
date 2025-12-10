@@ -1,30 +1,30 @@
+
 {
   "name": "Saree Business Manager",
   "short_name": "Saree Biz",
-  "id": "/?source=pwa",
-  "start_url": "./index.html",
-  "scope": "./",
-  "background_color": "#f8fafc",
+  "start_url": ".",
+  "scope": ".",
   "display": "standalone",
   "orientation": "portrait",
+  "background_color": "#f8fafc",
   "theme_color": "#db2777",
   "description": "Offline-first sales, purchase, and inventory management for your saree business.",
   "categories": ["business", "finance", "productivity"],
   "icons": [
     {
-      "src": "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%23db2777'/%3e%3ctext x='50' y='55' font-size='75' text-anchor='middle' fill='white'%3eॐ%3c/text%3e%3c/svg%3e",
+      "src": "vite.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%23db2777'/%3e%3ctext x='50' y='55' font-size='75' text-anchor='middle' fill='white'%3eॐ%3c/text%3e%3c/svg%3e",
+      "src": "vite.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%23db2777'/%3e%3ctext x='50' y='55' font-size='75' text-anchor='middle' fill='white'%3eॐ%3c/text%3e%3c/svg%3e",
+      "src": "vite.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -38,7 +38,7 @@
       "url": "./index.html?action=new_sale",
       "icons": [
         {
-          "src": "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%23db2777'/%3e%3ctext x='50' y='55' font-size='75' text-anchor='middle' fill='white'%3eॐ%3c/text%3e%3c/svg%3e",
+          "src": "vite.svg",
           "type": "image/svg+xml",
           "sizes": "192x192"
         }
@@ -51,7 +51,7 @@
       "url": "./index.html?action=new_customer",
       "icons": [
         {
-          "src": "data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3e%3crect width='100' height='100' fill='%23db2777'/%3e%3ctext x='50' y='55' font-size='75' text-anchor='middle' fill='white'%3eॐ%3c/text%3e%3c/svg%3e",
+          "src": "vite.svg",
           "type": "image/svg+xml",
           "sizes": "192x192"
         }

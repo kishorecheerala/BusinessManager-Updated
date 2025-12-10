@@ -24,6 +24,7 @@ self.addEventListener('install', (event) => {
         './',
         './index.html',
         './manifest.json',
+        './vite.svg',
         ...EXTERNAL_ASSETS
       ]).catch(err => console.error("Pre-caching failed:", err));
     })
