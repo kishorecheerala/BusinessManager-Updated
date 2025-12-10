@@ -1047,9 +1047,31 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             };
             dispatch({ type: 'SET_GOOGLE_USER', payload: user });
             showToast("Signed in successfully!", 'success');
-
-            // Optionally auto-sync after login
-            setTimeout(() => syncData(), 1000);
+    
+            // If signing in from onboarding (no profile), attempt a restore.
+            // Otherwise, perform a normal background sync.
+            const profileExists = stateRef.current.profile && stateRef.current.profile.name;
+            
+            if (!profileExists) {
+                showToast("Checking for cloud backup...", 'info');
+                try {
+                    const cloudData = await DriveService.read(user.accessToken);
+                    if (cloudData && cloudData.profile && cloudData.profile.length > 0) {
+                        showToast("Backup found! Restoring data...", 'success');
+                        await db.importData(cloudData); // Wipes local and imports
+                        // Robustly reload to ensure all state is correctly initialized
+                        setTimeout(() => window.location.reload(), 1500);
+                    } else {
+                        showToast("No cloud backup found. Please complete the setup.", 'info');
+                    }
+                } catch (e) {
+                    console.error("Restore on sign-in failed", e);
+                    showToast("Failed to check for backup. Please complete setup.", 'error');
+                }
+            } else {
+                // Regular sync for existing users
+                setTimeout(() => syncData(), 1000);
+            }
         }
     };
 
@@ -1109,25 +1131,16 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'SET_LAST_SYNC_TIME', payload: time });
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
             
-            // If we merged data, we should reload the app state from DB to show new items
             if (cloudData) {
-                const customers = await db.getAll('customers');
-                const products = await db.getAll('products');
-                const sales = await db.getAll('sales');
-                const purchases = await db.getAll('purchases');
-                const returns = await db.getAll('returns');
-                const expenses = await db.getAll('expenses');
-                const quotes = await db.getAll('quotes');
-                const trash = await db.getAll('trash');
-                const profileData = await db.getAll('profile');
-                
-                dispatch({ 
-                    type: 'SET_STATE', 
-                    payload: { customers, products, sales, purchases, returns, expenses, quotes, trash, profile: profileData[0] || null } 
-                });
+                showToast("Sync complete! Applying changes...", 'success');
+                // Reloading the app is the most robust way to ensure all state is updated from the newly merged DB.
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1500); // Give user a moment to see the toast.
+            } else {
+                // If no cloud data, we just wrote local data to cloud, no need to reload.
+                showToast("Sync complete!", 'success');
             }
-            
-            showToast("Sync complete!", 'success');
 
         } catch (error: any) {
             console.error("Sync failed", error);
