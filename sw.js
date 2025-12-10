@@ -1,6 +1,6 @@
 
 // Robust Offline Service Worker
-const CACHE_NAME = 'saree-business-manager-v-1.0.0';
+const CACHE_NAME = 'saree-business-manager-v-1.0.1';
 
 // Critical external assets to pre-cache for offline functionality
 const EXTERNAL_ASSETS = [
