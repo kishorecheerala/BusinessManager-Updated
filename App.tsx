@@ -343,8 +343,7 @@ const AppContent: React.FC = () => {
             const bg = state.themeColor;
             const svgString = `
                 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <rect width="512" height="512" rx="96" fill="${bg}"/>
-                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="400" font-family="serif" fill="white" font-weight="bold">ॐ</text>
+                <text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="400" font-family="serif" fill="${bg}" font-weight="bold">ॐ</text>
                 </svg>
             `.trim();
             
