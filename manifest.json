@@ -1,8 +1,8 @@
 {
   "id": "business-manager-pro-v1",
-  "name": "Saree Business Manager",
-  "short_name": "Saree Biz",
-  "description": "Comprehensive offline-first saree sales and inventory management.",
+  "name": "Business Manager",
+  "short_name": "Business Manager",
+  "description": "Comprehensive offline-first business sales and inventory management.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

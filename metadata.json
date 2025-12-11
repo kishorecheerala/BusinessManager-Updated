@@ -1,6 +1,6 @@
 {
-  "name": "Saree Business Manager",
-  "description": "Offline-first sales, purchase, and inventory management for your saree business.",
+  "name": "Business Manager",
+  "description": "Offline-first sales, purchase, and inventory management for your business.",
   "requestFramePermissions": [
     "camera",
     "microphone"

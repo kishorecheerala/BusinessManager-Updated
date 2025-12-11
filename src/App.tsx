@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect, useMemo, useLayoutEffect, Suspense } from 'react';
 import { 
   Home, Users, ShoppingCart, Package, Menu, Plus, UserPlus, PackagePlus, 
@@ -13,7 +14,7 @@ import { Page } from './types';
 // Components (Eager Load - Critical for App Skeleton)
 import Card from './components/Card';
 import Button from './components/Button';
-import OnboardingScreen from './components/OnboardingScreen'; // Imported Eagerly for fast First Paint
+import OnboardingScreen from './components/OnboardingScreen'; 
 import DevineLoader from './components/DevineLoader';
 import Toast from './components/Toast';
 
@@ -194,6 +195,9 @@ const AppContent: React.FC = () => {
     const [isSignInModalOpen, setIsSignInModalOpen] = useState(false);
     const [isLocked, setIsLocked] = useState(false);
     
+    // Onboarding State
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    
     const [parkModalState, setParkModalState] = useState<{ isOpen: boolean, targetPage: Page | null }>({ isOpen: false, targetPage: null });
 
     const moreMenuRef = useRef<HTMLDivElement>(null);
@@ -213,12 +217,22 @@ const AppContent: React.FC = () => {
         }
     }, [state.selection]);
 
+    // Check for onboarding
     useEffect(() => {
-        const storedVersion = localStorage.getItem('app_version');
-        if (storedVersion !== APP_VERSION) {
-            setTimeout(() => setIsChangeLogOpen(true), 1500);
+        if (isDbLoaded && (!state.profile || !state.profile.name)) {
+            setShowOnboarding(true);
         }
-    }, []);
+    }, [isDbLoaded, state.profile]);
+
+    // Check for changelog - only if not onboarding
+    useEffect(() => {
+        if (!showOnboarding && isDbLoaded && state.profile && state.profile.name) {
+            const storedVersion = localStorage.getItem('app_version');
+            if (storedVersion !== APP_VERSION) {
+                setTimeout(() => setIsChangeLogOpen(true), 1500);
+            }
+        }
+    }, [showOnboarding, isDbLoaded, state.profile]);
 
     const handleCloseChangeLog = () => {
         setIsChangeLogOpen(false);
@@ -404,16 +418,6 @@ const AppContent: React.FC = () => {
 
     if (!isDbLoaded) return <DevineLoader />;
 
-    // Render Onboarding Screen if profile is missing (Fresh Install)
-    if (!state.profile || !state.profile.name) {
-        return (
-            <div className={`min-h-screen bg-background text-text font-sans ${state.theme}`}>
-                <Toast />
-                <OnboardingScreen />
-            </div>
-        );
-    }
-
     const mainClass = currentPage === 'INVOICE_DESIGNER' 
         ? 'h-[100dvh] overflow-hidden' 
         : `min-h-screen pt-[7rem]`;
@@ -430,6 +434,8 @@ const AppContent: React.FC = () => {
 
     return (
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
+            <OnboardingScreen isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
+
             {/* Lazy Load Suspense Wrapper for Modals */}
             <Suspense fallback={null}>
                 {isLocked && (
