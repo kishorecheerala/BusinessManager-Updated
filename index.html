@@ -45,33 +45,45 @@
           background-color: inherit;
           z-index: 9999;
       }
+      .pre-loader-logo {
+          width: 144px;
+          height: 144px;
+          /* Uses the dynamic CSS variable */
+          background-color: rgb(var(--primary-color)); 
+          border-radius: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+          margin-bottom: 40px;
+          animation: logo-float 3s ease-in-out infinite;
+          will-change: transform, box-shadow;
+      }
       .pre-loader-om {
           font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-          font-size: 200px !important;
+          font-size: 100px !important;
           line-height: 1;
           font-weight: 700;
-          color: rgb(var(--primary-color));
-          animation: pulse-om 4s ease-in-out infinite;
-          margin-bottom: 32px;
+          color: #ffffff; /* White text on colored bg */
           user-select: none;
           display: block;
-          will-change: transform, opacity, text-shadow;
+          padding-top: 10px; /* Optical center adjustment */
       }
       .pre-loader-info {
           display: flex;
           flex-direction: column;
           align-items: center;
           gap: 16px;
-          width: 256px;
+          width: 200px;
       }
       .pre-loader-text {
-          font-size: 1.125rem; /* 18px */
+          font-size: 0.875rem; 
           font-weight: 700;
           color: rgb(var(--primary-color));
-          opacity: 0.8;
-          letter-spacing: 0.1em;
+          opacity: 0.9;
+          letter-spacing: 0.2em;
           text-transform: uppercase;
-          font-family: sans-serif;
+          font-family: system-ui, -apple-system, sans-serif;
           display: flex;
           align-items: flex-end;
       }
@@ -85,43 +97,31 @@
 
       .pre-loader-bar-bg {
           width: 100%;
-          height: 6px;
-          background-color: #e5e7eb;
+          height: 4px;
+          background-color: rgba(0,0,0,0.05);
           border-radius: 9999px;
           overflow: hidden;
       }
       .dark .pre-loader-bar-bg {
-          background-color: #1e293b;
+          background-color: rgba(255,255,255,0.1);
       }
       .pre-loader-bar-fill {
           height: 100%;
-          /* Use fallback color for gradients to ensure visibility */
           background: rgb(var(--primary-color)); 
-          background: linear-gradient(to right, rgba(var(--primary-color), 0.4), rgb(var(--primary-color)));
           width: 100%;
           transform-origin: left;
           animation: progress-indeterminate 1.5s infinite ease-in-out;
       }
 
       /* Animation Keyframes */
-      @keyframes pulse-om {
-          0% { 
-            transform: scale(0.9); 
-            opacity: 0.8; 
-            text-shadow: 0 0 20px rgb(var(--primary-color) / 0.5);
+      @keyframes logo-float {
+          0%, 100% { 
+            transform: translateY(0);
+            box-shadow: 0 20px 25px -5px rgba(var(--primary-color), 0.2), 0 10px 10px -5px rgba(var(--primary-color), 0.1);
           }
           50% { 
-            transform: scale(1.1); 
-            opacity: 1; 
-            text-shadow: 
-                0 0 30px rgb(var(--primary-color) / 0.8),
-                0 0 60px rgb(var(--primary-color) / 0.6),
-                0 0 90px rgb(var(--primary-color) / 0.4);
-          }
-          100% { 
-            transform: scale(0.9); 
-            opacity: 0.8; 
-            text-shadow: 0 0 20px rgb(var(--primary-color) / 0.5);
+            transform: translateY(-10px);
+            box-shadow: 0 25px 30px -5px rgba(var(--primary-color), 0.4), 0 10px 10px -5px rgba(var(--primary-color), 0.2);
           }
       }
       @keyframes progress-indeterminate {
@@ -136,12 +136,10 @@
     </style>
 
     <script>
-      // Capture PWA install prompt early to prevent missing it before React loads
+      // Capture PWA install prompt early
       window.deferredPrompt = null;
       window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent the mini-infobar from appearing on mobile
         e.preventDefault();
-        // Stash the event so it can be triggered later.
         window.deferredPrompt = e;
         console.log('Capture install prompt');
       });
@@ -172,8 +170,8 @@
           
           document.documentElement.style.setProperty('--primary-color', r + ' ' + g + ' ' + b);
           
-          // 3. Dynamic Icon Generation (For Tab Icon Only)
-          var svgIcon = '<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" rx="96" fill="#ffffff"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="400" font-family="serif" fill="' + savedColor + '" font-weight="bold">ॐ</text></svg>';
+          // 3. Dynamic Icon Generation (BACKGROUND = Theme Color, TEXT = White)
+          var svgIcon = '<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" rx="96" fill="' + savedColor + '"/><text x="50%" y="50%" dominant-baseline="central" text-anchor="middle" font-size="360" font-family="serif" fill="#ffffff" font-weight="bold" dy="20">ॐ</text></svg>';
           var iconDataUrl = 'data:image/svg+xml,' + encodeURIComponent(svgIcon);
           
           var link = document.querySelector("link[rel~='icon']");
@@ -287,7 +285,11 @@
   <body class="bg-background dark:bg-slate-900 text-text dark:text-slate-300 antialiased selection:bg-primary selection:text-white">
     <div id="root">
       <div class="pre-loader-container">
-        <div class="pre-loader-om">ॐ</div>
+        <!-- New Logo Box matching App Icon Style -->
+        <div class="pre-loader-logo">
+           <div class="pre-loader-om">ॐ</div>
+        </div>
+        
         <div class="pre-loader-info">
             <div class="pre-loader-text">
                 LOADING
