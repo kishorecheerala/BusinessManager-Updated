@@ -1091,178 +1091,172 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     app_metadata: app_metadata, // Store raw metadata too
                 }
             });
+        } finally {
             setIsDbLoaded(true);
-
-        } catch (error) {
-            console.error("Failed to hydrate state", error);
-            showToast("Failed to load data", 'error');
-            setIsDbLoaded(true); // Allow app to load empty if DB fails
         }
-    }, []); // Empty dependencies = stable referencesetIsDbLoaded(true);
-}
     }, []); // Empty dependency array as db functions are stable
 
-// Initial Load
-useEffect(() => {
-    hydrateState();
-}, [hydrateState]);
+    // Initial Load
+    useEffect(() => {
+        hydrateState();
+    }, [hydrateState]);
 
-// Auto-Sync Logic (Dynamic Sync)
-// Debounce to prevent syncing on every keystroke/minor update
-useEffect(() => {
-    if (!state.lastLocalUpdate || !state.googleUser?.accessToken) return;
+    // Auto-Sync Logic (Dynamic Sync)
+    // Debounce to prevent syncing on every keystroke/minor update
+    useEffect(() => {
+        if (!state.lastLocalUpdate || !state.googleUser?.accessToken) return;
 
-    const timeout = setTimeout(() => {
-        console.log("Auto-Sync Triggered...");
-        syncData(); // No need to await here, it's fire-and-forget
-    }, 5000); // 5 second debounce
+        const timeout = setTimeout(() => {
+            console.log("Auto-Sync Triggered...");
+            syncData(); // No need to await here, it's fire-and-forget
+        }, 5000); // 5 second debounce
 
-    return () => clearTimeout(timeout);
-}, [state.lastLocalUpdate, state.googleUser]);
+        return () => clearTimeout(timeout);
+    }, [state.lastLocalUpdate, state.googleUser]);
 
-const handleGoogleLoginResponse = async (response: any) => {
-    if (response.access_token) {
-        const userInfo = await getUserInfo(response.access_token);
-        const expiresAt = Date.now() + (response.expires_in * 1000);
+    const handleGoogleLoginResponse = async (response: any) => {
+        if (response.access_token) {
+            const userInfo = await getUserInfo(response.access_token);
+            const expiresAt = Date.now() + (response.expires_in * 1000);
 
-        const user: GoogleUser = {
-            name: userInfo.name,
-            email: userInfo.email,
-            picture: userInfo.picture,
-            accessToken: response.access_token,
-            expiresAt: expiresAt
-        };
-        dispatch({ type: 'SET_GOOGLE_USER', payload: user });
-        showToast("Signed in successfully!", 'success');
+            const user: GoogleUser = {
+                name: userInfo.name,
+                email: userInfo.email,
+                picture: userInfo.picture,
+                accessToken: response.access_token,
+                expiresAt: expiresAt
+            };
+            dispatch({ type: 'SET_GOOGLE_USER', payload: user });
+            showToast("Signed in successfully!", 'success');
 
-        // If signing in from onboarding (no profile), attempt a restore.
-        // Otherwise, perform a normal background sync.
-        const profileExists = stateRef.current.profile && stateRef.current.profile.name;
+            // If signing in from onboarding (no profile), attempt a restore.
+            // Otherwise, perform a normal background sync.
+            const profileExists = stateRef.current.profile && stateRef.current.profile.name;
 
-        if (!profileExists) {
-            showToast("Checking for cloud backup...", 'info');
-            try {
-                const cloudData = await DriveService.read(user.accessToken);
-                if (cloudData && cloudData.profile && cloudData.profile.length > 0) {
-                    showToast("Backup found! Restoring data...", 'success');
-                    await db.importData(cloudData); // Wipes local and imports
-                    // Robustly reload to ensure all state is correctly initialized
-                    setTimeout(() => hydrateState(), 1500);
-                } else {
-                    showToast("No cloud backup found. Please complete the setup.", 'info');
+            if (!profileExists) {
+                showToast("Checking for cloud backup...", 'info');
+                try {
+                    const cloudData = await DriveService.read(user.accessToken);
+                    if (cloudData && cloudData.profile && cloudData.profile.length > 0) {
+                        showToast("Backup found! Restoring data...", 'success');
+                        await db.importData(cloudData); // Wipes local and imports
+                        // Robustly reload to ensure all state is correctly initialized
+                        setTimeout(() => hydrateState(), 1500);
+                    } else {
+                        showToast("No cloud backup found. Please complete the setup.", 'info');
+                    }
+                } catch (e) {
+                    console.error("Restore on sign-in failed", e);
+                    showToast("Failed to check for backup. Please complete setup.", 'error');
                 }
-            } catch (e) {
-                console.error("Restore on sign-in failed", e);
-                showToast("Failed to check for backup. Please complete setup.", 'error');
+            } else {
+                // Regular sync for existing users
+                setTimeout(() => syncData(), 1000);
             }
+        }
+    };
+
+    const googleSignIn = (options?: { forceConsent?: boolean }) => {
+        if (!tokenClientRef.current) {
+            loadGoogleScript()
+                .then(() => {
+                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse);
+                    const prompt = options?.forceConsent ? 'consent' : '';
+                    tokenClientRef.current.requestAccessToken({ prompt });
+                })
+                .catch(err => {
+                    console.error("Failed to load Google Script", err);
+                    showToast("Failed to load Google Sign-In.", 'error');
+                });
         } else {
-            // Regular sync for existing users
-            setTimeout(() => syncData(), 1000);
+            const prompt = options?.forceConsent ? 'consent' : '';
+            tokenClientRef.current.requestAccessToken({ prompt });
         }
-    }
-};
+    };
 
-const googleSignIn = (options?: { forceConsent?: boolean }) => {
-    if (!tokenClientRef.current) {
-        loadGoogleScript()
-            .then(() => {
-                tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse);
-                const prompt = options?.forceConsent ? 'consent' : '';
-                tokenClientRef.current.requestAccessToken({ prompt });
-            })
-            .catch(err => {
-                console.error("Failed to load Google Script", err);
-                showToast("Failed to load Google Sign-In.", 'error');
+    const googleSignOut = () => {
+        if ((window as any).google) {
+            (window as any).google.accounts.oauth2.revoke(state.googleUser?.accessToken, () => {
+                console.log('Consent revoked');
             });
-    } else {
-        const prompt = options?.forceConsent ? 'consent' : '';
-        tokenClientRef.current.requestAccessToken({ prompt });
-    }
-};
+        }
+        dispatch({ type: 'SET_GOOGLE_USER', payload: null });
+        showToast("Signed out.", 'info');
+    };
 
-const googleSignOut = () => {
-    if ((window as any).google) {
-        (window as any).google.accounts.oauth2.revoke(state.googleUser?.accessToken, () => {
-            console.log('Consent revoked');
-        });
-    }
-    dispatch({ type: 'SET_GOOGLE_USER', payload: null });
-    showToast("Signed out.", 'info');
-};
-
-const syncData = async () => {
-    if (!stateRef.current.googleUser || !stateRef.current.googleUser.accessToken) {
-        showToast("Please sign in to sync.", 'error');
-        return;
-    }
-
-    dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
-    try {
-        // 1. Read Cloud Data
-        console.log("Sync: Reading cloud data...");
-        const cloudData = await DriveService.read(stateRef.current.googleUser.accessToken);
-
-        // 2. Merge Strategies
-        if (cloudData) {
-            console.log("Sync: Merging cloud data...");
-            await db.mergeData(cloudData);
-
-            // IMPORTANT: Re-hydrate immediately to reflect incoming changes in UI
-            await hydrateState();
+    const syncData = async () => {
+        if (!stateRef.current.googleUser || !stateRef.current.googleUser.accessToken) {
+            showToast("Please sign in to sync.", 'error');
+            return;
         }
 
-        // 3. Export & Upload
-        console.log("Sync: Exporting local data...");
-        const currentData = await db.exportData();
+        dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
+        try {
+            // 1. Read Cloud Data
+            console.log("Sync: Reading cloud data...");
+            const cloudData = await DriveService.read(stateRef.current.googleUser.accessToken);
 
-        console.log("Sync: Uploading to cloud...");
-        const fileId = await DriveService.write(stateRef.current.googleUser.accessToken, currentData);
+            // 2. Merge Strategies
+            if (cloudData) {
+                console.log("Sync: Merging cloud data...");
+                await db.mergeData(cloudData);
 
-        console.log("Sync: Success!", fileId);
-        dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
-        dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
+                // IMPORTANT: Re-hydrate immediately to reflect incoming changes in UI
+                await hydrateState();
+            }
 
-        showToast("Sync completed successfully!", 'success');
-    } catch (error) {
-        console.error("Sync Failed:", error);
-        dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-        showToast("Sync failed. Please try again.", 'error');
-    }
-};
+            // 3. Export & Upload
+            console.log("Sync: Exporting local data...");
+            const currentData = await db.exportData();
 
-// ... restore function implementation ...
-const restoreFromFileId = async (fileId: string) => {
-    if (!stateRef.current.googleUser?.accessToken) return;
-    try {
-        const data = await downloadFile(stateRef.current.googleUser.accessToken, fileId);
-        if (data) {
-            await db.importData(data);
-            await hydrateState();
-            showToast("Data restored successfully.", 'success');
+            console.log("Sync: Uploading to cloud...");
+            const fileId = await DriveService.write(stateRef.current.googleUser.accessToken, currentData);
+
+            console.log("Sync: Success!", fileId);
+            dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
+            dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
+
+            showToast("Sync completed successfully!", 'success');
+        } catch (error) {
+            console.error("Sync Failed:", error);
+            dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
+            showToast("Sync failed. Please try again.", 'error');
         }
-    } catch (e) {
-        console.error(e);
-        showToast("Restore failed", 'error');
-    }
-};
+    };
 
-const unlockApp = useCallback(() => {
-    dispatch({ type: 'UNLOCK_APP' });
-}, []);
+    // ... restore function implementation ...
+    const restoreFromFileId = async (fileId: string) => {
+        if (!stateRef.current.googleUser?.accessToken) return;
+        try {
+            const data = await downloadFile(stateRef.current.googleUser.accessToken, fileId);
+            if (data) {
+                await db.importData(data);
+                await hydrateState();
+                showToast("Data restored successfully.", 'success');
+            }
+        } catch (e) {
+            console.error(e);
+            showToast("Restore failed", 'error');
+        }
+    };
 
-const updateSecurity = useCallback((config: AppMetadataPin['security']) => {
-    dispatch({ type: 'UPDATE_SECURITY_CONFIG', payload: config });
-}, []);
+    const unlockApp = useCallback(() => {
+        dispatch({ type: 'UNLOCK_APP' });
+    }, []);
 
-const lockApp = useCallback(() => {
-    dispatch({ type: 'LOCK_APP' });
-}, []);
+    const updateSecurity = useCallback((config: AppMetadataPin['security']) => {
+        dispatch({ type: 'UPDATE_SECURITY_CONFIG', payload: config });
+    }, []);
 
-return (
-    <AppContext.Provider value={{ state: { ...state, restoreFromFileId }, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData, unlockApp, lockApp, updateSecurity }}>
-        {children}
-    </AppContext.Provider>
-);
+    const lockApp = useCallback(() => {
+        dispatch({ type: 'LOCK_APP' });
+    }, []);
+
+    return (
+        <AppContext.Provider value={{ state: { ...state, restoreFromFileId }, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData, unlockApp, lockApp, updateSecurity }}>
+            {children}
+        </AppContext.Provider>
+    );
 };
 
 export const useAppContext = () => {
