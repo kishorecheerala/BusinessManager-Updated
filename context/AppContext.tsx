@@ -1235,12 +1235,35 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 await hydrateState();
             }
 
-            // 3. Export & Upload
-            console.log("Sync: Exporting local data...");
-            const currentData = await db.exportData();
+            // 3. Export & Upload (FROM MEMORY, NOT DB)
+            // Fixes Critical Race Condition where DB read happens during DB write (which clears store)
+            console.log("Sync: Exporting local data (Memory)...");
+
+            const currentState = stateRef.current;
+            const exportPayload: any = {
+                customers: currentState.customers,
+                suppliers: currentState.suppliers,
+                products: currentState.products,
+                sales: currentState.sales,
+                purchases: currentState.purchases,
+                returns: currentState.returns,
+                expenses: currentState.expenses,
+                quotes: currentState.quotes,
+                custom_fonts: currentState.customFonts,
+                app_metadata: currentState.app_metadata,
+                audit_logs: currentState.audit_logs,
+                profile: currentState.profile ? [currentState.profile] : [], // Store as array
+                budgets: currentState.budgets,
+                financial_scenarios: currentState.financialScenarios,
+                trash: currentState.trash,
+                bank_accounts: currentState.bankAccounts
+            };
+
+            // Filter out empty arrays if necessary, or strictly follow DB schema structure
+            // db.exportData ignored notifications/snapshots, so we do too.
 
             console.log("Sync: Uploading to cloud...");
-            const fileId = await DriveService.write(stateRef.current.googleUser.accessToken, currentData);
+            const fileId = await DriveService.write(stateRef.current.googleUser.accessToken, exportPayload);
 
             console.log("Sync: Success!", fileId);
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
