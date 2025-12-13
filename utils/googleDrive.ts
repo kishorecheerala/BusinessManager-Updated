@@ -457,12 +457,14 @@ export const DriveService = {
     },
 
     async write(accessToken: string, data: any): Promise<any> {
-        let folderId = localStorage.getItem('gdrive_folder_id');
-        if (!folderId) {
-            const config = await locateDriveConfig(accessToken);
-            folderId = config.folderId;
-            if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
-        }
+        // CRITICAL FIX: Do NOT trust local cache for Folder ID.
+        // Always resolve the "Master Folder" (Oldest) from server to prevent split-brain.
+        // The previous optimization (checking localStorage first) caused devices to get stuck 
+        // writing to different duplicate folders.
+        const config = await locateDriveConfig(accessToken);
+        const folderId = config.folderId; // config is checking for "Oldest"
+
+        if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
         if (!folderId) throw new Error("Could not locate or create Drive folder.");
 
         try {
