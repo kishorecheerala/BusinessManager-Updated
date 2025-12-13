@@ -1042,206 +1042,227 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             ]);
 
             // Process Metadata
-            let profileData = (profile as any)?.[0] || null;
-            if (profileData && !profileData.updatedAt) {
-                // Auto-migrate: Add timestamp to legacy profile so it can sync
-                console.log("Migrating profile with timestamp for sync...");
-                profileData = { ...profileData, updatedAt: new Date().toISOString() };
-                await db.saveCollection('profile', [profileData]);
-            }
+            // Parse Metadata
+            const themeMeta = app_metadata.find(m => m.id === 'themeSettings') as AppMetadataTheme;
+            const pinMeta = app_metadata.find(m => m.id === 'securityPin') as AppMetadataPin;
+            const uiMeta = app_metadata.find(m => m.id === 'uiPreferences') as AppMetadataUIPreferences;
+            const invoiceMeta = app_metadata.find(m => m.id === 'invoiceSettings') as AppMetadataInvoiceSettings;
+            const navMeta = app_metadata.find(m => m.id === 'navOrder') as AppMetadataNavOrder;
+            const qaMeta = app_metadata.find(m => m.id === 'quickActions') as AppMetadataQuickActions;
 
-            const invoiceTemplate = (app_metadata.find(m => m.id === 'invoiceTemplateConfig') as InvoiceTemplateConfig) || initialState.invoiceTemplate;
-            const estimateTemplate = (app_metadata.find(m => m.id === 'estimateTemplateConfig') as InvoiceTemplateConfig) || initialState.estimateTemplate;
-            const debitNoteTemplate = (app_metadata.find(m => m.id === 'debitNoteTemplateConfig') as InvoiceTemplateConfig) || initialState.debitNoteTemplate;
-            const receiptTemplate = (app_metadata.find(m => m.id === 'receiptTemplateConfig') as InvoiceTemplateConfig) || initialState.receiptTemplate;
-            const reportTemplate = (app_metadata.find(m => m.id === 'reportTemplateConfig') as InvoiceTemplateConfig) || initialState.reportTemplate;
-            const themeSettings = app_metadata.find(m => m.id === 'themeSettings') as AppMetadataTheme;
-            const securitySettings = app_metadata.find(m => m.id === 'securityPin') as AppMetadataPin;
-            const uiPrefs = app_metadata.find(m => m.id === 'uiPreferences') as AppMetadataUIPreferences;
-            const navOrderMeta = app_metadata.find(m => m.id === 'navOrder') as AppMetadataNavOrder;
-            const quickActionsMeta = app_metadata.find(m => m.id === 'quickActions') as AppMetadataQuickActions;
-            const lastSyncTimeMeta = localStorage.getItem('lastSyncTime');
+            // Backup Metadata
+            const lastBackupMeta = app_metadata.find(m => m.id === 'lastBackup');
 
-            // Dispatch bulk update
             dispatch({
                 type: 'SET_STATE',
                 payload: {
-                    customers, suppliers, products, sales, purchases, returns, expenses, quotes,
-                    app_metadata, notifications, audit_logs,
-                    profile: profileData,
-                    budgets: budget, financialScenarios: scenarios, trash: trashData,
-                    invoiceTemplate, estimateTemplate, debitNoteTemplate, receiptTemplate, reportTemplate,
-                    theme: themeSettings?.theme || initialState.theme,
-                    themeColor: themeSettings?.color || initialState.themeColor,
-                    headerColor: themeSettings?.headerColor || initialState.headerColor,
-                    themeGradient: themeSettings?.gradient || initialState.themeGradient,
-                    font: themeSettings?.font || initialState.font,
-                    uiPreferences: uiPrefs || initialState.uiPreferences,
-                    pin: securitySettings?.pin || null,
-                    isLocked: securitySettings?.security?.enabled && !state.isLocked ? false : state.isLocked,
-                    navOrder: navOrderMeta?.order || initialState.navOrder,
-                    quickActions: quickActionsMeta?.actions || initialState.quickActions,
-                    lastSyncTime: lastSyncTimeMeta ? Number(lastSyncTimeMeta) : null,
-                    isOnline: navigator.onLine,
-                    bankAccounts: Array.isArray(bankAccountsData) ? (bankAccountsData as unknown as BankAccount[]) : []
+                    customers: customers as Customer[],
+                    suppliers: suppliers as Supplier[],
+                    products: products as Product[],
+                    sales: sales as Sale[],
+                    purchases: purchases as Purchase[],
+                    returns: returns as Return[],
+                    expenses: expenses as Expense[],
+                    quotes: quotes as Quote[],
+                    notifications: notifications as Notification[],
+                    audit_logs: audit_logs as AuditLogEntry[],
+
+                    // Profile is stored as array but used as object
+                    profile: profileData && profileData.length > 0 ? profileData[0] : null,
+
+                    trash: trashData as TrashItem[],
+                    bankAccounts: bankAccounts as BankAccount[],
+
+                    // Metadata Hydration
+                    theme: themeMeta?.theme || localDefaults.theme || 'light',
+                    themeColor: themeMeta?.color || localDefaults.themeColor || '#8b5cf6',
+                    headerColor: themeMeta?.headerColor || '',
+                    themeGradient: themeMeta?.gradient ?? (localDefaults.themeGradient || ''),
+                    font: themeMeta?.font || localDefaults.font || 'Inter',
+
+                    pin: pinMeta?.security?.pin || null,
+                    isLocked: !!(pinMeta?.security?.enabled),
+                    uiPreferences: uiMeta ? { ...DEFAULT_UI_PREFS, ...uiMeta } : DEFAULT_UI_PREFS,
+                    invoiceTemplate: invoiceMeta?.template || DEFAULT_TEMPLATE,
+                    navOrder: navMeta?.order || DEFAULT_NAV_ORDER,
+                    quickActions: qaMeta?.actions || DEFAULT_QUICK_ACTIONS,
+
+                    lastSyncTime: localDefaults.lastSyncTime || 0,
+                    app_metadata: app_metadata, // Store raw metadata too
                 }
             });
-        } catch (error) {
-            console.error("Failed to hydrate state:", error);
-            showToast("Failed to load data. Please refresh.", "error");
-        } finally {
             setIsDbLoaded(true);
+
+        } catch (error) {
+            console.error("Failed to hydrate state", error);
+            showToast("Failed to load data", 'error');
+            setIsDbLoaded(true); // Allow app to load empty if DB fails
         }
+    }, []); // Empty dependencies = stable referencesetIsDbLoaded(true);
+}
     }, []); // Empty dependency array as db functions are stable
 
-    // Initial Load
-    useEffect(() => {
-        hydrateState();
-    }, [hydrateState]);
+// Initial Load
+useEffect(() => {
+    hydrateState();
+}, [hydrateState]);
 
-    const handleGoogleLoginResponse = async (response: any) => {
-        if (response.access_token) {
-            const userInfo = await getUserInfo(response.access_token);
-            const expiresAt = Date.now() + (response.expires_in * 1000);
+// Auto-Sync Logic (Dynamic Sync)
+// Debounce to prevent syncing on every keystroke/minor update
+useEffect(() => {
+    if (!state.lastLocalUpdate || !state.googleUser?.accessToken) return;
 
-            const user: GoogleUser = {
-                name: userInfo.name,
-                email: userInfo.email,
-                picture: userInfo.picture,
-                accessToken: response.access_token,
-                expiresAt: expiresAt
-            };
-            dispatch({ type: 'SET_GOOGLE_USER', payload: user });
-            showToast("Signed in successfully!", 'success');
+    const timeout = setTimeout(() => {
+        console.log("Auto-Sync Triggered...");
+        syncData(); // No need to await here, it's fire-and-forget
+    }, 5000); // 5 second debounce
 
-            // If signing in from onboarding (no profile), attempt a restore.
-            // Otherwise, perform a normal background sync.
-            const profileExists = stateRef.current.profile && stateRef.current.profile.name;
+    return () => clearTimeout(timeout);
+}, [state.lastLocalUpdate, state.googleUser]);
 
-            if (!profileExists) {
-                showToast("Checking for cloud backup...", 'info');
-                try {
-                    const cloudData = await DriveService.read(user.accessToken);
-                    if (cloudData && cloudData.profile && cloudData.profile.length > 0) {
-                        showToast("Backup found! Restoring data...", 'success');
-                        await db.importData(cloudData); // Wipes local and imports
-                        // Robustly reload to ensure all state is correctly initialized
-                        setTimeout(() => hydrateState(), 1500);
-                    } else {
-                        showToast("No cloud backup found. Please complete the setup.", 'info');
-                    }
-                } catch (e) {
-                    console.error("Restore on sign-in failed", e);
-                    showToast("Failed to check for backup. Please complete setup.", 'error');
+const handleGoogleLoginResponse = async (response: any) => {
+    if (response.access_token) {
+        const userInfo = await getUserInfo(response.access_token);
+        const expiresAt = Date.now() + (response.expires_in * 1000);
+
+        const user: GoogleUser = {
+            name: userInfo.name,
+            email: userInfo.email,
+            picture: userInfo.picture,
+            accessToken: response.access_token,
+            expiresAt: expiresAt
+        };
+        dispatch({ type: 'SET_GOOGLE_USER', payload: user });
+        showToast("Signed in successfully!", 'success');
+
+        // If signing in from onboarding (no profile), attempt a restore.
+        // Otherwise, perform a normal background sync.
+        const profileExists = stateRef.current.profile && stateRef.current.profile.name;
+
+        if (!profileExists) {
+            showToast("Checking for cloud backup...", 'info');
+            try {
+                const cloudData = await DriveService.read(user.accessToken);
+                if (cloudData && cloudData.profile && cloudData.profile.length > 0) {
+                    showToast("Backup found! Restoring data...", 'success');
+                    await db.importData(cloudData); // Wipes local and imports
+                    // Robustly reload to ensure all state is correctly initialized
+                    setTimeout(() => hydrateState(), 1500);
+                } else {
+                    showToast("No cloud backup found. Please complete the setup.", 'info');
                 }
-            } else {
-                // Regular sync for existing users
-                setTimeout(() => syncData(), 1000);
+            } catch (e) {
+                console.error("Restore on sign-in failed", e);
+                showToast("Failed to check for backup. Please complete setup.", 'error');
             }
-        }
-    };
-
-    const googleSignIn = (options?: { forceConsent?: boolean }) => {
-        if (!tokenClientRef.current) {
-            loadGoogleScript()
-                .then(() => {
-                    tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse);
-                    const prompt = options?.forceConsent ? 'consent' : '';
-                    tokenClientRef.current.requestAccessToken({ prompt });
-                })
-                .catch(err => {
-                    console.error("Failed to load Google Script", err);
-                    showToast("Failed to load Google Sign-In.", 'error');
-                });
         } else {
-            const prompt = options?.forceConsent ? 'consent' : '';
-            tokenClientRef.current.requestAccessToken({ prompt });
+            // Regular sync for existing users
+            setTimeout(() => syncData(), 1000);
         }
-    };
+    }
+};
 
-    const googleSignOut = () => {
-        if ((window as any).google) {
-            (window as any).google.accounts.oauth2.revoke(state.googleUser?.accessToken, () => {
-                console.log('Consent revoked');
+const googleSignIn = (options?: { forceConsent?: boolean }) => {
+    if (!tokenClientRef.current) {
+        loadGoogleScript()
+            .then(() => {
+                tokenClientRef.current = initGoogleAuth(handleGoogleLoginResponse);
+                const prompt = options?.forceConsent ? 'consent' : '';
+                tokenClientRef.current.requestAccessToken({ prompt });
+            })
+            .catch(err => {
+                console.error("Failed to load Google Script", err);
+                showToast("Failed to load Google Sign-In.", 'error');
             });
+    } else {
+        const prompt = options?.forceConsent ? 'consent' : '';
+        tokenClientRef.current.requestAccessToken({ prompt });
+    }
+};
+
+const googleSignOut = () => {
+    if ((window as any).google) {
+        (window as any).google.accounts.oauth2.revoke(state.googleUser?.accessToken, () => {
+            console.log('Consent revoked');
+        });
+    }
+    dispatch({ type: 'SET_GOOGLE_USER', payload: null });
+    showToast("Signed out.", 'info');
+};
+
+const syncData = async () => {
+    if (!stateRef.current.googleUser || !stateRef.current.googleUser.accessToken) {
+        showToast("Please sign in to sync.", 'error');
+        return;
+    }
+
+    dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
+    try {
+        // 1. Read Cloud Data
+        console.log("Sync: Reading cloud data...");
+        const cloudData = await DriveService.read(stateRef.current.googleUser.accessToken);
+
+        // 2. Merge Strategies
+        if (cloudData) {
+            console.log("Sync: Merging cloud data...");
+            await db.mergeData(cloudData);
+
+            // IMPORTANT: Re-hydrate immediately to reflect incoming changes in UI
+            await hydrateState();
         }
-        dispatch({ type: 'SET_GOOGLE_USER', payload: null });
-        showToast("Signed out.", 'info');
-    };
 
-    const syncData = async () => {
-        if (!stateRef.current.googleUser || !stateRef.current.googleUser.accessToken) {
-            showToast("Please sign in to sync.", 'error');
-            return;
+        // 3. Export & Upload
+        console.log("Sync: Exporting local data...");
+        const currentData = await db.exportData();
+
+        console.log("Sync: Uploading to cloud...");
+        const fileId = await DriveService.write(stateRef.current.googleUser.accessToken, currentData);
+
+        console.log("Sync: Success!", fileId);
+        dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
+        dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
+
+        showToast("Sync completed successfully!", 'success');
+    } catch (error) {
+        console.error("Sync Failed:", error);
+        dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
+        showToast("Sync failed. Please try again.", 'error');
+    }
+};
+
+// ... restore function implementation ...
+const restoreFromFileId = async (fileId: string) => {
+    if (!stateRef.current.googleUser?.accessToken) return;
+    try {
+        const data = await downloadFile(stateRef.current.googleUser.accessToken, fileId);
+        if (data) {
+            await db.importData(data);
+            await hydrateState();
+            showToast("Data restored successfully.", 'success');
         }
+    } catch (e) {
+        console.error(e);
+        showToast("Restore failed", 'error');
+    }
+};
 
-        dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
-        try {
-            // 1. Read Cloud Data
-            console.log("Sync: Reading cloud data...");
-            const cloudData = await DriveService.read(stateRef.current.googleUser.accessToken);
+const unlockApp = useCallback(() => {
+    dispatch({ type: 'UNLOCK_APP' });
+}, []);
 
-            // 2. Merge Strategies
-            if (cloudData) {
-                console.log("Sync: Merging cloud data...");
-                await db.mergeData(cloudData);
+const updateSecurity = useCallback((config: AppMetadataPin['security']) => {
+    dispatch({ type: 'UPDATE_SECURITY_CONFIG', payload: config });
+}, []);
 
-                // IMPORTANT: Re-hydrate immediately to reflect incoming changes in UI
-                await hydrateState();
-            }
+const lockApp = useCallback(() => {
+    dispatch({ type: 'LOCK_APP' });
+}, []);
 
-            // 3. Export & Upload
-            console.log("Sync: Exporting local data...");
-            const currentData = await db.exportData();
-
-            console.log("Sync: Uploading to cloud...");
-            const fileId = await DriveService.write(stateRef.current.googleUser.accessToken, currentData);
-
-            console.log("Sync: Success!", fileId);
-            dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
-            dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
-
-            showToast("Sync completed successfully!", 'success');
-        } catch (error) {
-            console.error("Sync Failed:", error);
-            dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-            showToast("Sync failed. Please try again.", 'error');
-        }
-    };
-
-    // ... restore function implementation ...
-    const restoreFromFileId = async (fileId: string) => {
-        if (!stateRef.current.googleUser?.accessToken) return;
-        try {
-            const data = await downloadFile(stateRef.current.googleUser.accessToken, fileId);
-            if (data) {
-                await db.importData(data);
-                await hydrateState();
-                showToast("Data restored successfully.", 'success');
-            }
-        } catch (e) {
-            console.error(e);
-            showToast("Restore failed", 'error');
-        }
-    };
-
-    const unlockApp = useCallback(() => {
-        dispatch({ type: 'UNLOCK_APP' });
-    }, []);
-
-    const updateSecurity = useCallback((config: AppMetadataPin['security']) => {
-        dispatch({ type: 'UPDATE_SECURITY_CONFIG', payload: config });
-    }, []);
-
-    const lockApp = useCallback(() => {
-        dispatch({ type: 'LOCK_APP' });
-    }, []);
-
-    return (
-        <AppContext.Provider value={{ state: { ...state, restoreFromFileId }, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData, unlockApp, lockApp, updateSecurity }}>
-            {children}
-        </AppContext.Provider>
-    );
+return (
+    <AppContext.Provider value={{ state: { ...state, restoreFromFileId }, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData, unlockApp, lockApp, updateSecurity }}>
+        {children}
+    </AppContext.Provider>
+);
 };
 
 export const useAppContext = () => {
