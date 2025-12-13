@@ -156,14 +156,13 @@ export async function mergeData(cloudData: any): Promise<void> {
         const store = tx.objectStore(storeName);
 
         if (remoteItems.length > 0) {
-            // Optimization: Process items in parallel
-            await Promise.all(remoteItems.map(async (item) => {
+            for (const item of remoteItems) {
                 if (item && item.id) {
                     // Check Trash
                     if (trashIdSet.has(item.id)) {
                         const exists = await store.get(item.id);
                         if (exists) await store.delete(item.id);
-                        return;
+                        continue;
                     }
 
                     const localItem = await store.get(item.id);
@@ -181,7 +180,7 @@ export async function mergeData(cloudData: any): Promise<void> {
                         }
                     }
                 }
-            }));
+            }
         }
     }
     await tx.done;

@@ -1178,36 +1178,32 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         dispatch({ type: 'SET_SYNC_STATUS', payload: 'syncing' });
         try {
             // 1. Read Cloud Data
+            console.log("Sync: Reading cloud data...");
             const cloudData = await DriveService.read(stateRef.current.googleUser.accessToken);
 
             // 2. Merge Strategies
             if (cloudData) {
+                console.log("Sync: Merging cloud data...");
                 await db.mergeData(cloudData);
+
+                // IMPORTANT: Re-hydrate immediately to reflect incoming changes in UI
+                await hydrateState();
             }
 
-            // 3. Re-read Local Data to reflect merges
-            // Re-fetch everything from DB after merge to get current state for upload
-            const freshData = await db.exportData();
+            // 3. Export & Upload
+            console.log("Sync: Exporting local data...");
+            const currentData = await db.exportData();
 
-            // 4. Write to Cloud
-            await DriveService.write(stateRef.current.googleUser.accessToken, freshData);
+            console.log("Sync: Uploading to cloud...");
+            const fileId = await DriveService.write(stateRef.current.googleUser.accessToken, currentData);
 
-            // 5. Update State UI
-            const time = Date.now();
-            dispatch({ type: 'SET_LAST_SYNC_TIME', payload: time });
+            console.log("Sync: Success!", fileId);
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
+            dispatch({ type: 'SET_LAST_SYNC_TIME', payload: Date.now() });
 
-            // Re-hydrate state from DB to reflect any changes from cloud merge (Smart Sync)
-            await hydrateState();
-
-            if (cloudData) {
-                showToast("Sync complete! Data updated.", 'success');
-            } else {
-                showToast("Sync complete!", 'success');
-            }
-
-        } catch (error: any) {
-            console.error("Sync failed", error);
+            showToast("Sync completed successfully!", 'success');
+        } catch (error) {
+            console.error("Sync Failed:", error);
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
             showToast("Sync failed. Please try again.", 'error');
         }
