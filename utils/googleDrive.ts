@@ -417,10 +417,17 @@ export const debugDriveState = async (accessToken: string) => {
     return { logs, details };
 };
 
+// Fixed filename for stable sync
+const STABLE_SYNC_FILENAME = 'BusinessManager_LiveSync.json';
+const STABLE_ASSETS_FILENAME = 'BusinessManager_Assets.json';
+
 export const DriveService = {
     /**
      * Reads data from Drive.
-     * Supports both new Split JSON format (Core + Assets) and Legacy monolithic JSON.
+     * Strategy:
+     * 1. Look for STABLE_SYNC_FILENAME (New standard).
+     * 2. If not found, look for latest 'BusinessManager_Core_' (Migration from daily files).
+     * 3. If not found, look for latest 'BusinessManager_Backup_' (Legacy monolithic).
      */
     async read(accessToken: string): Promise<any | null> {
         try {
@@ -428,48 +435,58 @@ export const DriveService = {
             if (!folderId) return null;
             if (folderId) localStorage.setItem('gdrive_folder_id', folderId);
 
-            // 1. Try to find new "Core" file (Latest)
-            const coreFile = await findLatestFileByPrefix(accessToken, folderId, 'BusinessManager_Core_');
-
-            if (coreFile) {
-                console.log("Found Core Backup:", coreFile.name);
-                const coreData = await downloadFile(accessToken, coreFile.id);
+            // 1. Try Stable Sync File
+            const stableFile = await findFileByName(accessToken, folderId, STABLE_SYNC_FILENAME);
+            if (stableFile) {
+                console.log("Found Live Sync File:", stableFile.name);
+                const coreData = await downloadFile(accessToken, stableFile.id);
 
                 if (coreData) {
-                    // Extract timestamp from filename to find matching assets
-                    // Format: BusinessManager_Core_YYYY-MM-DD.json
-                    const match = coreFile.name.match(/(\d{4}-\d{2}-\d{2})/);
-                    const dateStr = match ? match[1] : '';
-
-                    // 2. Try to find corresponding "Assets" file
-                    // Strategy: First try matching date, if not found, try latest assets file
-                    let assetsFile = null;
-                    if (dateStr) {
-                        assetsFile = await findFileByName(accessToken, folderId, `BusinessManager_Assets_${dateStr}.json`);
-                    }
-
-                    if (!assetsFile) {
-                        assetsFile = await findLatestFileByPrefix(accessToken, folderId, 'BusinessManager_Assets_');
-                    }
-
+                    // Try to find assets
+                    const assetsFile = await findFileByName(accessToken, folderId, STABLE_ASSETS_FILENAME);
                     if (assetsFile) {
-                        console.log("Found Assets Backup:", assetsFile.name);
+                        console.log("Found Assets File:", assetsFile.name);
                         const assetsData = await downloadFile(accessToken, assetsFile.id);
                         if (assetsData) {
-                            console.log("Merging Core and Assets...");
                             return mergeStateData(coreData, assetsData);
                         }
-                    } else {
-                        console.warn("No Assets file found, returning Core data only (images might be missing).");
                     }
                     return coreData;
                 }
             }
 
-            // 3. Fallback to Legacy Monolithic File
+            // 2. Fallback: Daily Core Files (Migration)
+            const coreFile = await findLatestFileByPrefix(accessToken, folderId, 'BusinessManager_Core_');
+
+            if (coreFile) {
+                console.log("Found Legacy Daily Backup:", coreFile.name);
+                const coreData = await downloadFile(accessToken, coreFile.id);
+
+                if (coreData) {
+                    // Extract timestamp for assets match
+                    const match = coreFile.name.match(/(\d{4}-\d{2}-\d{2})/);
+                    const dateStr = match ? match[1] : '';
+
+                    let assetsFile = null;
+                    if (dateStr) {
+                        assetsFile = await findFileByName(accessToken, folderId, `BusinessManager_Assets_${dateStr}.json`);
+                    }
+                    if (!assetsFile) {
+                        assetsFile = await findLatestFileByPrefix(accessToken, folderId, 'BusinessManager_Assets_');
+                    }
+
+                    if (assetsFile) {
+                        const assetsData = await downloadFile(accessToken, assetsFile.id);
+                        if (assetsData) return mergeStateData(coreData, assetsData);
+                    }
+                    return coreData;
+                }
+            }
+
+            // 3. Fallback: Legacy Monolithic
             const legacyFile = await findLatestFileByPrefix(accessToken, folderId, 'BusinessManager_Backup_');
             if (legacyFile) {
-                console.log("Found Legacy Backup:", legacyFile.name);
+                console.log("Found Legacy Monolithic Backup:", legacyFile.name);
                 return await downloadFile(accessToken, legacyFile.id);
             }
 
@@ -482,11 +499,10 @@ export const DriveService = {
     },
 
     /**
-     * Writes data to Drive using Split Strategy.
-     * 1. Core Data (Lightweight JSON)
-     * 2. Assets Data (Heavy Images)
+     * Writes data to Drive.
+     * ALWAYS writes to STABLE_SYNC_FILENAME to ensure single source of truth.
      */
-    async write(accessToken: string, data: any): Promise<void> {
+    async write(accessToken: string, data: any): Promise<any> {
         let folderId = localStorage.getItem('gdrive_folder_id');
         if (!folderId) {
             const config = await locateDriveConfig(accessToken);
@@ -496,35 +512,42 @@ export const DriveService = {
         if (!folderId) throw new Error("Could not locate or create Drive folder.");
 
         try {
-            const filenames = getDailyFilenames();
-            console.log(`Preparing backup...`);
+            console.log(`Preparing sync upload...`);
 
             // Split Data
             const { core, assets, hasAssets } = splitStateData(data);
 
-            // Upload Core
-            const existingCore = await findFileByName(accessToken, folderId, filenames.core);
-            if (existingCore) {
-                console.log("Updating existing Core file...");
-                await uploadFile(accessToken, folderId, core, filenames.core, existingCore.id);
+            // 1. Upload Core to Stable File
+            const existingStable = await findFileByName(accessToken, folderId, STABLE_SYNC_FILENAME);
+            let coreFileId;
+
+            if (existingStable) {
+                console.log("Updating Live Sync file...");
+                const result = await uploadFile(accessToken, folderId, core, STABLE_SYNC_FILENAME, existingStable.id);
+                coreFileId = result.id;
             } else {
-                console.log("Creating new Core file...");
-                await uploadFile(accessToken, folderId, core, filenames.core);
+                console.log("Creating Live Sync file...");
+                const result = await uploadFile(accessToken, folderId, core, STABLE_SYNC_FILENAME);
+                coreFileId = result.id;
             }
 
-            // Upload Assets (Only if present)
+            // 2. Upload Assets to Stable File (if present)
             if (hasAssets) {
-                const existingAssets = await findFileByName(accessToken, folderId, filenames.assets);
+                const existingAssets = await findFileByName(accessToken, folderId, STABLE_ASSETS_FILENAME);
                 if (existingAssets) {
-                    console.log("Updating existing Assets file...");
-                    await uploadFile(accessToken, folderId, assets, filenames.assets, existingAssets.id);
+                    console.log("Updating Assets file...");
+                    await uploadFile(accessToken, folderId, assets, STABLE_ASSETS_FILENAME, existingAssets.id);
                 } else {
-                    console.log("Creating new Assets file...");
-                    await uploadFile(accessToken, folderId, assets, filenames.assets);
+                    console.log("Creating Assets file...");
+                    await uploadFile(accessToken, folderId, assets, STABLE_ASSETS_FILENAME);
                 }
             }
 
-            console.log("Backup successful.");
+            // 3. Optional: Create a dated backup occasionally (not every sync)
+            // Implementation can be added later if needed.
+
+            console.log("Sync successful.");
+            return coreFileId;
         } catch (e: any) {
             if (e.message && e.message.includes('404')) {
                 console.warn("Folder 404, retrying...", e);
