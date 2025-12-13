@@ -101,6 +101,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
     const [confirmModalState, setConfirmModalState] = useState<{ isOpen: boolean, saleIdToDelete: string | null }>({ isOpen: false, saleIdToDelete: null });
     const [isLedgerOpen, setIsLedgerOpen] = useState(false);
+    const [ledgerPartyId, setLedgerPartyId] = useState<string | null>(null);
 
     const isDirtyRef = useRef(false);
     const actionMenuRef = useRef<HTMLDivElement>(null);
@@ -473,7 +474,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
         );
     }, [state.customers, searchTerm]);
 
-    if (selectedCustomer && editedCustomer) {
+    if (selectedCustomer && editedCustomer && selectedCustomer.id !== 'ALL_CUSTOMERS') {
         const customerSales = state.sales.filter(s => s.customerId === selectedCustomer.id);
         const customerReturns = state.returns.filter(r => r.type === 'CUSTOMER' && r.partyId === selectedCustomer.id);
 
@@ -487,7 +488,7 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
 
         return (
             <>
-                {isLedgerOpen && <LedgerModal isOpen={isLedgerOpen} onClose={() => setIsLedgerOpen(false)} partyId={selectedCustomer.id} partyType="CUSTOMER" />}
+                {isLedgerOpen && <LedgerModal isOpen={isLedgerOpen} onClose={() => { setIsLedgerOpen(false); setLedgerPartyId(null); }} partyId={ledgerPartyId || (selectedCustomer ? selectedCustomer.id : '')} partyType="CUSTOMER" />}
 
                 {/* Opening Balance Modal */}
                 {isOpeningBalanceModalOpen && (
@@ -792,6 +793,8 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                 />
             )}
 
+            {isLedgerOpen && <LedgerModal isOpen={isLedgerOpen} onClose={() => { setIsLedgerOpen(false); setLedgerPartyId(null); }} partyId={ledgerPartyId || ''} partyType="CUSTOMER" />}
+
             <div className="space-y-4 animate-fade-in-fast">
 
                 <div className="flex justify-between items-center mb-6">
@@ -799,12 +802,16 @@ const CustomersPage: React.FC<CustomersPageProps> = ({ setIsDirty, setCurrentPag
                         <div className="p-2 bg-primary/10 rounded-lg text-primary">
                             <Users className="w-6 h-6" />
                         </div>
-                        <h1 className="text-2xl font-bold text-primary">Customers</h1>
+                        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Customers</h1>
                     </div>
-                    <Button onClick={() => setIsAdding(!isAdding)}>
-                        <Plus className="w-4 h-4 mr-2" />
-                        {isAdding ? 'Cancel' : 'Add Customer'}
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="secondary" onClick={() => { setLedgerPartyId('ALL_CUSTOMERS'); setIsLedgerOpen(true); }}>
+                            <FileText size={16} className="mr-2" /> All Transactions
+                        </Button>
+                        <Button onClick={() => setIsAdding(true)}>
+                            <Plus size={20} className="mr-2" /> Add Customer
+                        </Button>
+                    </div>
                 </div>
 
                 <div className="relative">

@@ -128,7 +128,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     }
 
     return (
-        <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
+        <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300`}>
             {/* Modals & Overlays */}
             <Suspense fallback={null}>
 
@@ -192,6 +192,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                                                 )}
                                                 <span className={`relative inline-flex rounded-full h-2 w-2 ${state.syncStatus === 'error' ? 'bg-red-500' : 'bg-green-400'} shadow-sm`}></span>
                                             </div>
+
+                                            {/* Last Synced Time */}
+                                            {state.lastSyncTime && (
+                                                <span className="text-[10px] text-white/80 ml-1.5 truncate">
+                                                    <span className="sm:hidden">
+                                                        {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                                    </span>
+                                                    <span className="hidden sm:inline">
+                                                        Last synced: {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                                    </span>
+                                                </span>
+                                            )}
                                         </>
                                     ) : (
                                         <span className="text-[10px] sm:text-xs text-white/80">Local Mode</span>
@@ -217,14 +229,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                             </button>
 
                             <div className="flex items-center gap-2">
-                                {state.lastSyncTime && (
-                                    <div className="hidden lg:flex flex-col items-end mr-1">
-                                        <span className="text-[10px] text-white/70 leading-none">Last Synced</span>
-                                        <span className="text-xs font-medium text-white/90 leading-tight">
-                                            {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                        </span>
-                                    </div>
-                                )}
+                                {/* Old Last Synced Block Removed */}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();

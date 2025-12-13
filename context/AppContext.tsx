@@ -4,7 +4,7 @@ import {
     AppMetadata, AppMetadataTheme, AppMetadataPin, AppMetadataUIPreferences,
     Notification, ProfileData, InvoiceTemplateConfig, Budget, FinancialScenario,
     AuditLogEntry, SaleDraft, ParkedSale, Page, ExpenseCategory, Theme,
-    GoogleUser, SyncStatus, AppMetadataInvoiceSettings, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, TrashItem, AppState, ToastState
+    GoogleUser, SyncStatus, AppMetadataInvoiceSettings, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, TrashItem, AppState, ToastState, BankAccount
 } from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
@@ -72,7 +72,11 @@ type Action =
     | { type: 'DELETE_PARKED_SALE'; payload: string }
     // Trash Actions
     | { type: 'RESTORE_FROM_TRASH'; payload: TrashItem }
-    | { type: 'PERMANENTLY_DELETE_FROM_TRASH'; payload: string };
+    | { type: 'PERMANENTLY_DELETE_FROM_TRASH'; payload: string }
+    // Bank Account Actions
+    | { type: 'ADD_BANK_ACCOUNT'; payload: BankAccount }
+    | { type: 'UPDATE_BANK_ACCOUNT'; payload: BankAccount }
+    | { type: 'DELETE_BANK_ACCOUNT'; payload: string };
 
 // Default Template to prevent crashes
 const DEFAULT_TEMPLATE: InvoiceTemplateConfig = {
@@ -123,13 +127,21 @@ const DEFAULT_SALE_DRAFT: SaleDraft = {
 const getLocalStorageState = () => {
     if (typeof window === 'undefined') return {};
 
-    const theme = (localStorage.getItem('theme') as Theme) || 'light';
+    let theme = (localStorage.getItem('theme') as Theme) || 'light';
+    // SANITIZATION: If theme contains spaces or is suspiciously long, reset it.
+    // This fixes issues where 'dark bg-gradient-...' got saved as the theme name.
+    if (theme.includes(' ') || theme.length > 20) {
+        console.warn('Detected corrupted theme state. Resetting to light.');
+        theme = 'light';
+        localStorage.setItem('theme', 'light');
+    }
     const themeColor = localStorage.getItem('themeColor') || '#8b5cf6';
     const font = localStorage.getItem('font') || 'Inter';
 
     let themeGradient = localStorage.getItem('themeGradient');
+    // FIX: Do NOT default to a gradient if missing. Missing means "No Gradient" (Solid Color).
     if (themeGradient === null) {
-        themeGradient = 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)';
+        themeGradient = '';
     } else if (themeGradient === 'none') {
         themeGradient = '';
     }
@@ -203,7 +215,8 @@ const initialState: AppState = {
 
     budgets: [],
     financialScenarios: [],
-    isLocked: false // Default to false, will settle to true if config says so during load
+    isLocked: false, // Default to false, will settle to true if config says so during load
+    bankAccounts: []
 };
 
 // Logging helper
@@ -616,12 +629,38 @@ const appReducer = (state: AppState, action: Action): AppState => {
         }
 
         case 'PERMANENTLY_DELETE_FROM_TRASH':
-            db.deleteFromStore('trash', action.payload);
             return {
                 ...state,
                 trash: state.trash.filter(t => t.id !== action.payload),
                 ...touch
             };
+
+        case 'ADD_BANK_ACCOUNT':
+            const newAccount = action.payload;
+            db.saveCollection('bank_accounts', [...state.bankAccounts, newAccount]);
+            return { ...state, bankAccounts: [...state.bankAccounts, newAccount], ...touch };
+
+        case 'UPDATE_BANK_ACCOUNT':
+            const updatedAccounts = state.bankAccounts.map(a => a.id === action.payload.id ? action.payload : a);
+            db.saveCollection('bank_accounts', updatedAccounts);
+            return { ...state, bankAccounts: updatedAccounts, ...touch };
+
+        case 'DELETE_BANK_ACCOUNT':
+            const acctToDelete = state.bankAccounts.find(a => a.id === action.payload);
+            const remainingAccounts = state.bankAccounts.filter(a => a.id !== action.payload);
+            db.saveCollection('bank_accounts', remainingAccounts);
+
+            if (acctToDelete) {
+                const trashAcct: TrashItem = {
+                    id: acctToDelete.id,
+                    originalStore: 'bank_accounts' as any, // Cast if needed or update StoreName type
+                    data: acctToDelete,
+                    deletedAt: new Date().toISOString()
+                };
+                db.addToTrash(trashAcct);
+                return { ...state, bankAccounts: remainingAccounts, trash: [trashAcct, ...state.trash], ...touch };
+            }
+            return { ...state, bankAccounts: remainingAccounts, ...touch };
 
         case 'ADD_NOTIFICATION':
             const newNotif = action.payload;
@@ -634,8 +673,9 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return { ...state, notifications: updatedNotifs };
 
         case 'SET_PROFILE':
-            db.saveCollection('profile', [action.payload]);
-            return { ...state, profile: action.payload, ...touch };
+            const profileToSave = { ...action.payload, updatedAt: new Date().toISOString() };
+            db.saveCollection('profile', [profileToSave]);
+            return { ...state, profile: profileToSave, ...touch };
 
         case 'SET_THEME':
             const themeMeta: AppMetadataTheme = {
@@ -901,6 +941,30 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         stateRef.current = state;
     }, [state]);
 
+    useEffect(() => {
+        const root = window.document.documentElement;
+        // Remove ALL possible theme classes first to prevent accumulation
+        root.classList.remove('blue', 'dark', 'purple', 'green', 'orange', 'material', 'fluent', 'from-purple-900', 'to-indigo-900', 'bg-gradient-to-br');
+
+        // Also clean up any potential lingering gradient classes if they were applied to root previously
+        // Check if any class starts with 'bg-' or 'from-' or 'to-' and remove it? 
+        // Safer to just remove all classes except standard ones, but that's risky.
+        // Let's rely on standard removal for known themes.
+
+        // Add current theme class
+        if (state.theme) {
+            // Handle special cases or default mapping
+            if (state.theme === 'system') {
+                if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                    root.classList.add('dark');
+                }
+                // 'system' itself isn't a CSS class typically, just logic
+            } else {
+                root.classList.add(state.theme);
+            }
+        }
+    }, [state.theme]);
+
     const showToast = useCallback((message: string, type: 'success' | 'info' | 'error' = 'info') => {
         dispatch({ type: 'SHOW_TOAST', payload: { message, type } });
     }, []);
@@ -928,7 +992,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const [
                 customers, suppliers, products, sales, purchases, returns, expenses, quotes,
                 customFonts, app_metadata, notifications, audit_logs, profile,
-                budget, scenarios, trashData
+                budget, scenarios, trashData, bankAccountsData
             ] = await Promise.all([
                 db.getAll('customers'),
                 db.getAll('suppliers'),
@@ -946,6 +1010,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 db.getAll('budgets'),
                 db.getAll('financial_scenarios'),
                 db.getAll('trash'),
+                db.getAll('bank_accounts'),
             ]);
 
             // Process Metadata
@@ -981,7 +1046,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                     navOrder: navOrderMeta?.order || initialState.navOrder,
                     quickActions: quickActionsMeta?.actions || initialState.quickActions,
                     lastSyncTime: lastSyncTimeMeta ? Number(lastSyncTimeMeta) : null,
-                    isOnline: navigator.onLine
+                    isOnline: navigator.onLine,
+                    bankAccounts: Array.isArray(bankAccountsData) ? (bankAccountsData as unknown as BankAccount[]) : []
                 }
             });
         } catch (error) {
@@ -1106,18 +1172,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
 
         } catch (error: any) {
             console.error("Sync failed", error);
-
-            // Handle Auth Errors (401/403)
-            const errMsg = error?.message || '';
-            if (errMsg.includes('401') || errMsg.includes('403') || errMsg.includes('Token')) {
-                dispatch({ type: 'SET_GOOGLE_USER', payload: null });
-                showToast("Session expired. Please sign in again.", 'error');
-                dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-                return;
-            }
-
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'error' });
-            showToast("Sync failed. Check connection.", 'error');
+            showToast("Sync failed. Please try again.", 'error');
         }
     };
 

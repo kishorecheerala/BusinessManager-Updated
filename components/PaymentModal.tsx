@@ -18,6 +18,7 @@ interface PaymentModalProps {
         method: 'CASH' | 'UPI' | 'CHEQUE';
         date: string;
         reference: string;
+        accountId?: string;
     };
     setPaymentDetails: (details: any) => void;
     type?: 'sale' | 'purchase';
@@ -52,6 +53,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         }
         onSubmit();
     }
+
+    const accountOptions = [
+        { value: '', label: 'Select Account (Optional)' },
+        ...(state.bankAccounts || []).map(acc => ({
+            value: acc.id,
+            label: `${acc.name} (${acc.type})`
+        }))
+    ];
 
     return (
         <div
@@ -100,6 +109,22 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                             value={paymentDetails.method}
                             onChange={(val) => setPaymentDetails({ ...paymentDetails, method: val as any })}
                         />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {type === 'sale' ? 'Deposit To Account' : 'Paid From Account'}
+                        </label>
+                        <Dropdown
+                            options={accountOptions}
+                            value={paymentDetails.accountId || ''}
+                            onChange={(val) => setPaymentDetails({ ...paymentDetails, accountId: val })}
+                        />
+                        {(!state.bankAccounts || state.bankAccounts.length === 0) && (
+                            <p className="text-xs text-amber-600 mt-1">
+                                * No bank accounts found. Add them in your Profile.
+                            </p>
+                        )}
                     </div>
 
                     <ModernDateInput

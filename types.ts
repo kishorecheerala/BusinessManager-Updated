@@ -48,12 +48,23 @@ export interface AuditLogEntry {
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error';
 
+export interface BankAccount {
+  id: string; // e.g. "BANK-1718..."
+  name: string; // "SBI Current", "Axis Saving"
+  accountNumber: string; // Last 4 digits or full
+  type: 'SAVINGS' | 'CURRENT' | 'OD' | 'CASH';
+  openingBalance: number;
+  currentBalance?: number; // Calculated, or maintained
+  isDefault?: boolean;
+}
+
 export interface Payment {
   id: string;
   amount: number;
   date: string; // ISO string
   method: 'CASH' | 'UPI' | 'CHEQUE' | 'RETURN_CREDIT';
   reference?: string;
+  accountId?: string; // Linked Bank Account ID
 }
 
 export interface Customer {
@@ -224,6 +235,7 @@ export interface Expense {
   note?: string;
   paymentMethod: 'CASH' | 'UPI' | 'CHEQUE';
   receiptImage?: string; // Base64 encoded image
+  accountId?: string; // Paid from which account
 }
 
 export interface CustomFont {
@@ -502,6 +514,9 @@ export interface AppState {
   receiptTemplate: InvoiceTemplateConfig;
   reportTemplate: InvoiceTemplateConfig;
   invoiceSettings?: AppMetadataInvoiceSettings;
+
+  // Multi-Account
+  bankAccounts: BankAccount[];
 
   // Financial Planning
   budgets: Budget[];

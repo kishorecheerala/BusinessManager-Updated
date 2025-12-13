@@ -1,12 +1,12 @@
 
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, AppMetadata, AuditLogEntry, Expense, Quote, CustomFont, Snapshot, TrashItem, Budget, FinancialScenario, AppState } from '../types';
+import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, AppMetadata, AuditLogEntry, Expense, Quote, CustomFont, Snapshot, TrashItem, Budget, FinancialScenario, AppState, BankAccount } from '../types';
 
 const DB_NAME = 'business-manager-db';
-const DB_VERSION = 12; // Bumped for Financial Planning
+const DB_VERSION = 13; // Bumped for Bank Accounts
 
-export type StoreName = 'customers' | 'suppliers' | 'products' | 'sales' | 'purchases' | 'returns' | 'app_metadata' | 'notifications' | 'profile' | 'audit_logs' | 'expenses' | 'quotes' | 'custom_fonts' | 'snapshots' | 'trash' | 'budgets' | 'financial_scenarios';
-const STORE_NAMES: StoreName[] = ['customers', 'suppliers', 'products', 'sales', 'purchases', 'returns', 'app_metadata', 'notifications', 'profile', 'audit_logs', 'expenses', 'quotes', 'custom_fonts', 'snapshots', 'trash', 'budgets', 'financial_scenarios'];
+export type StoreName = 'customers' | 'suppliers' | 'products' | 'sales' | 'purchases' | 'returns' | 'app_metadata' | 'notifications' | 'profile' | 'audit_logs' | 'expenses' | 'quotes' | 'custom_fonts' | 'snapshots' | 'trash' | 'budgets' | 'financial_scenarios' | 'bank_accounts';
+const STORE_NAMES: StoreName[] = ['customers', 'suppliers', 'products', 'sales', 'purchases', 'returns', 'app_metadata', 'notifications', 'profile', 'audit_logs', 'expenses', 'quotes', 'custom_fonts', 'snapshots', 'trash', 'budgets', 'financial_scenarios', 'bank_accounts'];
 
 interface BusinessManagerDB extends DBSchema {
     customers: { key: string; value: Customer; };
@@ -26,6 +26,7 @@ interface BusinessManagerDB extends DBSchema {
     trash: { key: string; value: TrashItem; };
     budgets: { key: string; value: Budget; };
     financial_scenarios: { key: string; value: FinancialScenario; };
+    bank_accounts: { key: string; value: BankAccount };
 }
 
 let dbPromise: Promise<IDBPDatabase<BusinessManagerDB>>;
@@ -174,8 +175,8 @@ export async function mergeData(cloudData: any): Promise<void> {
                     await store.put(item);
                 } else {
                     // 2. Conflict: Compare timestamps
-                    const remoteTime = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
-                    const localTime = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+                    const remoteTime = (item as any).updatedAt ? new Date((item as any).updatedAt).getTime() : 0;
+                    const localTime = (localItem as any).updatedAt ? new Date((localItem as any).updatedAt).getTime() : 0;
 
                     if (remoteTime > localTime) {
                         // Remote is newer -> Overwrite local

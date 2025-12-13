@@ -95,7 +95,7 @@ const Dropdown: React.FC<DropdownProps> = ({
   const DropdownMenu = () => (
     <div
       ref={dropdownRef}
-      className={`fixed bg-white dark:bg-slate-800 rounded-lg shadow-2xl border dark:border-slate-700 z-[100] animate-scale-in flex flex-col overflow-hidden ring-1 ring-black/5 ${positionClass}`}
+      className={`fixed bg-white dark:bg-slate-800 rounded-lg shadow-2xl border dark:border-slate-700 z-[100000] animate-scale-in flex flex-col overflow-hidden ring-1 ring-black/5 ${positionClass}`}
       style={{
         top: `${coords.top}px`,
         left: `${coords.left}px`,
@@ -133,7 +133,7 @@ const Dropdown: React.FC<DropdownProps> = ({
           <li className="px-4 py-3 text-sm text-gray-500 text-center">No options found.</li>
         )}
       </ul>
-    </div>
+    </div >
   );
 
   return (

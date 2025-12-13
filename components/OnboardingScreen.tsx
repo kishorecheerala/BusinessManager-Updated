@@ -46,6 +46,21 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ isOpen, onClose }) 
         onClose();
     };
 
+    const handleSkip = () => {
+        // Create a default/guest profile to prevent the onboarding loop
+        const defaultProfile: ProfileData = {
+            id: 'userProfile',
+            name: 'My Business',
+            ownerName: 'Entrepreneur',
+            phone: '',
+            address: '',
+            gstNumber: '',
+            logo: ''
+        };
+        dispatch({ type: 'SET_PROFILE', payload: defaultProfile });
+        onClose();
+    };
+
     if (!isOpen) return null;
 
     return createPortal(
@@ -110,7 +125,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ isOpen, onClose }) 
                     </div>
 
                     <button
-                        onClick={onClose}
+                        onClick={handleSkip}
                         className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs font-medium transition-colors underline decoration-dotted underline-offset-4"
                     >
                         Skip Setup
