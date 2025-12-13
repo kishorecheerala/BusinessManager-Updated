@@ -1,5 +1,5 @@
 // Cache-busting service worker - Forces complete refresh
-const CACHE_VERSION = 'v-robust-1';
+const CACHE_VERSION = 'v-robust-2-sync-fix';
 const CACHE_NAME = `business-manager-${CACHE_VERSION}`;
 
 console.log('[SW] Cache version:', CACHE_NAME);
@@ -31,9 +31,9 @@ self.addEventListener('activate', (event) => {
 // Fetch - network first, then cache
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-  
+
   if (request.method !== 'GET') return;
-  
+
   event.respondWith(
     fetch(request)
       .then((response) => {
