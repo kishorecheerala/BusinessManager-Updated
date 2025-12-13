@@ -99,6 +99,17 @@ const safeJsonParse = async (response: Response) => {
     }
 };
 
+const filesList = async (accessToken: string, params: Record<string, string>) => {
+    const query = new URLSearchParams(params).toString();
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?${query}`, {
+        headers: getHeaders(accessToken),
+        cache: 'no-store'
+    });
+    if (!response.ok) await handleApiError(response, "List Files Failed");
+    const data = await safeJsonParse(response);
+    return data && data.files ? data.files : [];
+};
+
 const handleApiError = async (response: Response, context: string) => {
     let details = response.statusText;
     try {
@@ -356,10 +367,16 @@ export const getUserInfo = async (accessToken: string) => {
 
 async function locateDriveConfig(accessToken: string) {
     console.log("Locating app folder in Drive...");
-    const folders = await getCandidateFolders(accessToken);
+
+    // Use the unified constant APP_FOLDER_NAME
+    const folders = await filesList(accessToken, {
+        q: `mimeType = 'application/vnd.google-apps.folder' and name = '${APP_FOLDER_NAME}' and trashed = false`,
+        fields: 'files(id, name, createdTime)'
+    });
+
     let activeFolderId = null;
 
-    if (folders.length > 0) {
+    if (folders && folders.length > 0) {
         // PERMANENT FIX: Handle Duplicate Folders
         // Sort by creation time (Oldest is Truth)
         folders.sort((a: any, b: any) => new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime());
@@ -382,10 +399,76 @@ async function locateDriveConfig(accessToken: string) {
 }
 
 export const debugDriveState = async (accessToken: string) => {
-    // ... (Existing debug code omitted for brevity but preserved in principle if I hadn't replaced the whole block)
-    // For this tool replacement, I'll keep the existing debugDriveState as is or minimal since I'm targeting the logic functions.
-    // Re-implementing a simple version to fit the replacement block size if needed, but I'll paste the full block.
-    return { logs: ["Debug tool available"], details: [] };
+    const logs: string[] = [];
+    const details: any[] = [];
+
+    logs.push("🔍 Starting Drive Diagnostic Scan...");
+    logs.push(`📂 Target App Folder Name: '${APP_FOLDER_NAME}'`);
+
+    const localFolderId = localStorage.getItem('gdrive_folder_id');
+    const localFileId = localStorage.getItem('gdrive_sync_file_id');
+
+    logs.push(`💾 Local Cache Folder ID: ${localFolderId || 'None'}`);
+    logs.push(`💾 Local Cache File ID:   ${localFileId || 'None'}`);
+
+    // 1. Find Folders
+    const folders = await filesList(accessToken, {
+        q: `mimeType = 'application/vnd.google-apps.folder' and name = '${APP_FOLDER_NAME}' and trashed = false`,
+        fields: 'files(id, name, createdTime)'
+    });
+
+    if (!folders || folders.length === 0) {
+        logs.push("❌ CRITICAL: No App Folder Found in Drive.");
+        return { logs, details };
+    }
+
+    // Sort to find Master
+    folders.sort((a: any, b: any) => new Date(a.createdTime).getTime() - new Date(b.createdTime).getTime());
+    const masterFolder = folders[0];
+
+    logs.push(`✅ Found ${folders.length} app folder(s).`);
+    logs.push(`👑 MASTER FOLDER: ${masterFolder.id} (Created: ${masterFolder.createdTime})`);
+
+    if (localFolderId && localFolderId !== masterFolder.id) {
+        logs.push(`⚠️ WARNING: Local device is linked to a DIFFERENT folder than Master!`);
+        logs.push(`👉 Expected: ${masterFolder.id}`);
+        logs.push(`👉 Actual:   ${localFolderId}`);
+        logs.push(`🔧 Auto-Fix Recommended: Run a Sync or Re-Auth.`);
+    } else if (localFolderId) {
+        logs.push(`✅ Device is correctly linked to Master Folder.`);
+    }
+
+    if (folders.length > 1) {
+        logs.push(`⚠️ WARNING: ${folders.length - 1} Duplicate Folders found! (Split Brain Risk)`);
+        folders.slice(1).forEach((f: any) => logs.push(`   - Duplicate: ${f.id} (Created: ${f.createdTime})`));
+    }
+
+    // 2. Scan Master Folder Content
+    const files = await filesList(accessToken, {
+        q: `'${masterFolder.id}' in parents and trashed = false`,
+        fields: 'files(id, name, createdTime, modifiedTime, size)'
+    });
+
+    if (files) {
+        logs.push(`📄 Found ${files.length} files in Master Folder.`);
+        details.push({ folder: masterFolder, files: files });
+
+        const syncFile = files.find((f: any) => f.name === STABLE_SYNC_FILENAME);
+        if (syncFile) {
+            logs.push(`✅ Live Sync File Found: ${syncFile.id}`);
+            if (localFileId && localFileId !== syncFile.id) {
+                logs.push(`⚠️ WARNING: Local File ID mismatch!`);
+                logs.push(`👉 Server: ${syncFile.id}`);
+                logs.push(`👉 Local:  ${localFileId}`);
+            } else {
+                logs.push(`✅ File Link Verified.`);
+            }
+        } else {
+            logs.push(`⚠️ No Live Sync File ('${STABLE_SYNC_FILENAME}') found yet.`);
+        }
+    }
+
+    return { logs, details };
 };
 
 // Fixed filename for stable sync

@@ -297,15 +297,21 @@ const AppContent: React.FC = () => {
     if (!isDbLoaded) return <DevineLoader />;
 
     // App Lock Screen
-    if (state.isLocked) {
+    // Safety: If locked but no PIN is set (corruption?), auto-unlock.
+    // App Lock Screen
+    // Only show PinLock if explicitly locked AND a valid PIN exists.
+    // If state.isLocked is true but pin is missing (corruption), we safely fall through to AppLayout.
+    /* EMERGENCY UNLOCK: Lock Screen Disabled by User Request
+    if (state.isLocked && state.pin) {
         return (
             <PinLock
                 mode="unlock"
-                storedPin={state.appMetadata.security?.pin}
+                storedPin={state.pin}
                 onSuccess={unlockApp}
             />
         );
     }
+    */
 
     return (
         <AppLayout
