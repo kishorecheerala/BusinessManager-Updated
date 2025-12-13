@@ -195,16 +195,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                                             </div>
 
                                             {/* Last Synced Time */}
-                                            {state.lastSyncTime && (
-                                                <span className="text-[10px] text-white/80 ml-1.5 truncate">
-                                                    <span className="sm:hidden">
-                                                        {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toUpperCase()}
-                                                    </span>
-                                                    <span className="hidden sm:inline">
-                                                        Last synced: {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toUpperCase()}
-                                                    </span>
+                                            <div className="flex flex-col items-end mr-3 hidden sm:flex">
+                                                <span className="text-xs font-medium dark:text-gray-200">
+                                                    {state.syncStatus === 'syncing' ? 'Syncing...' :
+                                                        state.syncStatus === 'error' ? 'Sync Failed' :
+                                                            'Cloud Sync'}
                                                 </span>
-                                            )}
+                                                <span className="text-[10px] text-gray-500 dark:text-gray-400">
+                                                    {state.syncStatus === 'syncing' ? 'Please wait' :
+                                                        state.lastSyncTime ? new Date(state.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) :
+                                                            'Not synced yet'}
+                                                </span>
+                                            </div>
                                         </>
                                     ) : (
                                         <span className="text-[10px] sm:text-xs text-white/80">Local Mode</span>
