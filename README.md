@@ -71,7 +71,7 @@ The project is organized into a modular and scalable structure:
 The application uses a "Local First" architecture. Critical data (Sales, Products) is stored in **IndexedDB** for high capacity, while settings use **LocalStorage**. This ensures instant load times and full offline capability.
 
 ### Cloud Sync
-Users can sign in with Google to sync their database to a private folder (`BusinessManager_AppData`) in their Google Drive. The sync uses a "Read-Merge-Write" strategy to prevent data loss when switching devices.
+Users can sign in with Google to sync their database to a private folder (`BusinessManager_AppData`) in their Google Drive. The sync uses a robust **"Last Write Wins"** strategy with timestamp-based conflict resolution to ensure data consistency across multiple devices.
 
 ### AI Features
 - **Smart Analyst:** Analyzes transaction history to provide executive summaries.

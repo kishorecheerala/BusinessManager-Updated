@@ -1,5 +1,5 @@
 
-export const APP_VERSION = '1.6.0';
+export const APP_VERSION = '1.6.1';
 
 export interface Release {
     version: string;
@@ -9,6 +9,19 @@ export interface Release {
 }
 
 export const releases: Release[] = [
+    {
+        version: '1.6.1',
+        date: new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),
+        features: [
+            '🕒 Enhanced Time Display: "Last Synced" and Banner times now use clear AM/PM formatting.',
+            '🆘 Support: Fixed specific "Help & Documentation" links in the main menu.'
+        ],
+        fixes: [
+            'Fixed "Sync Failed" error by correcting database save logic.',
+            'Resolved onboarding loop issue with "Skip Setup".',
+            'Fixed Profile Sync timestamp issues across devices.'
+        ]
+    },
     {
         version: '1.6.0',
         date: new Date().toLocaleDateString('en-IN', { year: 'numeric', month: 'long', day: 'numeric' }),

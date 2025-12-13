@@ -145,6 +145,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
                     onLockApp={handleLockApp}
                     onOpenAPIConfig={() => setIsAPIConfigOpen(true)}
+                    onHelpClick={() => setIsHelpOpen(true)}
                 />
                 <UniversalSearch isOpen={isSearchOpen} onClose={() => setIsSearchOpen(false)} onNavigate={onNavigate} />
                 <AskAIModal isOpen={isAskAIOpen} onClose={() => setIsAskAIOpen(false)} onNavigate={onNavigate} />
@@ -197,10 +198,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                                             {state.lastSyncTime && (
                                                 <span className="text-[10px] text-white/80 ml-1.5 truncate">
                                                     <span className="sm:hidden">
-                                                        {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                                        {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toUpperCase()}
                                                     </span>
                                                     <span className="hidden sm:inline">
-                                                        Last synced: {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                                        Last synced: {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }).toUpperCase()}
                                                     </span>
                                                 </span>
                                             )}
@@ -282,7 +283,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         <div className="flex-1 text-right opacity-90 truncate pl-2 flex items-center justify-end gap-2">
                             {!state.isOnline && <span className="text-[10px] font-bold bg-red-500 text-white px-2 py-0.5 rounded sm:hidden">OFFLINE</span>}
                             <CalendarClock className="w-4 h-4 text-white/80" />
-                            {currentDateTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} {currentDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                            {currentDateTime.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' })} {currentDateTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }).toUpperCase()}
                         </div>
                     </div>
                 </header>

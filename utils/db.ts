@@ -155,36 +155,33 @@ export async function mergeData(cloudData: any): Promise<void> {
 
         const store = tx.objectStore(storeName);
 
-        for (const item of remoteItems) {
-            if (item && item.id) {
-                // CRITICAL: If this item ID is in the trash, DO NOT ADD IT.
-                // In fact, ensure it is deleted.
-                if (trashIdSet.has(item.id)) {
-                    const exists = await store.get(item.id);
-                    if (exists) {
-                        await store.delete(item.id);
+        if (remoteItems.length > 0) {
+            // Optimization: Process items in parallel
+            await Promise.all(remoteItems.map(async (item) => {
+                if (item && item.id) {
+                    // Check Trash
+                    if (trashIdSet.has(item.id)) {
+                        const exists = await store.get(item.id);
+                        if (exists) await store.delete(item.id);
+                        return;
                     }
-                    continue;
-                }
 
-                const localItem = await store.get(item.id);
+                    const localItem = await store.get(item.id);
 
-                // SMART MERGE STRATEGY (Last Write Wins):
-                if (!localItem) {
-                    // 1. New item from cloud -> Add it
-                    await store.put(item);
-                } else {
-                    // 2. Conflict: Compare timestamps
-                    const remoteTime = (item as any).updatedAt ? new Date((item as any).updatedAt).getTime() : 0;
-                    const localTime = (localItem as any).updatedAt ? new Date((localItem as any).updatedAt).getTime() : 0;
-
-                    if (remoteTime > localTime) {
-                        // Remote is newer -> Overwrite local
+                    if (!localItem) {
+                        // 1. New -> Add
                         await store.put(item);
+                    } else {
+                        // 2. Conflict: Compare timestamps
+                        const remoteTime = (item as any).updatedAt ? new Date((item as any).updatedAt).getTime() : 0;
+                        const localTime = (localItem as any).updatedAt ? new Date((localItem as any).updatedAt).getTime() : 0;
+
+                        if (remoteTime > localTime) {
+                            await store.put(item);
+                        }
                     }
-                    // Else: Local is newer or equal -> Keep local (do nothing)
                 }
-            }
+            }));
         }
     }
     await tx.done;
