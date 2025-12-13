@@ -65,6 +65,7 @@ export interface Customer {
   reference?: string;
   loyaltyPoints?: number; // New: Loyalty Points Balance
   priceTier?: 'RETAIL' | 'WHOLESALE'; // New: Customer Pricing Tier
+  updatedAt?: string; // ISO 8601 Timestamp for Smart Sync
 }
 
 export interface Supplier {
@@ -77,6 +78,7 @@ export interface Supplier {
   account1?: string;
   account2?: string;
   upi?: string;
+  updatedAt?: string; // ISO 8601 Timestamp for Smart Sync
 }
 
 export interface ProductBatch {
@@ -98,6 +100,7 @@ export interface Product {
   gstPercent: number;
   unit?: string; // New: Unit of Measurement (Pcs, Kg, Mtr, etc.)
   image?: string; // Base64 encoded image (Main)
+  updatedAt?: string; // ISO 8601 Timestamp for Smart Sync
   additionalImages?: string[]; // New: Multiple images
   batches?: ProductBatch[];
 }
@@ -120,6 +123,7 @@ export interface Sale {
   payments: Payment[];
   loyaltyPointsUsed?: number; // New: Points redeemed
   loyaltyPointsEarned?: number; // New: Points awarded
+  updatedAt?: string; // ISO 8601 Timestamp for Smart Sync
 }
 
 // --- New Types for Sales Management ---
@@ -160,6 +164,7 @@ export interface Quote {
   validUntil?: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'CONVERTED';
   convertedSaleId?: string;
+  updatedAt?: string; // For Smart Sync
 }
 
 export interface PurchaseItem {
@@ -186,6 +191,7 @@ export interface Purchase {
   supplierInvoiceId?: string; // Manual invoice ID from supplier
   payments: Payment[];
   paymentDueDates?: string[]; // ISO date strings
+  updatedAt?: string; // ISO 8601 Timestamp for Smart Sync
 }
 
 export interface ReturnItem {
@@ -205,6 +211,7 @@ export interface Return {
   amount: number; // Amount refunded to customer or credited from supplier
   reason?: string;
   notes?: string;
+  updatedAt?: string; // For Smart Sync
 }
 
 export type ExpenseCategory = 'Rent' | 'Salary' | 'Electricity' | 'Transport' | 'Maintenance' | 'Marketing' | 'Food' | 'Other';
@@ -373,7 +380,12 @@ export interface InvoiceTemplateConfig {
 // --- App Metadata Types ---
 export interface AppMetadataPin {
   id: 'securityPin';
-  pin: string;
+  pin?: string;
+  security?: {
+    pin: string;
+    enabled: boolean;
+    lastAttempt?: number;
+  };
 }
 
 export interface AppMetadataBackup {
@@ -515,6 +527,7 @@ export interface AppState {
   navOrder: string[];
   quickActions: string[];
   isOnline: boolean;
+  isLocked: boolean; // For App Lock
 
   // Sales Management State
   currentSale: SaleDraft;

@@ -41,10 +41,12 @@ const TrashPage = React.lazy(() => import('./pages/TrashPage'));
 const FinancialPlanningPage = React.lazy(() => import('./pages/FinancialPlanningPage'));
 
 
+import PinLock from './components/PinLock';
+
 import { QUICK_ACTION_REGISTRY, QUICK_ACTION_SHORTCUTS } from './utils/quickActions';
 
 const AppContent: React.FC = () => {
-    const { state, dispatch, isDbLoaded, showToast } = useAppContext();
+    const { state, dispatch, isDbLoaded, showToast, unlockApp } = useAppContext();
     const { showConfirm } = useDialog();
 
     // --- Routing State ---
@@ -66,7 +68,6 @@ const AppContent: React.FC = () => {
 
     // --- UI State ---
     const [isDirty, setIsDirty] = useState(false);
-    const [isLocked, setIsLocked] = useState(false);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [parkModalState, setParkModalState] = useState<{ isOpen: boolean, targetPage: Page | null }>({ isOpen: false, targetPage: null });
 
@@ -281,12 +282,21 @@ const AppContent: React.FC = () => {
 
     if (!isDbLoaded) return <DevineLoader />;
 
+    // App Lock Screen
+    if (state.isLocked) {
+        return (
+            <PinLock
+                mode="unlock"
+                storedPin={state.appMetadata.security?.pin}
+                onSuccess={unlockApp}
+            />
+        );
+    }
+
     return (
         <AppLayout
             currentPage={currentPage}
             onNavigate={handleNavigation}
-            isLocked={isLocked}
-            setIsLocked={setIsLocked}
         >
             <OnboardingScreen isOpen={showOnboarding} onClose={() => setShowOnboarding(false)} />
             <Toast />

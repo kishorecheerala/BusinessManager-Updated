@@ -29,18 +29,14 @@ interface AppLayoutProps {
     children: React.ReactNode;
     currentPage: Page;
     onNavigate: (page: Page) => void;
-    isLocked: boolean;
-    setIsLocked: (locked: boolean) => void;
 }
 
 const AppLayout: React.FC<AppLayoutProps> = ({
     children,
     currentPage,
-    onNavigate,
-    isLocked,
-    setIsLocked
+    onNavigate
 }) => {
-    const { state, dispatch, syncData, showToast } = useAppContext();
+    const { state, dispatch, syncData, showToast, lockApp } = useAppContext();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -88,8 +84,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     };
 
     const handleLockApp = () => {
-        setIsLocked(true);
+        lockApp();
         setIsMenuOpen(false);
+        showToast("App Locked", 'info');
     };
 
     // Prepare Nav Items
@@ -134,15 +131,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         <div className={`min-h-screen flex flex-col bg-background dark:bg-slate-950 text-text dark:text-slate-200 font-sans transition-colors duration-300 ${state.theme}`}>
             {/* Modals & Overlays */}
             <Suspense fallback={null}>
-                {isLocked && (
-                    <div className="fixed inset-0 z-[90] bg-background dark:bg-slate-950 flex items-center justify-center">
-                        <PinModal
-                            mode="enter"
-                            correctPin={state.pin}
-                            onCorrectPin={() => setIsLocked(false)}
-                        />
-                    </div>
-                )}
 
                 <ChangeLogModal isOpen={isChangeLogOpen} onClose={() => setIsChangeLogOpen(false)} />
                 <SignInModal isOpen={isSignInModalOpen} onClose={() => setIsSignInModalOpen(false)} />
@@ -228,29 +216,40 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                                 {state.theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                             </button>
 
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!state.googleUser) {
-                                        setIsSignInModalOpen(true);
-                                    } else {
-                                        syncData();
-                                    }
-                                }}
-                                onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    setIsCloudDebugOpen(true);
-                                }}
-                                className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
-                            >
-                                {state.syncStatus === 'syncing' ? (
-                                    <RefreshCw size={20} className="animate-spin" />
-                                ) : state.syncStatus === 'error' ? (
-                                    <CloudOff size={20} className="text-red-300" />
-                                ) : (
-                                    <Cloud size={20} className={!state.googleUser ? "opacity-70" : ""} />
+                            <div className="flex items-center gap-2">
+                                {state.lastSyncTime && (
+                                    <div className="hidden lg:flex flex-col items-end mr-1">
+                                        <span className="text-[10px] text-white/70 leading-none">Last Synced</span>
+                                        <span className="text-xs font-medium text-white/90 leading-tight">
+                                            {new Date(state.lastSyncTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                        </span>
+                                    </div>
                                 )}
-                            </button>
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (!state.googleUser) {
+                                            setIsSignInModalOpen(true);
+                                        } else {
+                                            syncData();
+                                        }
+                                    }}
+                                    onContextMenu={(e) => {
+                                        e.preventDefault();
+                                        setIsCloudDebugOpen(true);
+                                    }}
+                                    className="relative p-2 hover:bg-white/20 rounded-full transition-colors"
+                                    title={state.lastSyncTime ? `Last Synced: ${new Date(state.lastSyncTime).toLocaleString()}` : "Sync Data"}
+                                >
+                                    {state.syncStatus === 'syncing' ? (
+                                        <RefreshCw size={20} className="animate-spin" />
+                                    ) : state.syncStatus === 'error' ? (
+                                        <CloudOff size={20} className="text-red-300" />
+                                    ) : (
+                                        <Cloud size={20} className={!state.googleUser ? "opacity-70" : ""} />
+                                    )}
+                                </button>
+                            </div>
 
                             <div className="relative" ref={notificationsRef}>
                                 <button onClick={() => setIsNotificationsOpen(!isNotificationsOpen)} className="p-2 hover:bg-white/20 rounded-full transition-colors relative">

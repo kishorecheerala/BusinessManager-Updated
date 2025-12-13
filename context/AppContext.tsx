@@ -1,6 +1,11 @@
-
 import React, { createContext, useReducer, useContext, useEffect, ReactNode, useState, useCallback, useRef } from 'react';
-import { Customer, Supplier, Product, Sale, Purchase, Return, Notification, ProfileData, Page, AppMetadata, Theme, GoogleUser, AuditLogEntry, SyncStatus, Expense, Quote, AppMetadataInvoiceSettings, InvoiceTemplateConfig, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, AppMetadataTheme, AppMetadataUIPreferences, SaleDraft, ParkedSale, TrashItem, AppState, ToastState } from '../types';
+import {
+    Customer, Supplier, Product, Sale, Purchase, Return, Expense, Quote,
+    AppMetadata, AppMetadataTheme, AppMetadataPin, AppMetadataUIPreferences,
+    Notification, ProfileData, InvoiceTemplateConfig, Budget, FinancialScenario,
+    AuditLogEntry, SaleDraft, ParkedSale, Page, ExpenseCategory, Theme,
+    GoogleUser, SyncStatus, AppMetadataInvoiceSettings, CustomFont, PurchaseItem, AppMetadataNavOrder, AppMetadataQuickActions, TrashItem, AppState, ToastState
+} from '../types';
 import * as db from '../utils/db';
 import { StoreName } from '../utils/db';
 import { DriveService, initGoogleAuth, getUserInfo, loadGoogleScript, downloadFile } from '../utils/googleDrive';
@@ -197,13 +202,14 @@ const initialState: AppState = {
     trash: [],
 
     budgets: [],
-    financialScenarios: []
+    financialScenarios: [],
+    isLocked: false // Default to false, will settle to true if config says so during load
 };
 
 // Logging helper
 const logAction = (state: AppState, actionType: string, details: string): AuditLogEntry => {
     return {
-        id: `LOG-${Date.now()}`,
+        id: `LOG - ${Date.now()} `,
         timestamp: new Date().toISOString(),
         user: state.googleUser?.email || state.profile?.ownerName || 'User',
         action: actionType,
@@ -239,14 +245,14 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'ADD_CUSTOMER':
             const newCustomer = action.payload;
             db.saveCollection('customers', [...state.customers, newCustomer]);
-            newLog = logAction(state, 'Added Customer', `Name: ${newCustomer.name}`);
+            newLog = logAction(state, 'Added Customer', `Name: ${newCustomer.name} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
             return { ...state, customers: [...state.customers, newCustomer], audit_logs: [newLog, ...state.audit_logs], ...touch };
 
         case 'UPDATE_CUSTOMER':
             const updatedCustomers = state.customers.map(c => c.id === action.payload.id ? action.payload : c);
             db.saveCollection('customers', updatedCustomers);
-            newLog = logAction(state, 'Updated Customer', `ID: ${action.payload.id}`);
+            newLog = logAction(state, 'Updated Customer', `ID: ${action.payload.id} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
             return { ...state, customers: updatedCustomers, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
@@ -307,7 +313,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
             db.saveCollection('sales', [...state.sales, newSale]);
             db.saveCollection('customers', customersAfterSale);
-            newLog = logAction(state, 'New Sale', `ID: ${newSale.id}, Amt: ${newSale.totalAmount}`);
+            newLog = logAction(state, 'New Sale', `ID: ${newSale.id}, Amt: ${newSale.totalAmount} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
             return { ...state, sales: [...state.sales, newSale], customers: customersAfterSale, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
@@ -334,7 +340,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
             db.saveCollection('sales', updatedSalesList);
             db.saveCollection('products', adjustedProducts);
-            newLog = logAction(state, 'Updated Sale', `ID: ${updatedSale.id}`);
+            newLog = logAction(state, 'Updated Sale', `ID: ${updatedSale.id} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
             return { ...state, sales: updatedSalesList, products: adjustedProducts, audit_logs: [newLog, ...state.audit_logs], ...touch };
@@ -377,7 +383,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
             db.saveCollection('products', restoredProducts);
             db.saveCollection('customers', customersAfterDelete);
 
-            newLog = logAction(state, 'Deleted Sale', `ID: ${action.payload}`);
+            newLog = logAction(state, 'Deleted Sale', `ID: ${action.payload} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
             return {
@@ -443,7 +449,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
             db.saveCollection('purchases', [...state.purchases, newPurchase]);
             db.saveCollection('products', prodsAfterPurchase);
-            newLog = logAction(state, 'New Purchase', `ID: ${newPurchase.id}, Amt: ${newPurchase.totalAmount}`);
+            newLog = logAction(state, 'New Purchase', `ID: ${newPurchase.id}, Amt: ${newPurchase.totalAmount} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
             return {
@@ -482,7 +488,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
             db.deleteFromStore('purchases', purchaseToDelete.id);
             db.saveCollection('products', reducedProducts);
 
-            newLog = logAction(state, 'Deleted Purchase', `ID: ${action.payload}`);
+            newLog = logAction(state, 'Deleted Purchase', `ID: ${action.payload} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
             return {
@@ -521,7 +527,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
             db.saveCollection('returns', [...state.returns, newReturn]);
             db.saveCollection('products', stockAdjProducts);
-            newLog = logAction(state, 'Return Processed', `Type: ${newReturn.type}, ID: ${newReturn.id}`);
+            newLog = logAction(state, 'Return Processed', `Type: ${newReturn.type}, ID: ${newReturn.id} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
             return { ...state, returns: [...state.returns, newReturn], products: stockAdjProducts, audit_logs: [newLog, ...state.audit_logs], ...touch };
@@ -699,12 +705,15 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'UPDATE_UI_PREFERENCES':
             const newPrefs = { ...state.uiPreferences, ...action.payload };
             const metaWithoutPrefs = state.app_metadata.filter(m => m.id !== 'uiPreferences');
-            newPrefs.id = 'uiPreferences';
-            db.saveCollection('app_metadata', [...metaWithoutPrefs, newPrefs]);
-            return { ...state, uiPreferences: newPrefs, app_metadata: [...metaWithoutPrefs, newPrefs], ...touch };
+            const prefsMeta = { ...newPrefs, id: 'uiPreferences' } as AppMetadataUIPreferences;
+            db.saveCollection('app_metadata', [...metaWithoutPrefs, prefsMeta]);
+            return { ...state, uiPreferences: newPrefs, app_metadata: [...metaWithoutPrefs, prefsMeta], ...touch };
 
         case 'SET_PIN':
-            const pinMeta: AppMetadata = { id: 'securityPin', pin: action.payload };
+            const pinMeta: AppMetadataPin = {
+                id: 'securityPin',
+                security: { enabled: true, pin: action.payload }
+            };
             db.saveCollection('app_metadata', [...state.app_metadata.filter(m => m.id !== 'securityPin'), pinMeta]);
             return { ...state, pin: action.payload };
 
@@ -754,7 +763,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
                     type === 'DEBIT_NOTE' ? 'debitNoteTemplate' :
                         type === 'RECEIPT' ? 'receiptTemplate' : 'reportTemplate';
 
-            const templateMeta: AppMetadata = { ...config, id: `${tmplKey}Config` as any };
+            const templateMeta: AppMetadata = { ...config, id: `${tmplKey} Config` as any };
             const otherMeta = state.app_metadata.filter(m => m.id !== templateMeta.id);
             db.saveCollection('app_metadata', [...otherMeta, templateMeta]);
 
@@ -811,7 +820,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
         case 'PARK_CURRENT_SALE':
             const draftToPark: ParkedSale = {
                 ...state.currentSale,
-                id: `DRAFT-${Date.now()}`,
+                id: `DRAFT - ${Date.now()} `,
                 parkedAt: Date.now()
             };
             const newParkedList = [draftToPark, ...state.parkedSales];
@@ -912,71 +921,81 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         };
     }, []);
 
-    useEffect(() => {
-        const loadData = async () => {
-            const customers = await db.getAll('customers');
-            const suppliers = await db.getAll('suppliers');
-            const products = await db.getAll('products');
-            const sales = await db.getAll('sales');
-            const purchases = await db.getAll('purchases');
-            const returns = await db.getAll('returns');
-            const expenses = await db.getAll('expenses');
-            const quotes = await db.getAll('quotes');
-            const customFonts = await db.getAll('custom_fonts');
-            const app_metadata = await db.getAll('app_metadata');
-            const notifications = await db.getAll('notifications');
-            const profileData = await db.getAll('profile');
-            const audit_logs = await db.getAll('audit_logs');
-            const trash = await db.getAll('trash');
 
-            const pinMeta = app_metadata.find(m => m.id === 'securityPin') as any;
-            const pin = pinMeta ? pinMeta.pin : null;
+    const hydrateState = useCallback(async () => {
+        try {
+            // Load all collections
+            const [
+                customers, suppliers, products, sales, purchases, returns, expenses, quotes,
+                customFonts, app_metadata, notifications, audit_logs, profile,
+                budget, scenarios, trashData
+            ] = await Promise.all([
+                db.getAll('customers'),
+                db.getAll('suppliers'),
+                db.getAll('products'),
+                db.getAll('sales'),
+                db.getAll('purchases'),
+                db.getAll('returns'),
+                db.getAll('expenses'),
+                db.getAll('quotes'),
+                db.getAll('custom_fonts'),
+                db.getAll('app_metadata'),
+                db.getAll('notifications'),
+                db.getAll('audit_logs'),
+                db.getAll('profile'),
+                db.getAll('budgets'),
+                db.getAll('financial_scenarios'),
+                db.getAll('trash'),
+            ]);
 
-            const invSettings = app_metadata.find(m => m.id === 'invoiceSettings') as AppMetadataInvoiceSettings;
-            const navOrderMeta = app_metadata.find(m => m.id === 'navOrder') as AppMetadataNavOrder;
-            const quickActionsMeta = app_metadata.find(m => m.id === 'quickActions') as AppMetadataQuickActions;
-            const themeMeta = app_metadata.find(m => m.id === 'themeSettings') as AppMetadataTheme;
-            const uiPrefsMeta = app_metadata.find(m => m.id === 'uiPreferences') as AppMetadataUIPreferences;
-
+            // Process Metadata
             const invoiceTemplate = (app_metadata.find(m => m.id === 'invoiceTemplateConfig') as InvoiceTemplateConfig) || initialState.invoiceTemplate;
             const estimateTemplate = (app_metadata.find(m => m.id === 'estimateTemplateConfig') as InvoiceTemplateConfig) || initialState.estimateTemplate;
             const debitNoteTemplate = (app_metadata.find(m => m.id === 'debitNoteTemplateConfig') as InvoiceTemplateConfig) || initialState.debitNoteTemplate;
             const receiptTemplate = (app_metadata.find(m => m.id === 'receiptTemplateConfig') as InvoiceTemplateConfig) || initialState.receiptTemplate;
             const reportTemplate = (app_metadata.find(m => m.id === 'reportTemplateConfig') as InvoiceTemplateConfig) || initialState.reportTemplate;
+            const themeSettings = app_metadata.find(m => m.id === 'themeSettings') as AppMetadataTheme;
+            const securitySettings = app_metadata.find(m => m.id === 'securityPin') as AppMetadataPin;
+            const uiPrefs = app_metadata.find(m => m.id === 'uiPreferences') as AppMetadataUIPreferences;
+            const navOrderMeta = app_metadata.find(m => m.id === 'navOrder') as AppMetadataNavOrder;
+            const quickActionsMeta = app_metadata.find(m => m.id === 'quickActions') as AppMetadataQuickActions;
+            const lastSyncTimeMeta = localStorage.getItem('lastSyncTime');
 
-            const loadedTheme = themeMeta?.theme || state.theme;
-            const loadedColor = themeMeta?.color || state.themeColor;
-            const loadedHeaderColor = themeMeta?.headerColor || state.headerColor;
-            const loadedFont = themeMeta?.font || state.font;
-            let loadedGradient = themeMeta?.gradient;
-
-            if (loadedGradient === undefined) {
-                loadedGradient = state.themeGradient;
-            }
-
+            // Dispatch bulk update
             dispatch({
                 type: 'SET_STATE',
                 payload: {
-                    customers, suppliers, products, sales, purchases, returns, expenses, quotes, customFonts,
-                    app_metadata, notifications, audit_logs, trash,
-                    profile: profileData[0] || null,
-                    pin,
-                    invoiceSettings: invSettings,
-                    navOrder: navOrderMeta ? navOrderMeta.order : DEFAULT_NAV_ORDER,
-                    quickActions: quickActionsMeta ? quickActionsMeta.actions : DEFAULT_QUICK_ACTIONS,
+                    customers, suppliers, products, sales, purchases, returns, expenses, quotes,
+                    customFonts, app_metadata, notifications, audit_logs,
+                    profile: (profile as any)?.[0] || null, // Handle profile array vs object check
+                    budgets: budget, financialScenarios: scenarios, trash: trashData,
                     invoiceTemplate, estimateTemplate, debitNoteTemplate, receiptTemplate, reportTemplate,
-                    uiPreferences: uiPrefsMeta || DEFAULT_UI_PREFS,
-                    theme: loadedTheme,
-                    themeColor: loadedColor,
-                    headerColor: loadedHeaderColor,
-                    themeGradient: loadedGradient,
-                    font: loadedFont
+                    theme: themeSettings?.theme || initialState.theme,
+                    themeColor: themeSettings?.color || initialState.themeColor,
+                    headerColor: themeSettings?.headerColor || initialState.headerColor,
+                    themeGradient: themeSettings?.gradient || initialState.themeGradient,
+                    font: themeSettings?.font || initialState.font,
+                    uiPreferences: uiPrefs || initialState.uiPreferences,
+                    pin: securitySettings?.pin || null,
+                    isLocked: securitySettings?.security?.enabled && !state.isLocked ? false : state.isLocked,
+                    navOrder: navOrderMeta?.order || initialState.navOrder,
+                    quickActions: quickActionsMeta?.actions || initialState.quickActions,
+                    lastSyncTime: lastSyncTimeMeta ? Number(lastSyncTimeMeta) : null,
+                    isOnline: navigator.onLine
                 }
             });
+        } catch (error) {
+            console.error("Failed to hydrate state:", error);
+            showToast("Failed to load data. Please refresh.", "error");
+        } finally {
             setIsDbLoaded(true);
-        };
-        loadData();
-    }, []);
+        }
+    }, []); // Empty dependency array as db functions are stable
+
+    // Initial Load
+    useEffect(() => {
+        hydrateState();
+    }, [hydrateState]);
 
     const handleGoogleLoginResponse = async (response: any) => {
         if (response.access_token) {
@@ -1005,7 +1024,7 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                         showToast("Backup found! Restoring data...", 'success');
                         await db.importData(cloudData); // Wipes local and imports
                         // Robustly reload to ensure all state is correctly initialized
-                        setTimeout(() => window.location.reload(), 1500);
+                        setTimeout(() => hydrateState(), 1500);
                     } else {
                         showToast("No cloud backup found. Please complete the setup.", 'info');
                     }
@@ -1076,14 +1095,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             dispatch({ type: 'SET_LAST_SYNC_TIME', payload: time });
             dispatch({ type: 'SET_SYNC_STATUS', payload: 'success' });
 
+            // Re-hydrate state from DB to reflect any changes from cloud merge (Smart Sync)
+            await hydrateState();
+
             if (cloudData) {
-                showToast("Sync complete! Applying changes...", 'success');
-                // Reloading the app is the most robust way to ensure all state is updated from the newly merged DB.
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1500); // Give user a moment to see the toast.
+                showToast("Sync complete! Data updated.", 'success');
             } else {
-                // If no cloud data, we just wrote local data to cloud, no need to reload.
                 showToast("Sync complete!", 'success');
             }
 
@@ -1111,7 +1128,8 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
             const data = await downloadFile(stateRef.current.googleUser.accessToken, fileId);
             if (data) {
                 await db.importData(data);
-                window.location.reload();
+                await hydrateState();
+                showToast("Data restored successfully.", 'success');
             }
         } catch (e) {
             console.error(e);
@@ -1119,8 +1137,20 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
         }
     };
 
+    const unlockApp = useCallback(() => {
+        dispatch({ type: 'UNLOCK_APP' });
+    }, []);
+
+    const updateSecurity = useCallback((config: AppMetadataPin['security']) => {
+        dispatch({ type: 'UPDATE_SECURITY_CONFIG', payload: config });
+    }, []);
+
+    const lockApp = useCallback(() => {
+        dispatch({ type: 'LOCK_APP' });
+    }, []);
+
     return (
-        <AppContext.Provider value={{ state: { ...state, restoreFromFileId }, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData }}>
+        <AppContext.Provider value={{ state: { ...state, restoreFromFileId }, dispatch, isDbLoaded, showToast, googleSignIn, googleSignOut, syncData, unlockApp, lockApp, updateSecurity }}>
             {children}
         </AppContext.Provider>
     );

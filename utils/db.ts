@@ -167,11 +167,21 @@ export async function mergeData(cloudData: any): Promise<void> {
                 }
 
                 const localItem = await store.get(item.id);
-                // SMART MERGE STRATEGY:
-                // If local item does NOT exist, add the cloud item.
-                // If local item DOES exist, we KEEP the local item (Local Wins).
+
+                // SMART MERGE STRATEGY (Last Write Wins):
                 if (!localItem) {
+                    // 1. New item from cloud -> Add it
                     await store.put(item);
+                } else {
+                    // 2. Conflict: Compare timestamps
+                    const remoteTime = item.updatedAt ? new Date(item.updatedAt).getTime() : 0;
+                    const localTime = localItem.updatedAt ? new Date(localItem.updatedAt).getTime() : 0;
+
+                    if (remoteTime > localTime) {
+                        // Remote is newer -> Overwrite local
+                        await store.put(item);
+                    }
+                    // Else: Local is newer or equal -> Keep local (do nothing)
                 }
             }
         }
