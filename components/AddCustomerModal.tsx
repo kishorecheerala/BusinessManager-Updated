@@ -71,7 +71,11 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
             const { latitude, longitude } = pos.coords;
             try {
                 // Attempt Reverse Geocoding using OpenStreetMap (Nominatim) - Free & No Key
-                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+                const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
+                    headers: {
+                        'User-Agent': 'BusinessManagerApp/1.0'
+                    }
+                });
                 const data = await response.json();
 
                 if (data && data.display_name) {
@@ -80,7 +84,7 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
                         address: data.display_name,
                         area: data.address?.city || data.address?.town || data.address?.village || data.address?.suburb || prev.area
                     }));
-                    showToast("Location found!", "success");
+                    showToast("Precise location found!", "success");
                 } else {
                     throw new Error("No address found");
                 }
@@ -92,6 +96,10 @@ const AddCustomerModal: React.FC<AddCustomerModalProps> = ({ isOpen, onClose, on
         }, (err) => {
             console.error("Geo Error", err);
             showToast("Unable to retrieve location. Please enable permissions.", "error");
+        }, {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
         });
     };
 

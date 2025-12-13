@@ -256,26 +256,28 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return { ...state, ...action.payload };
 
         case 'ADD_CUSTOMER':
-            const newCustomer = action.payload;
-            db.saveCollection('customers', [...state.customers, newCustomer]);
-            newLog = logAction(state, 'Added Customer', `Name: ${newCustomer.name} `);
+            const newCustomer = { ...action.payload, updatedAt: new Date().toISOString() };
+            db.saveCollection('customers', [newCustomer, ...state.customers]);
+            newLog = logAction(state, 'Customer Added', newCustomer.name);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
-            return { ...state, customers: [...state.customers, newCustomer], audit_logs: [newLog, ...state.audit_logs], ...touch };
+            return { ...state, customers: [newCustomer, ...state.customers], audit_logs: [newLog, ...state.audit_logs], ...touch };
 
         case 'UPDATE_CUSTOMER':
-            const updatedCustomers = state.customers.map(c => c.id === action.payload.id ? action.payload : c);
+            const updatedCustomer: Customer = { ...action.payload, updatedAt: new Date().toISOString() };
+            const updatedCustomers = state.customers.map(c => c.id === updatedCustomer.id ? updatedCustomer : c);
             db.saveCollection('customers', updatedCustomers);
-            newLog = logAction(state, 'Updated Customer', `ID: ${action.payload.id} `);
+            newLog = logAction(state, 'Updated Customer', `ID: ${updatedCustomer.id} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
             return { ...state, customers: updatedCustomers, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
         case 'ADD_SUPPLIER':
-            const newSupplier = action.payload;
-            db.saveCollection('suppliers', [...state.suppliers, newSupplier]);
-            return { ...state, suppliers: [...state.suppliers, newSupplier], ...touch };
+            const newSupplier = { ...action.payload, updatedAt: new Date().toISOString() };
+            db.saveCollection('suppliers', [newSupplier, ...state.suppliers]);
+            return { ...state, suppliers: [newSupplier, ...state.suppliers], ...touch };
 
         case 'UPDATE_SUPPLIER':
-            const updatedSuppliers = state.suppliers.map(s => s.id === action.payload.id ? action.payload : s);
+            const updatedSupplier = { ...action.payload, updatedAt: new Date().toISOString() };
+            const updatedSuppliers = state.suppliers.map(s => s.id === updatedSupplier.id ? updatedSupplier : s);
             db.saveCollection('suppliers', updatedSuppliers);
             return { ...state, suppliers: updatedSuppliers, ...touch };
 
@@ -454,7 +456,7 @@ const appReducer = (state: AppState, action: Action): AppState => {
         }
 
         case 'ADD_PURCHASE':
-            const newPurchase = action.payload;
+            const newPurchase = { ...action.payload, updatedAt: new Date().toISOString() };
             const prodsAfterPurchase = state.products.map(p => {
                 const item = newPurchase.items.find(i => i.productId === p.id);
                 if (item) {
@@ -462,7 +464,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
                         ...p,
                         quantity: p.quantity + item.quantity,
                         purchasePrice: item.price,
-                        salePrice: item.saleValue
+                        salePrice: item.saleValue,
+                        updatedAt: new Date().toISOString()
                     };
                 }
                 return p;
@@ -477,18 +480,19 @@ const appReducer = (state: AppState, action: Action): AppState => {
                         purchasePrice: item.price,
                         salePrice: item.saleValue,
                         gstPercent: item.gstPercent,
+                        updatedAt: new Date().toISOString()
                     });
                 }
             });
 
-            db.saveCollection('purchases', [...state.purchases, newPurchase]);
+            db.saveCollection('purchases', [newPurchase, ...state.purchases]);
             db.saveCollection('products', prodsAfterPurchase);
             newLog = logAction(state, 'New Purchase', `ID: ${newPurchase.id}, Amt: ${newPurchase.totalAmount} `);
             db.saveCollection('audit_logs', [newLog, ...state.audit_logs]);
 
             return {
                 ...state,
-                purchases: [...state.purchases, newPurchase],
+                purchases: [newPurchase, ...state.purchases],
                 products: prodsAfterPurchase,
                 audit_logs: [newLog, ...state.audit_logs],
                 ...touch
@@ -496,7 +500,8 @@ const appReducer = (state: AppState, action: Action): AppState => {
 
         case 'UPDATE_PURCHASE':
             const { updatedPurchase } = action.payload;
-            const updatedPurchasesList = state.purchases.map(p => p.id === updatedPurchase.id ? updatedPurchase : p);
+            const updatedPurchaseWithTime = { ...updatedPurchase, updatedAt: new Date().toISOString() };
+            const updatedPurchasesList = state.purchases.map(p => p.id === updatedPurchaseWithTime.id ? updatedPurchaseWithTime : p);
             db.saveCollection('purchases', updatedPurchasesList);
             return { ...state, purchases: updatedPurchasesList, ...touch };
 
@@ -545,17 +550,17 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return { ...state, purchases: purchasesWithPayment, ...touch };
 
         case 'ADD_RETURN':
-            const newReturn = action.payload;
+            const newReturn = { ...action.payload, updatedAt: new Date().toISOString() };
             let stockAdjProducts = [...state.products];
             if (newReturn.type === 'CUSTOMER') {
                 stockAdjProducts = state.products.map(p => {
                     const item = newReturn.items.find(i => i.productId === p.id);
-                    return item ? { ...p, quantity: p.quantity + item.quantity } : p;
+                    return item ? { ...p, quantity: p.quantity + item.quantity, updatedAt: new Date().toISOString() } : p;
                 });
             } else {
                 stockAdjProducts = state.products.map(p => {
                     const item = newReturn.items.find(i => i.productId === p.id);
-                    return item ? { ...p, quantity: Math.max(0, p.quantity - item.quantity) } : p;
+                    return item ? { ...p, quantity: Math.max(0, p.quantity - item.quantity), updatedAt: new Date().toISOString() } : p;
                 });
             }
 
@@ -567,12 +572,13 @@ const appReducer = (state: AppState, action: Action): AppState => {
             return { ...state, returns: [...state.returns, newReturn], products: stockAdjProducts, audit_logs: [newLog, ...state.audit_logs], ...touch };
 
         case 'UPDATE_RETURN':
-            const updatedReturns = state.returns.map(r => r.id === action.payload.updatedReturn.id ? action.payload.updatedReturn : r);
+            const updatedReturn = { ...action.payload.updatedReturn, updatedAt: new Date().toISOString() };
+            const updatedReturns = state.returns.map(r => r.id === updatedReturn.id ? updatedReturn : r);
             db.saveCollection('returns', updatedReturns);
             return { ...state, returns: updatedReturns, ...touch };
 
         case 'ADD_EXPENSE':
-            const newExpense = action.payload;
+            const newExpense = { ...action.payload, updatedAt: new Date().toISOString() };
             db.saveCollection('expenses', [...state.expenses, newExpense]);
             return { ...state, expenses: [...state.expenses, newExpense], ...touch };
 
@@ -599,12 +605,13 @@ const appReducer = (state: AppState, action: Action): AppState => {
         }
 
         case 'ADD_QUOTE':
-            const newQuote = action.payload;
+            const newQuote = { ...action.payload, updatedAt: new Date().toISOString() };
             db.saveCollection('quotes', [...state.quotes, newQuote]);
             return { ...state, quotes: [...state.quotes, newQuote], ...touch };
 
         case 'UPDATE_QUOTE':
-            const updatedQuotes = state.quotes.map(q => q.id === action.payload.id ? action.payload : q);
+            const updatedQuote = { ...action.payload, updatedAt: new Date().toISOString() };
+            const updatedQuotes = state.quotes.map(q => q.id === updatedQuote.id ? updatedQuote : q);
             db.saveCollection('quotes', updatedQuotes);
             return { ...state, quotes: updatedQuotes, ...touch };
 
