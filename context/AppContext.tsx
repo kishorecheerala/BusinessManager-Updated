@@ -1017,11 +1017,9 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
     const hydrateState = useCallback(async () => {
         try {
             // Load all collections
-            const [
-                customers, suppliers, products, sales, purchases, returns, expenses, quotes,
-                customFonts, app_metadata, notifications, audit_logs, profile,
-                budget, scenarios, trashData, bankAccountsData
-            ] = await Promise.all([
+            // Load all collections with a TIMEOUT to prevent freeze
+            // If DB hangs for > 3 seconds, we proceed with empty data to show UI
+            const loadPromise = Promise.all([
                 db.getAll('customers'),
                 db.getAll('suppliers'),
                 db.getAll('products'),
@@ -1040,6 +1038,25 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
                 db.getAll('trash'),
                 db.getAll('bank_accounts'),
             ]);
+
+            const timeoutPromise = new Promise((resolve) => {
+                setTimeout(() => resolve('TIMEOUT'), 3000);
+            });
+
+            const results = await Promise.race([loadPromise, timeoutPromise]);
+
+            if (results === 'TIMEOUT') {
+                console.error("DB Load Timed Out - Forcing Empty State");
+                showToast("Data load timed out. Please refresh or check connection.", 'error');
+                setIsDbLoaded(true);
+                return;
+            }
+
+            const [
+                customers, suppliers, products, sales, purchases, returns, expenses, quotes,
+                customFonts, app_metadata, notifications, audit_logs, profile,
+                budget, scenarios, trashData, bankAccountsData
+            ] = results as any[];
 
             // Process Metadata
             // Parse Metadata

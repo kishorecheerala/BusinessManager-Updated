@@ -224,14 +224,39 @@ export const createFolder = async (accessToken: string) => {
 };
 
 export const findFileByName = async (accessToken: string, folderId: string, filename: string) => {
+    // Fetch ALL files with this name, sorted by newest first
     const q = `name='${filename}' and '${folderId}' in parents and trashed=false`;
-    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc&pageSize=1`, {
+    const response = await fetch(`https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&orderBy=modifiedTime desc`, {
         headers: getHeaders(accessToken),
         cache: 'no-store'
     });
+
     if (!response.ok) await handleApiError(response, "Search File Failed");
     const data = await safeJsonParse(response);
-    return data && data.files && data.files.length > 0 ? data.files[0] : null;
+
+    if (data && data.files && data.files.length > 0) {
+        // The first file is the newest one (Live Sync File)
+        const newestFile = data.files[0];
+
+        // If duplicates exist, DELETE the older ones to fix "Split Brain"
+        if (data.files.length > 1) {
+            console.warn(`[Sync Fix] Found ${data.files.length} duplicates for ${filename}. Keeping newest (${newestFile.id}), deleting others...`);
+
+            // Delete older files in background
+            const duplicates = data.files.slice(1);
+            Promise.all(duplicates.map((file: any) => {
+                console.log(`[Sync Fix] Deleting duplicate: ${file.id}`);
+                return fetch(`https://www.googleapis.com/drive/v3/files/${file.id}`, {
+                    method: 'DELETE',
+                    headers: getHeaders(accessToken)
+                }).catch(e => console.error("Failed to delete duplicate", e));
+            }));
+        }
+
+        return newestFile;
+    }
+
+    return null;
 };
 
 // Find latest file starting with a prefix
